@@ -1,0 +1,14 @@
+# The proof of concept is its own git repository (macknix/cohort-data-builder),
+# kept locally as a reference only.
+PoC/
+
+# macOS
+.DS_Store
+
+# Claude Code: per-machine settings and state; the Spec Kit skills are shared.
+.claude/settings.local.json
+.claude/.cc-writes/
+.claude/skills/speckit-taskstoissues/
+
+# R session history
+**/.Rhistory
