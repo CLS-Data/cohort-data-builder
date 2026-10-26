@@ -1,0 +1,33 @@
+# Weekly dependency updates, one grouped pull request per ecosystem.
+#
+# target-branch points at the feature's integration branch while feature 001 is in
+# progress; remove the three target-branch lines once it has merged, so updates go to main.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: 001-cohort-data-builder
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /
+    target-branch: 001-cohort-data-builder
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    target-branch: 001-cohort-data-builder
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
