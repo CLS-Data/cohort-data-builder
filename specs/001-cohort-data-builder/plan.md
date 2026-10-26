@@ -164,6 +164,9 @@ tests/
 ├── ci.yml                 # every push and pull request: all gates
 └── pages.yml              # main: run ci.yml, then deploy site/ to Pages
 .github/pull_request_template.md
+.github/workflows/pr-description.yml   # blocks PRs without a filled-in How to review
+.github/scripts/check_pr_body.py
+CLAUDE.md                  # instructions Claude Code reads every session
 .github/dependabot.yml     # github-actions, uv, npm
 ```
 
@@ -174,12 +177,15 @@ git-ignored here and never committed. Its `site/data/` provides the initial supp
 copied into `site/data/`.
 
 **Version control**: GitHub flow with an integration branch per feature, as set out in
-`CONTRIBUTING.md` (tasks T001–T006): `main` is protected (pull request, one approval,
+`CONTRIBUTING.md` (tasks T001–T007): `main` is protected (pull request, one approval,
 `ci` status check, squash merge, no force push); feature work happens on
 `001-cohort-data-builder`, with one short-lived branch and pull request per phase or story;
 Conventional Commits, with each failing test committed (`test:`) before the code that
 passes it (`feat:`/`fix:`), so reviewers can confirm test-first from history; Dependabot
 keeps pinned actions and locks current; `v0.1.0` is tagged when the P1 MVP is complete.
+Every pull request carries a filled-in *How to review* section (constitution v1.1.0): the
+template prompts for it, `CLAUDE.md` instructs Claude to write it, and the
+`pr-description` check (`.github/scripts/check_pr_body.py`) blocks merging without it.
 
 ## Complexity Tracking
 

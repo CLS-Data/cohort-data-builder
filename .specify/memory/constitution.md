@@ -1,23 +1,20 @@
 <!--
 Sync Impact Report
 ==================
-Version change: (unversioned template) → 1.0.0
-Modified principles:
-  - [PRINCIPLE_1_NAME] → I. Test-Driven Development (NON-NEGOTIABLE)
-  - [PRINCIPLE_2_NAME] → II. Documented Code
-  - [PRINCIPLE_3_NAME] → III. Static GitHub Pages Deployment
-  - [PRINCIPLE_4_NAME] → IV. Simplicity
-  - [PRINCIPLE_5_NAME] → removed (project defines four principles)
-Added sections:
-  - Deployment & Technology Constraints (was [SECTION_2_NAME])
-  - Development Workflow & Quality Gates (was [SECTION_3_NAME])
+Version change: 1.0.0 → 1.1.0 (MINOR: new workflow rule)
+Modified principles: none
+Modified sections:
+  - Development Workflow & Quality Gates: added the "How to review" requirement for every
+    pull request
+Added sections: none
 Removed sections: none
 Templates reviewed (not modified by this command; they read the constitution at runtime):
-  - .specify/templates/plan-template.md (Constitution Check gate) ✅ compatible
+  - .specify/templates/plan-template.md ✅ compatible
   - .specify/templates/spec-template.md ✅ compatible
-  - .specify/templates/tasks-template.md ⚠ states "Tests are OPTIONAL"; under Principle I
-    tests are mandatory, so generated task lists MUST always include test tasks first
-Follow-up TODOs: none
+  - .specify/templates/tasks-template.md ⚠ "Tests are OPTIONAL" still conflicts with
+    Principle I; generated task lists MUST include test tasks first
+Follow-up: .github/pull_request_template.md, CLAUDE.md and the pull-request description
+check are created by feature 001 tasks T003, T007, T016–T017
 -->
 
 # Cohort Data Builder Constitution
@@ -104,6 +101,11 @@ as a static site.
   production build.
 - Code review MUST confirm tests were written first (tests present for all new
   behaviour), doc comments are present, and README/data-format docs are current.
+- Every pull request MUST include a "How to review" section giving clear, concise,
+  numbered steps a reviewer can follow without other context: how to check out and run the
+  change, what to try and the expected result, which files need close reading, and what is
+  deliberately out of scope. A pull request whose "How to review" section is missing or
+  unfilled MUST NOT be merged.
 - Merges to the default branch trigger deployment to GitHub Pages only when every gate
   above passes.
 
@@ -120,4 +122,4 @@ as a static site.
   design; any violation MUST be recorded and justified in Complexity Tracking.
 - Compliance is reviewed on every pull request against the principles above.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-26 | **Last Amended**: 2026-10-26
+**Version**: 1.1.0 | **Ratified**: 2026-10-26 | **Last Amended**: 2026-10-26
