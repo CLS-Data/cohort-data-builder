@@ -76,7 +76,7 @@ def test_identifier_is_always_included_and_not_toggleable(mini):
     expect(btn.locator(".v-check")).to_have_text("✓")
     expect(btn).to_have_attribute("aria-disabled", "true")
     expect(btn).to_have_attribute("title", re.compile("every download"))
-    btn.click()
+    btn.click(force=True)
     expect(count(mini)).to_have_text("Nothing selected yet")
 
 
@@ -84,7 +84,7 @@ def test_file_without_identifier_cannot_be_selected(mini):
     btn = row(mini, "areacode").locator(".vrow-btn")
     expect(btn).to_have_attribute("aria-disabled", "true")
     expect(btn).to_have_attribute("title", re.compile("mini_noid has no PID column"))
-    btn.click()
+    btn.click(force=True)
     expect(count(mini)).to_have_text("Nothing selected yet")
 
 
@@ -147,6 +147,7 @@ def test_site_works_when_storage_throws(page, serve, mini_site):
 
 def test_real_large_group_shows_200_until_show_all(page, serve):
     page.goto(serve(SITE) + "#bcs70")
+    expect(page.locator("#result-count")).to_have_text("32,452 variables")
     expect(page.locator("#select-all")).to_be_hidden()  # 32,452 is over the limit
     page.get_by_label("Search variables").fill("Source by which individual was linked")
     page.get_by_role("button", name="Show details for source", exact=True).click()
