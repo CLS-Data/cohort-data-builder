@@ -1,0 +1,28 @@
+{
+ "file": "mini_grid",
+ "wave": "10y",
+ "variables": [
+  {
+   "variable": "PID",
+   "label": "Person identifier",
+   "type": "numeric",
+   "measurement": "NOMINAL"
+  },
+  {
+   "variable": "hhrel",
+   "label": "Relationship to cohort member",
+   "type": "numeric",
+   "measurement": "NOMINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Parent"
+    },
+    {
+     "value": "2.0",
+     "label": "Sibling"
+    }
+   ]
+  }
+ ]
+}
