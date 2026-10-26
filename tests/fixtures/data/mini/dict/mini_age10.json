@@ -41,6 +41,10 @@
     {
      "value": "-1.0",
      "label": "Dislike"
+    },
+    {
+     "value": "-9.0",
+     "label": "Refused"
     }
    ],
    "na": {
@@ -48,7 +52,7 @@
     "ranges": [
      [
       -9,
-      -1
+      -2
      ]
     ],
     "kept": [

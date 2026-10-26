@@ -5,6 +5,8 @@
 import { loadCatalogue, loadCohort } from "../core/data.js";
 import { read, storeKey, write } from "../core/storage.js";
 import { esc } from "../core/text.js";
+import { renderAbout } from "./overview.js";
+import { resetForCohort, runSearch, wireResults } from "./results.js";
 import { state } from "./state.js";
 import { switchView } from "./views.js";
 
@@ -56,6 +58,10 @@ async function openCohort(key) {
   $("#foot-counts").textContent =
     `${m.counts.variables.toLocaleString("en-GB")} variables · ${m.counts.files} files · ` +
     `${m.wave.list.length} ${m.wave.plural} · built ${m.built}`;
+
+  resetForCohort();
+  renderAbout();
+  runSearch();
 }
 
 /** Restore the stored theme and make the theme button switch it. */
@@ -90,6 +96,7 @@ async function boot() {
   for (const tab of document.querySelectorAll(".view-tab")) {
     tab.addEventListener("click", () => switchView(tab.dataset.view));
   }
+  wireResults();
   window.addEventListener("hashchange", () => {
     const key = decodeURIComponent(location.hash.slice(1));
     if (state.catalogue.some((d) => d.key === key)) openCohort(key);
