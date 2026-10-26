@@ -1,0 +1,130 @@
+[
+ [
+  "PID",
+  "Person identifier",
+  0,
+  0,
+  0
+ ],
+ [
+  "sex",
+  "Sex of cohort member",
+  0,
+  0,
+  0
+ ],
+ [
+  "smoke5",
+  "Does the mother smoke",
+  0,
+  0,
+  0,
+  [
+   0,
+   95
+  ]
+ ],
+ [
+  "tenure5",
+  "Housing tenure of the family home",
+  0,
+  0,
+  0,
+  [
+   2,
+   60
+  ]
+ ],
+ [
+  "quote5",
+  "Mother said \"fine\"\\not fine\nsecond line",
+  0,
+  0,
+  1
+ ],
+ [
+  "nolab5",
+  "",
+  0,
+  0,
+  0
+ ],
+ [
+  "pid",
+  "Person identifier",
+  1,
+  1,
+  0
+ ],
+ [
+  "sex",
+  "Sex of cohort member",
+  1,
+  1,
+  0
+ ],
+ [
+  "alc10",
+  "How often drinks alcohol",
+  1,
+  1,
+  1,
+  [
+   1,
+   30
+  ]
+ ],
+ [
+  "tenure10",
+  "Housing tenure of the family home",
+  1,
+  1,
+  0,
+  [
+   2,
+   95
+  ]
+ ],
+ [
+  "weight10",
+  "Weight in kilograms",
+  1,
+  1,
+  2
+ ],
+ [
+  "mood10",
+  "Mood today",
+  1,
+  1,
+  1
+ ],
+ [
+  "misc10",
+  "Interviewer notes code",
+  1,
+  1,
+  -1
+ ],
+ [
+  "PID",
+  "Person identifier",
+  2,
+  1,
+  0
+ ],
+ [
+  "hhrel",
+  "Relationship to cohort member",
+  2,
+  1,
+  0
+ ],
+ [
+  "areacode",
+  "Area code",
+  3,
+  2,
+  0
+ ]
+]
