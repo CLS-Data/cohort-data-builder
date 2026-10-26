@@ -7,14 +7,27 @@
 import { loadDict } from "../core/data.js";
 import { describeVariable } from "../core/details.js";
 import { buildLabelIndex, filterVariables, PAGE, page, sameLabel } from "../core/search.js";
+import {
+  addMany,
+  canSelect,
+  has,
+  rangeBetween,
+  removeMany,
+  rowKey,
+  selectAllState,
+  selectableItems,
+  toggle,
+  toItem,
+} from "../core/selection.js";
 import { esc, highlight, levelName } from "../core/text.js";
 import { renderSpine, wireOverview } from "./overview.js";
-import { state } from "./state.js";
+import { setSelection } from "./selected.js";
+import { DRAG_MIME, state } from "./state.js";
 import { switchView } from "./views.js";
 
 const $ = (sel) => document.querySelector(sel);
 const n = (x) => x.toLocaleString("en-GB");
-const keyOf = (row) => `${row[2]}:${row[0]}`;
+const keyOf = rowKey;
 const waveKey = (i) => state.manifest.wave.list[i].key;
 const fileOf = (row) => state.manifest.files[row[2]];
 
@@ -42,6 +55,14 @@ export function runSearch({ keepPlace = false } = {}) {
   renderSpine(r.perWave, isFiltered());
   renderLevelSelect();
   renderFilters();
+  renderSelectAll();
+}
+
+/** The selection changed but the matches did not: redraw what shows it, keeping place. */
+export function refreshSelection() {
+  if (!state.manifest) return;
+  renderResults();
+  renderSelectAll();
 }
 
 const isFiltered = () =>
@@ -106,16 +127,23 @@ function rowHtml(row, i, q) {
   const open = state.expanded.has(key);
   const wave = state.manifest.wave.list[row[3]];
   const label = row[1] || "No label";
-  return `<li class="vrow${open ? " is-open" : ""}" data-key="${esc(key)}">
+  const why = canSelect(row, file, state.manifest.identifier);
+  const isId = why && file.hasId; // the identifier: in every download already
+  const isIn = !why && has(state.bundle, file.name, row[0]);
+  const mark = isIn || isId ? "✓" : why ? "" : "＋";
+  const attrs = why
+    ? `aria-disabled="true" title="${esc(why)}"`
+    : `aria-pressed="${isIn}" title="Click to ${isIn ? "remove" : "select"} · Shift-click for a range" draggable="true"`;
+  return `<li class="vrow${open ? " is-open" : ""}${isIn ? " is-in" : ""}${why ? " is-fixed" : ""}" data-key="${esc(key)}">
     <div class="vrow-main">
-      <div class="vrow-btn" data-i="${i}">
-        <span class="v-check" aria-hidden="true"></span>
+      <button class="vrow-btn" data-i="${i}" ${attrs}>
+        <span class="v-check" aria-hidden="true">${mark}</span>
         <span class="v-name" title="${esc(row[0])}">${highlight(row[0], q)}</span>
         <span class="v-label" title="${esc(label)}">${highlight(label, q)}</span>
         <span class="v-wave" title="${esc(wave.label || "")}">${esc(wave.key)}</span>
         <span class="v-file" title="${esc(file.description || file.name)}">${esc(file.name)}</span>
         <span class="v-topics"></span>
-      </div>
+      </button>
       <button class="v-expand" data-expand="${i}" aria-expanded="${open}"
           ${open ? `aria-controls="more-${esc(key)}"` : ""}
           aria-label="${open ? "Hide" : "Show"} details for ${esc(row[0])}"
@@ -256,6 +284,102 @@ function toggleRow(row) {
   }
 }
 
+/* ── Selecting ───────────────────────────────────────────────────────── */
+
+function renderSelectAll() {
+  const btn = $("#select-all");
+  const mode = selectAllState(state.matches, state.manifest, state.bundle);
+  btn.hidden = mode === "hidden";
+  if (btn.hidden) return;
+  const count = selectableItems(state.matches, state.manifest).length;
+  btn.dataset.mode = mode;
+  btn.textContent = `${mode === "remove" ? "Remove" : "Select"} all ${n(count)}`;
+}
+
+/* Said beside the count, and to a screen reader, when one click changed several rows. */
+let sayTimer;
+function sayCount(change) {
+  const el = $("#select-status");
+  const m = Math.abs(change);
+  el.textContent = change
+    ? `${change > 0 ? "Added" : "Removed"} ${n(m)} variable${m === 1 ? "" : "s"}`
+    : "";
+  clearTimeout(sayTimer);
+  sayTimer = setTimeout(() => {
+    el.textContent = "";
+  }, 5000);
+}
+
+function selectAll() {
+  const items = selectableItems(state.matches, state.manifest);
+  if ($("#select-all").dataset.mode === "remove") {
+    const r = removeMany(state.bundle, items);
+    setSelection(r.selection);
+    sayCount(-r.changed);
+  } else {
+    const r = addMany(state.bundle, items, state.manifest);
+    setSelection(r.selection);
+    sayCount(r.changed);
+  }
+}
+
+/* A click puts a row in the selection or takes it out (Cmd- or Ctrl-click the same: a
+   click never clears the others). Shift-click carries every row between it and the last
+   row clicked the way the clicked row goes: in, or out. */
+function selectRow(btn, e) {
+  const row = state.matches[Number(btn.dataset.i)];
+  if (!row) return;
+  const key = keyOf(row);
+  const had = document.activeElement === btn;
+  const anchor = state.anchor;
+  state.anchor = key;
+  if (btn.getAttribute("aria-disabled") === "true") return;
+  const item = toItem(row, state.manifest);
+  if (e.shiftKey && anchor && anchor !== key) {
+    window.getSelection()?.removeAllRanges(); // Shift-click also extends the text selection
+    const range = rangeBetween(state.matches, anchor, key, state.manifest);
+    if (range.length) {
+      const adding = !has(state.bundle, item.file, item.name);
+      const r = adding
+        ? addMany(state.bundle, range, state.manifest)
+        : removeMany(state.bundle, range);
+      setSelection(r.selection);
+      sayCount(adding ? r.changed : -r.changed);
+    }
+  } else {
+    setSelection(toggle(state.bundle, item, state.manifest).selection);
+  }
+  if (had) {
+    document
+      .querySelector(`.vrow[data-key="${CSS.escape(key)}"] .vrow-btn`)
+      ?.focus({ preventScroll: true });
+  }
+}
+
+/* Drag a row onto the Selection tab to add it. */
+function wireDrag() {
+  $("#results").addEventListener("dragstart", (e) => {
+    const btn = e.target.closest?.(".vrow-btn");
+    const row = btn && state.matches[Number(btn.dataset.i)];
+    if (!row) return;
+    e.dataTransfer.setData(DRAG_MIME, JSON.stringify(toItem(row, state.manifest)));
+    e.dataTransfer.effectAllowed = "copy";
+  });
+  const tab = $('.view-tab[data-view="basket"]');
+  tab.addEventListener("dragover", (e) => {
+    if (e.dataTransfer.types.includes(DRAG_MIME)) e.preventDefault();
+  });
+  tab.addEventListener("drop", (e) => {
+    e.preventDefault();
+    try {
+      const item = JSON.parse(e.dataTransfer.getData(DRAG_MIME));
+      setSelection(addMany(state.bundle, [item], state.manifest).selection);
+    } catch {
+      // not one of our rows
+    }
+  });
+}
+
 /* Go to another variable: search for its label, which brings the whole same-label family
    into the list together, and open it. */
 async function jumpTo(key) {
@@ -318,8 +442,12 @@ export function wireResults() {
     if (jump) return jumpTo(jump.dataset.jump);
     const file = e.target.closest("[data-file-open]");
     if (file) return filterToFile(Number(file.dataset.fileOpen));
-    if (e.target.closest("[data-clear-all]")) clearAll();
+    if (e.target.closest("[data-clear-all]")) return clearAll();
+    const btn = e.target.closest(".vrow-btn");
+    if (btn) selectRow(btn, e);
   });
+  $("#select-all").addEventListener("click", selectAll);
+  wireDrag();
 
   $("#more").addEventListener("click", (e) => {
     if (!e.target.closest("#show-more")) return;

@@ -150,6 +150,7 @@ site/                      # published as-is to GitHub Pages
         ├── results.js
         ├── overview.js
         ├── panel.js
+        ├── selected.js    # selection and options: save, restore, notify views
         └── review.js
 
 tests/

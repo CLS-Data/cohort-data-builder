@@ -6,18 +6,13 @@ import { loadCatalogue, loadCohort } from "../core/data.js";
 import { read, storeKey, write } from "../core/storage.js";
 import { esc } from "../core/text.js";
 import { renderAbout } from "./overview.js";
-import { resetForCohort, runSearch, wireResults } from "./results.js";
+import { renderPanel, wirePanel } from "./panel.js";
+import { refreshSelection, resetForCohort, runSearch, wireResults } from "./results.js";
+import { onSelectionChange, restoreOptions, restoreSelection, storage } from "./selected.js";
 import { state } from "./state.js";
 import { switchView } from "./views.js";
 
 const $ = (sel) => document.querySelector(sel);
-const storage = (() => {
-  try {
-    return window.localStorage;
-  } catch {
-    return undefined; // blocked site data: the site forgets between visits
-  }
-})();
 
 /** Replace the page with a readable failure message. */
 function fail(message, detail) {
@@ -62,6 +57,7 @@ async function openCohort(key) {
   resetForCohort();
   renderAbout();
   runSearch();
+  restoreSelection();
 }
 
 /** Restore the stored theme and make the theme button switch it. */
@@ -96,7 +92,13 @@ async function boot() {
   for (const tab of document.querySelectorAll(".view-tab")) {
     tab.addEventListener("click", () => switchView(tab.dataset.view));
   }
+  restoreOptions();
   wireResults();
+  wirePanel();
+  onSelectionChange(() => {
+    renderPanel();
+    refreshSelection();
+  });
   window.addEventListener("hashchange", () => {
     const key = decodeURIComponent(location.hash.slice(1));
     if (state.catalogue.some((d) => d.key === key)) openCohort(key);
