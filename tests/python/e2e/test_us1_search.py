@@ -21,7 +21,7 @@ def row(page, name):
 
 
 def open_details(page, name):
-    page.get_by_role("button", name=f"Show details for {name}").first.click()
+    page.get_by_role("button", name=f"Show details for {name}", exact=True).first.click()
     return row(page, name).first.locator(".vrow-more")
 
 
