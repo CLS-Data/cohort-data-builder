@@ -129,7 +129,11 @@ test("a clashing column gets the sweep, then a number", () => {
 });
 
 test("the identifier's name counts as taken", () => {
-  const s = add([], { name: "$PID", label: "", file: "mini_grid", wave: "10y" }, manifest).selection;
+  const s = add(
+    [],
+    { name: "$PID", label: "", file: "mini_grid", wave: "10y" },
+    manifest,
+  ).selection;
   assert.equal(s[0].column, "PID_10y");
 });
 
