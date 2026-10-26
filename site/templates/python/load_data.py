@@ -26,7 +26,14 @@ DELIMITED = {"tab": "\t", "txt": "\t", "dat": "\t", "csv": ","}
 
 
 def index_data_dir(data_dir: Path) -> dict[str, list[Path]]:
-    """Every readable file under data_dir, by lower-case name without extension."""
+    """Index every readable file under a folder, subfolders included.
+
+    Args:
+        data_dir: The folder holding the data files.
+
+    Returns:
+        Paths grouped by lower-case file name without its extension.
+    """
     if not data_dir.is_dir():
         raise SystemExit(
             f"The data folder does not exist: {data_dir.resolve()}\n"
@@ -40,8 +47,18 @@ def index_data_dir(data_dir: Path) -> dict[str, list[Path]]:
 
 
 def find_data_file(index: dict[str, list[Path]], file: str) -> Path | None:
-    """The path to one file, or None. When the same file is present in several
-    formats, the first in SUPPORTED_FORMATS is used and the choice reported."""
+    """Find one data file by name, whatever its format.
+
+    When the same file is present in several formats, the first in SUPPORTED_FORMATS is
+    used and the choice is reported.
+
+    Args:
+        index: From index_data_dir.
+        file: The file name without extension.
+
+    Returns:
+        The path, or None when the file is not there.
+    """
     hits = index.get(file.lower())
     if not hits:
         return None
@@ -70,6 +87,14 @@ def _read_delimited(path: Path, sep: str, **kwargs) -> pd.DataFrame:
 
 
 def read_header(path: Path) -> list[str]:
+    """Read a data file's column names without reading its data.
+
+    Args:
+        path: The data file.
+
+    Returns:
+        The column names, as the file spells them.
+    """
     ext = path.suffix.lower().lstrip(".")
     if ext in DELIMITED:
         return list(_read_delimited(path, DELIMITED[ext], nrows=0,
@@ -87,7 +112,14 @@ def read_columns(path: Path, wanted: list[str]) -> tuple[pd.DataFrame, list[str]
     differently in different formats, and the columns come back spelt as
     `wanted` spells them. Values are the codes as deposited: value labels are
     not applied and SPSS user-missing codes are kept, so every format gives
-    the same numbers. Returns the data and the wanted names not found.
+    the same numbers.
+
+    Args:
+        path: The data file.
+        wanted: The column names to read.
+
+    Returns:
+        The data, and the wanted names the file does not have.
     """
     ext = path.suffix.lower().lstrip(".")
     header = read_header(path)
@@ -104,22 +136,36 @@ def read_columns(path: Path, wanted: list[str]) -> tuple[pd.DataFrame, list[str]
         data, _ = _pyreadstat().read_sav(str(path), usecols=columns, user_missing=True,
                                          apply_value_formats=False)
 
-    back = {c.lower(): w for c, w in zip(columns, found)}
+    back = {c.lower(): w for c, w in zip(columns, found, strict=True)}
     data = data.rename(columns=lambda c: back[c.lower()])[found]
     return data, [w for w in wanted if w not in found]
 
 
 def normalise_identifier(series: pd.Series) -> pd.Series:
-    """Trimmed and upper-cased, so the same person links across files that
-    formatted the identifier differently."""
+    """Trim and upper-case identifiers so the same person links across files.
+
+    Args:
+        series: The identifier column, as read.
+
+    Returns:
+        The identifiers as strings.
+    """
     if pd.api.types.is_float_dtype(series) and (series.dropna() % 1 == 0).all():
         series = series.astype("Int64")
     return series.astype("string").str.strip().str.upper()
 
 
 def apply_missing_codes(series: pd.Series, codes: dict | None) -> pd.Series:
-    """Replace one variable's missing-value codes with NA. `codes` is
-    {"values": [...], "ranges": [[lo, hi], ...]}; an open end is None."""
+    """Replace one variable's missing-value codes with NA.
+
+    Args:
+        series: The variable's values.
+        codes: {"values": [...], "ranges": [[lo, hi], ...]}, where None is an open end;
+            None means the variable has no codes.
+
+    Returns:
+        The values with those codes replaced by NA.
+    """
     if codes is None or not pd.api.types.is_numeric_dtype(series):
         return series
     drop = series.isin(codes["values"])
@@ -132,12 +178,22 @@ def apply_missing_codes(series: pd.Series, codes: dict | None) -> pd.Series:
 
 def write_output(data: pd.DataFrame, path: Path, fmt: str,
                  labels: dict | None = None, value_labels: dict | None = None) -> Path:
-    """Write one table as csv, dta (Stata) or sav (SPSS). `path` has no extension.
+    """Write one table as csv, dta (Stata) or sav (SPSS).
 
     Stata and SPSS files carry each column's label and its value labels, from
     the data dictionary, so they open ready to use. CSV has nowhere to put
     them; codebook.csv lists them instead. Stata keeps variable labels to 80
     characters, so longer ones are cut there.
+
+    Args:
+        data: The table.
+        path: Where to write it, without an extension.
+        fmt: "csv", "dta" or "sav".
+        labels: Variable labels by column.
+        value_labels: Value labels by column, {code: label}.
+
+    Returns:
+        The path written.
     """
     file = path.with_name(f"{path.name}.{fmt}")
     if fmt == "csv":
@@ -145,14 +201,14 @@ def write_output(data: pd.DataFrame, path: Path, fmt: str,
         return file
     if fmt not in ("dta", "sav"):
         raise SystemExit(f'OUTPUT_FORMAT must be "csv", "dta" or "sav", not "{fmt}".')
-    labels = {c: l for c, l in (labels or {}).items() if c in data.columns}
+    labels = {c: text for c, text in (labels or {}).items() if c in data.columns}
     codes = {c: v for c, v in (value_labels or {}).items()
              if c in data.columns and pd.api.types.is_numeric_dtype(data[c])}
     # Both writers want plain object strings, not pandas' string dtype.
     data = data.astype({c: object for c in data.columns if pd.api.types.is_string_dtype(data[c])})
     if fmt == "dta":
         data.to_stata(file, write_index=False, version=118,
-                      variable_labels={c: l[:80] for c, l in labels.items()},
+                      variable_labels={c: text[:80] for c, text in labels.items()},
                       value_labels={c: {int(k): v for k, v in m.items()} for c, m in codes.items()})
     else:
         _pyreadstat().write_sav(data, str(file), column_labels=labels,
