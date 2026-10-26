@@ -44,11 +44,3 @@ variable's value labels in `codebook.csv` before analysing it.
 ## What is in here
 
 {{contents}}
-    codebook.csv       what every output column is
-    data/              where the data files go
-    output/            created on the first run
-    R/load_data.R      finds and reads data files; the read call follows the extension
-    R/merge.R          your selection and the merge — run this
-    python/load_data.py
-    python/merge.py    the same in Python — run this
-    python/requirements.txt
