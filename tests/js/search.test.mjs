@@ -132,7 +132,7 @@ test("the fixture's shared labels are found across sweeps", async () => {
 test("filtering 35,000 rows takes well under the 0.5 s budget", () => {
   const big = Array.from({ length: 35000 }, (_, i) => [
     `VAR${i}`,
-    i % 50 === 0 ? `Smoking question ${i}` : `Other question number ${i}`,
+    i % 7 === 0 ? `Smoking question ${i}` : `Other question number ${i}`,
     i % 80,
     i % 12,
     i % 3,
