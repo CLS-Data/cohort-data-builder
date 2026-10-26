@@ -1,0 +1,23 @@
+# Blocks pull requests whose "How to review" section is missing or unfilled
+# (constitution, Development Workflow & Quality Gates).
+
+name: PR description
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-description:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check How to review
+        # The body goes in through env, never interpolated into the script: PR text is
+        # untrusted and must not be able to inject shell commands.
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: python3 .github/scripts/check_pr_body.py
