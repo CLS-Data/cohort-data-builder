@@ -16,11 +16,11 @@
   --paper-2:  #f5f7f3;
   --paper-3:  #dfe3dc;
   --ink:      #131a22;
-  --ink-2:    #4d5862;
-  --ink-3:    #78838c;
+  --ink-2:    #424c55;
+  --ink-3:    #56616a;
   --rule:     #c5ccc3;
   --contour:  #8e2f6b;
-  --ochre:    #9a6410;
+  --ochre:    #7a4e08;
   --moss:     #2c6b50;
   --sea:      #2a5c8a;
   /* Topic areas (see "Topic areas" below): light steps. */
@@ -44,8 +44,8 @@
     --paper-2: #192026;
     --paper-3: #232c33;
     --ink:     #e7ece7;
-    --ink-2:   #9aa6ac;
-    --ink-3:   #6d7a82;
+    --ink-2:   #b3bdc2;
+    --ink-3:   #909da5;
     --rule:    #2b353d;
     --contour: #e879b8;
     --ochre:   #d9a145;
@@ -63,7 +63,7 @@
 
 :root[data-theme="dark"] {
   --paper:   #11171b;  --paper-2: #192026;  --paper-3: #232c33;
-  --ink:     #e7ece7;  --ink-2:   #9aa6ac;  --ink-3:   #6d7a82;
+  --ink:     #e7ece7;  --ink-2:   #b3bdc2;  --ink-3:   #909da5;
   --rule:    #2b353d;  --contour: #e879b8;  --ochre:   #d9a145;
   --moss:    #6cc198;  --sea:     #82b8e8;
   --shadow:  0 1px 0 rgba(0, 0, 0, .3), 0 2px 12px -6px rgba(0, 0, 0, .7);
@@ -75,8 +75,8 @@
 }
 :root[data-theme="light"] {
   --paper:   #e9ece7;  --paper-2: #f5f7f3;  --paper-3: #dfe3dc;
-  --ink:     #131a22;  --ink-2:   #4d5862;  --ink-3:   #78838c;
-  --rule:    #c5ccc3;  --contour: #8e2f6b;  --ochre:   #9a6410;
+  --ink:     #131a22;  --ink-2:   #424c55;  --ink-3:   #56616a;
+  --rule:    #c5ccc3;  --contour: #8e2f6b;  --ochre:   #7a4e08;
   --moss:    #2c6b50;  --sea:     #2a5c8a;
   --shadow:  0 1px 0 rgba(19, 26, 34, .04), 0 2px 10px -6px rgba(19, 26, 34, .18);
   --d-demographics: #b54467;  --d-housing-environment: #06b995;  --d-physical-health: #18883a;
@@ -415,10 +415,10 @@ code, kbd { font-family: var(--mono); font-size: .92em; }
 .vrow.is-open { background: var(--paper-2); }
 /* Selected: tinted, barred and ticked, so a scan down the list finds them. */
 .vrow.is-in {
-  background: color-mix(in srgb, var(--moss) 12%, transparent);
+  background: color-mix(in srgb, var(--moss) 8%, transparent);
   box-shadow: inset 3px 0 0 var(--moss);
 }
-.vrow.is-in:hover { background: color-mix(in srgb, var(--moss) 18%, transparent); }
+.vrow.is-in:hover { background: color-mix(in srgb, var(--moss) 12%, transparent); }
 .vrow-main { display: flex; align-items: stretch; }
 .vrow-btn {
   flex: 1; min-width: 0;
@@ -568,12 +568,23 @@ main { display: block; }
 }
 
 /* ── The selection panel ──────────────────────────────────────────────
-   Always there on a wide screen; on a mid-width one, opened from the
-   "Selected (N)" button in the filter bar; on a phone, the Selection tab
-   does the job. */
+   Always there on a wide screen; on a narrower one, opened from the
+   "Selected (N)" button in the filter bar. On a phone it opens full width
+   above the list, scrolling on its own. */
 
 .spanel { display: none; }
 .sp-toggle { display: none; }
+@media (max-width: 900px) {
+  .sp-toggle { display: inline; }
+  .vwork { display: flex; flex-direction: column; }
+  .vwork.is-panel-open .sp-toggle { font-weight: 700; }
+  .vwork.is-panel-open .spanel {
+    display: flex; flex-direction: column; order: -1;
+    max-height: 60vh; border-bottom: 1px solid var(--rule);
+    background: var(--paper-2);
+  }
+  .vwork.is-panel-open .sp-list { flex: 0 1 auto; overflow-y: auto; }
+}
 @media (min-width: 901px) {
   .spanel {
     flex: 0 0 320px; min-height: 0;
@@ -919,7 +930,7 @@ pre.code {
 .linklist li { border-bottom: 1px solid var(--rule); }
 .linklist button {
   width: 100%; text-align: left; padding: 8px 0;
-  border: 0; background: none; cursor: pointer; font: inherit;
+  border: 0; background: none; cursor: pointer; font: inherit; color: var(--ink);
   display: flex; align-items: baseline; gap: 10px;
 }
 .linklist button:hover .ll-name { color: var(--contour); }
@@ -936,7 +947,7 @@ pre.code {
   text-decoration: none; cursor: pointer;
 }
 .btn:hover { border-color: var(--ink-2); }
-.btn-primary { background: var(--contour); border-color: var(--contour); color: #fff; }
+.btn-primary { background: var(--contour); border-color: var(--contour); color: var(--paper); }
 .btn-primary:hover { filter: brightness(1.1); }
 .btn-primary[aria-disabled="true"] { opacity: .45; pointer-events: none; }
 .btn-quiet { background: none; color: var(--ink-3); }
@@ -1000,7 +1011,7 @@ body.is-dragging-var .view-tab[data-view="basket"] {
 .col-kind-id { background: var(--ink-3); color: var(--paper-2); }
 
 /* The identifier's row: present, permanent, and plainly not yours to change. */
-.col-row.is-fixed { opacity: .75; }
+.col-row.is-fixed .col-name { color: var(--ink-2); }
 
 .col-name {
   font-family: var(--mono); font-size: 12.5px; font-weight: 700;
@@ -1124,7 +1135,7 @@ body.is-dragging-var .view-tab[data-view="basket"] {
   .ov-hint { display: block; margin: 2px 0 0; }
 
   .fb-search { flex-basis: 100%; max-width: none; }
-  .fb-end { margin-left: 0; }
+  .fb-end { margin-left: 0; flex-wrap: wrap; gap: 6px 12px; }
 
   /* A row becomes a card: name and sweep, then the label, then topics. */
   .vtable { padding: 0 12px 8px; }

@@ -6,7 +6,7 @@ entities in [data-model.md](data-model.md).
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/) (manages Python 3.12 and all Python test tooling)
-- Node.js 20 or later (JavaScript tests, Biome, download generation in tests)
+- Node.js 22 or later (JavaScript tests, Biome, download generation in tests; CI uses 24)
 - Optional, for the generated-R tests: R with the `haven` package
 
 ## Setup
@@ -22,13 +22,13 @@ npm ci                               # Biome only
 ```sh
 uv run pytest tests/python/data      # supplied data matches the format: all pass
 uv run ruff check . && uv run ruff format --check .
-npx biome ci site tests/js
-node --test tests/js/
+npm run lint                         # Biome: site/js and tests/js
+npm test                             # JavaScript core tests
 uv run pytest                        # everything: data, generated scripts, browser, axe
 ```
 
 Expected: every command exits 0. Without R/haven locally, generated-R tests report as
-skipped; in CI they must run.
+skipped; CI sets `CDB_REQUIRE_R=1`, which turns a missing R into a failure.
 
 ## 2. Browse (User Stories 1, 2, 4)
 
