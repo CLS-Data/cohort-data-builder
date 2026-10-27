@@ -7,6 +7,9 @@ one at a time, once each; any still failing are recorded as failed.
 
 from __future__ import annotations
 
+import os
+import signal
+import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -48,6 +51,7 @@ class RunResult:
     retries: int = 0
     singles: int = 0
     last_error: str = ""
+    stopped: bool = False
 
 
 @dataclass
@@ -89,6 +93,11 @@ class Runner:
         self.clock = clock
         self.on_event = on_event
         self._schema = reply_schema(scheme)
+        self._stop = threading.Event()
+
+    def request_stop(self) -> None:
+        """Start no more batches; the ones already sent finish and are stored."""
+        self._stop.set()
 
     def run(self, variables: list[Variable]) -> RunResult:
         """Tag the variables, storing each batch's records as it completes."""
@@ -106,6 +115,7 @@ class Runner:
             # Results are stored here, in the main thread, as each batch completes.
             for future in as_completed(futures):
                 self._store(result, future.result(), model=self.settings.model)
+        result.stopped = self._stop.is_set()
         return result
 
     def _store(self, result: RunResult, out: _Outcome, model: str) -> None:
@@ -127,6 +137,8 @@ class Runner:
 
     def _batch(self, batch: list[Variable]) -> _Outcome:
         out = _Outcome()
+        if self._stop.is_set():
+            return out  # never sent: neither tagged nor failed, so the next run does it
         got = None
         for attempt in range(self.settings.retries + 1):
             out.requests += 1
@@ -157,3 +169,31 @@ class Runner:
     def _ask(self, batch: list[Variable]) -> dict[int, Tags]:
         text = self.provider.complete(build_messages(self.scheme, batch), self._schema)
         return parse_reply(text, self.scheme, len(batch))
+
+
+def install_stop_handler(runner, exit: Callable[[int], None] = os._exit) -> Callable[[], None]:
+    """Make Ctrl-C stop the run gently, and a second Ctrl-C exit at once.
+
+    Python delivers Ctrl-C only to the main thread, never to the workers, so this handler,
+    installed by the main thread, is how a stop reaches the runner. The second Ctrl-C exits
+    without waiting; the stored tags are still valid because the store only appends.
+
+    Args:
+        runner: Anything with ``request_stop()``.
+        exit: Called with 130 on the second Ctrl-C; tests pass a recorder.
+
+    Returns:
+        A function that puts the previous handler back.
+    """
+    previous = signal.getsignal(signal.SIGINT)
+    presses = []
+
+    def handler(signum, frame):
+        presses.append(signum)
+        if len(presses) == 1:
+            runner.request_stop()
+        else:
+            exit(130)
+
+    signal.signal(signal.SIGINT, handler)
+    return lambda: signal.signal(signal.SIGINT, previous)

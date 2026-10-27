@@ -159,3 +159,47 @@ def test_never_more_requests_in_flight_than_workers(tmp_path, small_scheme, vari
         tmp_path, small_scheme, stub, read_variables(variables_path), clock, batch_size=5, workers=2
     )
     assert stub.max_in_flight == 2
+
+
+def test_request_stop_lets_running_batches_finish_and_starts_no_more(
+    tmp_path, small_scheme, variables_path, clock
+):
+    runner_box = []
+
+    def reply(messages, schema):
+        if len(stub.calls) == 2:
+            runner_box[0].request_stop()
+        return answer()(messages, schema)
+
+    stub = StubProvider(reply)
+    settings = Settings(batch_size=20, workers=1, retries=2, model="stub:test")
+    runner = Runner(small_scheme, stub, TagStore(tmp_path), settings, clock)
+    runner_box.append(runner)
+    result = runner.run(read_variables(variables_path))
+    assert len(stub.calls) == 2
+    assert result.stopped is True
+    assert result.tagged == 1 + 40  # the identifier, and the two batches that ran
+    assert result.failed == []
+
+
+def test_the_stop_handler_stops_then_exits(small_scheme):
+    import signal
+
+    from topic_tagger.runner import install_stop_handler
+
+    class FakeRunner:
+        stopped = 0
+
+        def request_stop(self):
+            self.stopped += 1
+
+    runner, exits = FakeRunner(), []
+    restore = install_stop_handler(runner, exit=exits.append)
+    try:
+        signal.raise_signal(signal.SIGINT)
+        assert runner.stopped == 1 and exits == []
+        signal.raise_signal(signal.SIGINT)
+        assert exits == [130]
+    finally:
+        restore()
+    assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
