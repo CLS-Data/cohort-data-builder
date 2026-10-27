@@ -1,0 +1,63 @@
+# A small scheme for tests: 3 domains, 8 topics.
+name = "Test topics"
+version = 1
+identifier_topic = "identifiers"
+fallback_topic = "other"
+guidance = """
+Tag each variable with the topics it measures.
+"""
+
+[[domains]]
+id = "demographics"
+label = "Demographics"
+description = "Who the person is."
+
+  [[domains.topics]]
+  id = "age"
+  label = "Age"
+  description = "Age or date of birth."
+
+  [[domains.topics]]
+  id = "gender"
+  label = "Sex and gender"
+  description = "Sex or gender."
+
+[[domains]]
+id = "health"
+label = "Health"
+description = "Health and health behaviour."
+
+  [[domains.topics]]
+  id = "smoking"
+  label = "Smoking"
+  description = "Tobacco use."
+
+  [[domains.topics]]
+  id = "alcohol"
+  label = "Alcohol"
+  description = "Drinking alcohol."
+
+  [[domains.topics]]
+  id = "physical_health"
+  label = "Physical health"
+  description = "Conditions, height, weight."
+
+[[domains]]
+id = "survey"
+label = "Survey administration"
+description = "How the data were collected."
+
+  [[domains.topics]]
+  id = "identifiers"
+  label = "Identifiers"
+  description = "Person and household identifiers."
+
+  [[domains.topics]]
+  id = "survey_weights"
+  label = "Survey weights"
+  description = "Weights and design variables."
+
+  [[domains.topics]]
+  id = "other"
+  label = "Other"
+  description = "Nothing else fits."
