@@ -24,6 +24,7 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "tests/**/test_*.py" = ["D"]
 "tests/**/conftest.py" = ["D"]
+"adhoc/tests/*.py" = ["D"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]

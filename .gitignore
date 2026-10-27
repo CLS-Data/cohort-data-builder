@@ -27,3 +27,7 @@ test-results/
 
 # Supplied metadata: never committed (no study data in the repository)
 /CLS_studies_metadata.csv
+
+# Ad hoc processing: the data folders are kept, their contents never committed
+/adhoc/data/*/*
+!/adhoc/data/*/.gitkeep
