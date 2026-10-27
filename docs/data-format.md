@@ -171,7 +171,7 @@ All problems are listed in one run. The rules:
 | D7 | Scheme ids are unique. Every topic tag names a topic in the scheme, with a confidence from 0 to 1. |
 | D8 | `hasId` is true exactly when the file's dictionary has the identifier (ignoring case). |
 
-The checks live in `tests/python/data/checks.py`. A change to this format is a change to
+The checks live in `scripts/checks.py`. A change to this format is a change to
 `specs/001-cohort-data-builder/contracts/site-data.md`, this page and the checks, together.
 
 ## Adding or updating a cohort
