@@ -6,7 +6,7 @@ name: CI
 on:
   # Pushes to short-lived branches are covered by their pull request's run.
   push:
-    branches: [main, 001-cohort-data-builder]
+    branches: [main, 002-topic-tagger]
   pull_request:
   workflow_call:
 
