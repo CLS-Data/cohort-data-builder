@@ -72,3 +72,14 @@ def test_reply_schema_limits_topics_and_confidences(small_scheme):
     assert json.dumps(small_scheme.topic_ids) in text  # the enum, in scheme order
     tag = schema["$defs"]["TopicTag"]["properties"]
     assert tag["confidence"]["minimum"] == 0 and tag["confidence"]["maximum"] == 1
+
+
+def test_the_reply_format_is_spelled_out_for_hosts_that_ignore_the_schema(small_scheme):
+    # Some hosts (e.g. Ollama cloud models) ignore the JSON schema, so the prompt says it too.
+    system, _ = build_messages(small_scheme, batch())
+    text = system["content"]
+    assert "Reply with JSON only" in text
+    example = text[text.index("{") : text.rindex("}") + 1]
+    assert json.loads(example) == {
+        "variables": [{"id": 0, "topics": [{"topic": "age", "confidence": 0.9}]}]
+    }

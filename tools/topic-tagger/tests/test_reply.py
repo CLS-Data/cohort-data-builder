@@ -61,3 +61,21 @@ def test_tags_are_strongest_first_with_ties_in_scheme_order(small_scheme):
 def test_variables_without_tags_are_left_out(small_scheme):
     text = reply((0, [("smoking", 0.9)]), (1, []))
     assert parse_reply(text, small_scheme, 2) == {0: [("smoking", 0.9)]}
+
+
+@pytest.mark.parametrize(
+    "wrap",
+    [
+        "```json\n{}\n```",
+        "```\n{}\n```",
+        "Here are the tags:\n{}\nDone.",
+    ],
+)
+def test_json_wrapped_in_fences_or_text_is_accepted(small_scheme, wrap):
+    text = wrap.replace("{}", reply((0, [("smoking", 0.9)])))
+    assert parse_reply(text, small_scheme, 1) == {0: [("smoking", 0.9)]}
+
+
+def test_plain_text_is_still_rejected(small_scheme):
+    with pytest.raises(ReplyError):
+        parse_reply("0 A01AGE age:0.9 gender:0.1", small_scheme, 1)

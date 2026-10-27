@@ -125,3 +125,12 @@ def test_help_lists_every_option(capsys):
         "--force",
     ):
         assert opt in out
+
+
+def test_failures_say_why(tmp_path, variables_path, capsys):
+    from topic_tagger.reply import ReplyError
+
+    stub = StubProvider(lambda m, s: (_ for _ in ()).throw(ReplyError("the reply is not JSON")))
+    assert tag(variables_path, tmp_path / "out", stub) == 1
+    err = capsys.readouterr().err
+    assert "Last error: the reply is not JSON" in err
