@@ -356,6 +356,10 @@ confirm the cohort appears on the site.
 - **FR-029**: The project MUST NOT include tools to prepare cohort data (dictionary
   conversion, missing-code derivation or topic tagging); cohort data is supplied ready to
   use.
+  *Superseded for topic tagging only by
+  [002 Topic Tagger](../002-topic-tagger/spec.md) (2026-10-27): data now arrives without
+  topics, and a standalone tagger in `tools/topic-tagger/` adds them. Dictionary conversion
+  and missing-code derivation remain out of scope.*
 - **FR-030**: The project MUST check all supplied cohort data against the documented format
   and refuse to publish if any problem is found, reporting each with its file and location.
 - **FR-031**: The project MUST document the supplied-data format fully enough for the data

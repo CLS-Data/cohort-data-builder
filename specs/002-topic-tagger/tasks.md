@@ -46,7 +46,7 @@ Follow `CONTRIBUTING.md`:
   `002-topic-tagger` to `main`, followed by the release `v0.2.0`.
 
 - [ ] T001 Push `002-topic-tagger` to GitHub. Ask the user to add `002-topic-tagger` to the `release-branch` ruleset, or to a new matching rule (pull request required, linear history), and to make `ci`, `pr-description` and, once T005 exists, `topic-tagger` required checks on it and on `main-protection`.
-- [ ] T002 Supersede 001 FR-029 for topic tagging only: in `specs/001-cohort-data-builder/spec.md`, add a note under FR-029 that points to `specs/002-topic-tagger/spec.md`. Update `CLAUDE.md` so it names spec 002 beside 001 and gives the tool's commands (the table above).
+- [x] T002 Supersede 001 FR-029 for topic tagging only: in `specs/001-cohort-data-builder/spec.md`, add a note under FR-029 that points to `specs/002-topic-tagger/spec.md`. Update `CLAUDE.md` so it names spec 002 beside 001 and gives the tool's commands (the table above).
 
 **Checkpoint**: the integration branch is protected, and the docs say which spec governs
 which area.

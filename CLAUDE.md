@@ -7,9 +7,12 @@ in `.specify/memory/constitution.md`. What to build is in
 `specs/001-cohort-data-builder/spec.md`, how in `plan.md`, and the work in `tasks.md`.
 `PoC/` is a git-ignored local reference: never import from it or commit it.
 
-## Commands
+Feature 002 (`specs/002-topic-tagger/`) adds the topic tagger: a standalone Python tool in
+`tools/topic-tagger/`, its own project that imports nothing outside its folder and is imported
+by nothing outside it, and `scripts/topics.py`, which exports cohorts for it and merges the
+tags back into `site/data`.
 
-Available once Phase 1 (Setup) is merged:
+## Commands
 
 ```sh
 uv sync && uv run playwright install chromium && npm ci   # setup
@@ -19,6 +22,14 @@ uv run pytest                                             # Python, generated-sc
 uv run ruff check . && uv run ruff format --check .       # Python lint/format
 npm run lint                                              # JavaScript lint/format (Biome)
 uv run python -m http.server -d site 8000                 # run the site locally
+```
+
+Topic tagger, from `tools/topic-tagger/`:
+
+```sh
+uv sync                                                   # setup
+uv run pytest                                             # tests (no Ollama needed)
+uv run ruff check . && uv run ruff format --check .       # lint/format
 ```
 
 ## How work is done
