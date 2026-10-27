@@ -65,7 +65,9 @@ def read_variables(path: Path) -> list[Variable]:
     rows: list[Variable] = []
     problems: list[str] = []
     seen: dict[str, list[int]] = {}
-    for n, line in enumerate(text.splitlines(), 1):
+    # Only "\n" ends a line: splitlines() would also split inside a JSON string at
+    # characters such as U+0085 or U+2028, which JSON leaves unescaped.
+    for n, line in enumerate(text.split("\n"), 1):
         if not line.strip():
             continue
         try:

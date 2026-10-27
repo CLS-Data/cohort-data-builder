@@ -9,14 +9,14 @@ from topic_tagger.variables import read_variables
 
 
 def ids_in(messages):
-    return [json.loads(x)["id"] for x in messages[1]["content"].splitlines() if x.startswith("{")]
+    return [json.loads(x)["id"] for x in messages[1]["content"].split("\n") if x.startswith("{")]
 
 
 def answer(topic="other", conf=0.4, skip=()):
     """A stand-in model that tags every variable it is sent, except names in ``skip``."""
 
     def reply(messages, schema):
-        rows = [json.loads(x) for x in messages[1]["content"].splitlines() if x.startswith("{")]
+        rows = [json.loads(x) for x in messages[1]["content"].split("\n") if x.startswith("{")]
         return json.dumps(
             {
                 "variables": [
@@ -100,7 +100,7 @@ def test_after_the_retries_variables_go_one_at_a_time(
     def reply(messages, schema):
         if len(ids_in(messages)) > 1:
             raise ReplyError("the whole batch fails")
-        if json.loads(messages[1]["content"].splitlines()[-1])["name"] == variables[2].variable:
+        if json.loads(messages[1]["content"].split("\n")[-1])["name"] == variables[2].variable:
             raise ReplyError("this one fails on its own too")
         return answer()(messages, schema)
 

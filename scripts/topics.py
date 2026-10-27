@@ -132,7 +132,9 @@ def _records(path: Path) -> dict[tuple[str, str], dict]:
     except OSError as e:
         raise TopicsError(f"cannot read {path}: {e.strerror}") from e
     out = {}
-    for line in text.splitlines():
+    for line in text.split("\n"):  # not splitlines(): see read_variables in the tagger
+        if not line.strip():
+            continue
         try:
             r = json.loads(line)
         except json.JSONDecodeError:

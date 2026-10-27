@@ -25,6 +25,7 @@ from topic_tagger.variables import InputError, read_variables
 
 OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED, STOPPED = 0, 1, 2, 3, 4, 130
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
+SUMMARY_TOP = 10  # files or groups listed in the end-of-run summary
 
 
 def main(
@@ -284,6 +285,12 @@ def _summary(run: dict, stats: dict, scheme, folder: Path) -> str:
     def counts(pairs, label=str) -> str:
         return ", ".join(f"{label(k)} {n}" for k, n in pairs) or "none"
 
+    def largest(pairs) -> str:
+        # Largest first (ties in their given order), at most SUMMARY_TOP, then the rest counted.
+        pairs = sorted(pairs, key=lambda x: -x[1])
+        rest = len(pairs) - SUMMARY_TOP
+        return counts(pairs[:SUMMARY_TOP]) + (f", and {rest} more" if rest > 0 else "")
+
     areas = sorted(stats["per_domain"].items(), key=lambda x: -x[1])
     leading = sorted(stats["per_topic"].items(), key=lambda x: -x[1])[:10]
     bins = stats["confidence_histogram"]
@@ -299,10 +306,10 @@ def _summary(run: dict, stats: dict, scheme, folder: Path) -> str:
         f"Topic areas: {counts([a for a in areas if a[1]], domain.get)}",
         f"Leading topics: {counts([t for t in leading if t[1]], topic.get)}",
         f"Unused topics: {len(stats['unused'])} of {len(topic)}",
-        "By file: " + counts((f, c["tagged"]) for f, c in stats["per_file"].items()),
+        "By file: " + largest((f, c["tagged"]) for f, c in stats["per_file"].items()),
     ]
     if stats["per_group"]:
-        lines.append(f"By {stats['group_by']}: {counts(stats['per_group'].items())}")
+        lines.append(f"By {stats['group_by']}: {largest(stats['per_group'].items())}")
     lines.append(f"Report: {folder / 'report.html'}")
     return "\n".join(lines)
 

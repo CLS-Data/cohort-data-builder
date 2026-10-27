@@ -195,3 +195,19 @@ def test_exit_2_on_bad_input(cohort, tmp_path, missing, capsys):
     (tags / missing).unlink()
     assert main(["merge", str(cohort), "--tags", str(tags)]) == 2
     assert missing in capsys.readouterr().err
+
+
+def test_only_newline_ends_a_tags_line(cohort, tmp_path, capsys):
+    # A name with U+2028 is valid JSON unescaped; str.splitlines() would split the record.
+    odd = {
+        "file": "mini_age5",
+        "variable": "odd\u2028name",
+        "topics": [["other", 0.5]],
+        "scheme": SCHEME["hash"],
+        "model": "stub:test",
+        "tagged": "2027-01-15T08:00:00Z",
+    }
+    tags = tag_folder(cohort, tmp_path)
+    with (tags / "tags.jsonl").open("a", encoding="utf-8") as f:
+        f.write(json.dumps(odd, ensure_ascii=False) + "\n")
+    assert merge(cohort, tags).unknown == ["mini_age5/odd\u2028name"]

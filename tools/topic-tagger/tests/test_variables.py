@@ -42,6 +42,14 @@ def test_blank_lines_are_ignored(tmp_path):
     assert [r.variable for r in read_variables(write(tmp_path, lines))] == ["a", "b"]
 
 
+@pytest.mark.parametrize("char", ["\x85", "\u2028", "\u2029"])
+def test_only_newline_ends_a_line(tmp_path, char):
+    # JSON allows these inside a string unescaped; str.splitlines() would break on them.
+    line = json.dumps({"file": "f", "variable": "v", "label": f"a{char}b"}, ensure_ascii=False)
+    (row,) = read_variables(write(tmp_path, [line]))
+    assert row.label == f"a{char}b"
+
+
 def test_duplicates_are_listed_with_line_numbers_ignoring_case(tmp_path):
     lines = [json.dumps({"file": "f", "variable": v}) for v in ("A", "b", "a", "B", "c")]
     with pytest.raises(InputError) as err:
