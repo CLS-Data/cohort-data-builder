@@ -1,0 +1,61 @@
+# Topic Tagger: tags variable metadata by topic with a language model (Ollama for now).
+# A self-contained project: it imports nothing from the rest of the repository.
+
+[project]
+name = "topic-tagger"
+version = "0.1.0"
+description = "Tag survey variables by topic with a local language model."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain-core>=1.6.10",
+    "openai>=3.29.0",
+    "pydantic>=2.14.1",
+    "rich>=15.0.0",
+]
+
+[project.scripts]
+topic-tagger = "topic_tagger.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Resolve only releases at least two weeks older than the lock, so a freshly published
+# (and possibly compromised) release is never picked up by accident.
+[tool.uv]
+exclude-newer = "2026-10-13T00:00:00Z"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/topic_tagger"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "D"]
+# Constructor arguments are documented on the class, Google style.
+ignore = ["D107"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["topic_tagger"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/test_*.py" = ["D"]
+"tests/**/conftest.py" = ["D"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not slow'"
+markers = ["slow: timing checks that depend on the machine; run with -m slow"]

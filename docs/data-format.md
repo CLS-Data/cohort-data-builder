@@ -171,7 +171,7 @@ All problems are listed in one run. The rules:
 | D7 | Scheme ids are unique. Every topic tag names a topic in the scheme, with a confidence from 0 to 1. |
 | D8 | `hasId` is true exactly when the file's dictionary has the identifier (ignoring case). |
 
-The checks live in `tests/python/data/checks.py`. A change to this format is a change to
+The checks live in `scripts/checks.py`. A change to this format is a change to
 `specs/001-cohort-data-builder/contracts/site-data.md`, this page and the checks, together.
 
 ## Adding or updating a cohort
@@ -187,3 +187,34 @@ The checks live in `tests/python/data/checks.py`. A change to this format is a c
    automatically.
 
 No code changes are needed. The site lists whatever `datasets.json` lists.
+
+## Adding topics
+
+Cohorts often arrive without topics. The [Topic Tagger](../tools/topic-tagger/README.md)
+assigns them with a language model on the maintainer's machine. `scripts/topics.py`
+connects it to this folder, so a cohort without topics is published with them in three
+commands, run from the repository root:
+
+```sh
+uv run python scripts/topics.py export site/data/<key> --out variables.jsonl
+(cd tools/topic-tagger && uv run topic-tagger tag ../../variables.jsonl --out ../../tags \
+  --scheme my-scheme.toml)
+uv run python scripts/topics.py merge site/data/<key> --tags tags
+```
+
+- **`export`** writes every variable of the cohort except its identifier, with its label,
+  value labels and sweep. Existing topics are not read.
+- **The tagger** tags them using the topics and instructions in the scheme file. Make one
+  with `topic-tagger init-scheme`, from its bundled example. Check its `report.html`
+  before publishing. Stop it at any time; running the same command again carries on.
+- **`merge`** writes the scheme into the manifest's `topics` and every variable's tags into
+  its dictionary and index row, strongest first. The identifier gets the topic
+  `identifiers` at 100% in every file that has it; choose another with
+  `--identifier-topic`. Variables the tagger could not tag are left without topics.
+  Nothing else in the cohort changes.
+- `merge` lists, without stopping, tags for variables not in the cohort, variables with no
+  tags, and tags made with an earlier scheme (skipped). It then runs the checks above and
+  exits 1 if they find problems, 2 on bad input.
+
+Then continue from step 4 of *Adding or updating a cohort*. Keep `variables.jsonl` and the
+tags folder out of the repository: they are working files.

@@ -20,3 +20,10 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 test-results/
+
+# Topic tagging working files (docs/data-format.md, "Adding topics")
+/variables.jsonl
+/tags/
+
+# Supplied metadata: never committed (no study data in the repository)
+/CLS_studies_metadata.csv
