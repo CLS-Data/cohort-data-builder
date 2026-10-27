@@ -6,7 +6,8 @@ constitution wins.
 
 ## Branches
 
-- `main` is what GitHub Pages publishes. It only changes through a reviewed pull request.
+- `main` is what GitHub Pages publishes. It only changes through a pull request whose
+  required checks pass.
 - Each feature has an integration branch named after its spec folder, e.g.
   `001-cohort-data-builder`.
 - Each phase or user story is a short-lived branch off the integration branch, e.g.
@@ -46,7 +47,10 @@ test-driven.
    - what is deliberately out of scope.
 
    Placeholder text (`~N min`, `<branch>`, …) fails the `pr-description` check.
-3. Wait for the required checks, then ask for review.
+3. Wait for the required checks, then review: a second person if there is one, otherwise the
+   author, working through the How to review steps before merging. GitHub does not let
+   anyone approve their own pull request, so no approval is required while the project has a
+   single maintainer.
 4. Merge with **squash merge** only.
 
 ## Required checks
@@ -58,12 +62,13 @@ test-driven.
 
 ## Branch protection
 
-Set by an organisation admin. Until these are on, follow them by hand.
+Repository rulesets `main-protection` (on `main`) and `release-branch` (on
+`001-cohort-data-builder`):
 
 | Setting | `main` | `001-cohort-data-builder` |
 |---|---|---|
 | Require a pull request before merging | Yes | Yes |
-| Required approvals | 1 (dismiss stale approvals) | 0 |
+| Required approvals | 0 while there is one maintainer; raise to 1 when a second joins | 0 |
 | Required status checks | `ci`, `pr-description` (branch up to date) | `ci`, `pr-description` (branch up to date) |
 | Require linear history (squash only) | Yes | Yes |
 | Allow force pushes / deletion | No | No |
@@ -71,7 +76,7 @@ Set by an organisation admin. Until these are on, follow them by hand.
 ## Releases
 
 Releases are tagged `vX.Y.Z` on `main` and published as GitHub Releases. `v0.1.0` is the
-MVP: search, select and download.
+first release: search, select, download, topics and the supplied-data checks.
 
 ## Dependencies
 
