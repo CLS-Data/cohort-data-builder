@@ -15,6 +15,14 @@
 - Q: How are the final statistics kept? → A: A terminal summary plus a saved report with charts
   that opens in a browser.
 - Q: Is agreement with a hand-tagged sample in scope? → A: No, left for later.
+- Q: Should the tool know about sweeps? → A: No. An input record may carry any extra fields,
+  and the report groups by the one named with an option (default `sweep`).
+- Q: Should the tool tag the participant identifier by rule? → A: No. That is study-specific;
+  the processing script leaves the identifier out of the export and tags it on merge.
+- Q: Should error messages name Ollama? → A: Only when the Ollama provider is chosen; other
+  hosts get neutral messages.
+- Q: Should the tool fall back to the bundled scheme? → A: No. A scheme file must always be
+  chosen; the bundled one is an example to copy.
 
 **Input**: User description: "Data providers will provide the metadata without assigned topics. We need a simple client tool, with simple controls of prompts/topics that can be run locally by a maintainer on their machine with ollama. This tool lives in this repository and must not be entangled into the rest of the repo as ideally it will be usable by other people. I want the client tool to produce some nice visuals and runtime stats plus some final stats on the produced topics."
 
@@ -65,12 +73,10 @@ scheme, and every confidence is between 0 and 1.
    in it are retried, never stored as given.
 3. **Given** a model reply that leaves some variables out, **When** it is received, **Then**
    only the missing variables are retried.
-4. **Given** the cohort's participant identifier, **When** it is tagged, **Then** it gets a
-   fixed "identifiers" tag by rule, without asking the model.
-5. **Given** Ollama is not running or the model is not installed, **When** the tool starts,
+4. **Given** Ollama is not running or the model is not installed, **When** the tool starts,
    **Then** it stops before any tagging with a message saying which is the problem and how
    to fix it.
-6. **Given** the maintainer wants to check the setup first, **When** they ask for a dry run,
+5. **Given** the maintainer wants to check the setup first, **When** they ask for a dry run,
    **Then** the tool shows the exact instructions and first batch it would send, and sends
    nothing.
 
@@ -178,13 +184,13 @@ and confirm each statistic in the summary matches what is expected from those an
    - the spread of confidences;
    - the share of variables tagged only below the site's default threshold (50%);
    - the average number of topics per variable;
-   - counts per data file and per sweep.
+   - counts per data file, and per value of the grouping field (default `sweep`).
 2. **Given** a finished run, **When** the maintainer wants to keep or share the statistics,
    **Then** a self-contained report file is saved beside the output, which opens in a
    browser without a network connection and shows the same statistics with charts:
    - variables per topic area, and per topic within each area;
    - the spread of confidences;
-   - topic areas by sweep;
+   - topic areas by the grouping field, when the variables have it;
    - speed over the run.
 3. **Given** several runs, **When** the maintainer opens their reports, **Then** each names
    its run (date, model, scheme version, settings), so they can be compared side by side.
@@ -208,10 +214,12 @@ features appear on the site for that cohort.
 **Acceptance Scenarios**:
 
 1. **Given** a cohort folder in the site data format without topics, **When** the maintainer
-   exports it, **Then** they get the tool's input file with every variable: file, name,
-   label, value labels and sweep.
+   exports it, **Then** they get the tool's input file with every variable except the
+   participant identifier: file, name, label, value labels and sweep.
 2. **Given** the tool's output for that cohort, **When** the maintainer merges it, **Then**:
    - the scheme is written into the cohort's manifest;
+   - the participant identifier gets the scheme's identifier topic (default `identifiers`)
+     at 100%, without the model;
    - each variable's tags go into its dictionary entry, as `[topic id, confidence]`;
    - the index rows get the same tags as `[topic number, percent]`, strongest first;
    - nothing else in the cohort's data changes.
@@ -250,8 +258,9 @@ features appear on the site for that cohort.
 **Input and output**
 
 - **FR-001**: The tool MUST read variable metadata in its own simple, documented format: one
-  record per variable, with data file, name, label, value labels and, optionally, sweep. It
-  MUST NOT read the site's data folder.
+  record per variable, with data file, name, label and value labels, plus any other fields,
+  which it keeps for grouping in the statistics and never sends to the model. It MUST NOT
+  read the site's data folder.
 - **FR-002**: The tool MUST write, in its own documented format, every variable's topics with
   a confidence (0–1) for each, together with the model and the scheme version that produced
   them and when. It MUST also write the scheme used.
@@ -266,14 +275,18 @@ features appear on the site for that cohort.
   can set (by default the local machine), with the model chosen by the maintainer.
 - **FR-006**: The tool MUST accept only topics from the scheme and confidences from 0 to 1,
   rejecting and retrying anything else.
-- **FR-007**: The tool MUST tag the participant identifier by rule, without the model.
+- **FR-007**: The tool MUST send every input variable to the model; it MUST NOT contain
+  study-specific rules. (Tagging a study's identifier by rule is the processing script's
+  job, FR-026.)
 - **FR-008**: The tool MUST send variables in batches, with the batch size and the number of
   requests in flight set by the maintainer, and MUST retry failed requests a set number of
   times before trying variables one at a time.
 - **FR-009**: The tool MUST provide a dry run that shows what would be sent and sends
   nothing.
-- **FR-010**: The tool MUST check before starting that Ollama is reachable and the model
-  exists, stopping with a clear message otherwise.
+- **FR-010**: The tool MUST check before starting that the host is reachable and the model
+  exists, stopping with a clear message otherwise. Messages name the host and how to fix
+  the problem only for the provider chosen (e.g. `ollama pull` for Ollama), and are neutral
+  for any other host.
 - **FR-011**: The tool MUST warn and ask for confirmation before sending metadata to a model
   that does not run on the maintainer's machine, unless told explicitly to proceed.
 
@@ -296,9 +309,12 @@ features appear on the site for that cohort.
 - **FR-017**: The tool MUST check the scheme file before tagging and list every mistake
   (duplicate or malformed ids, empty topic areas, missing labels or descriptions) with its
   location.
-- **FR-018**: The tool MUST ship with the scheme the site uses today as its starting point.
-- **FR-019**: All run settings (model, address, batch size, requests in flight, retries,
-  limits, scheme file) MUST have sensible defaults and be shown by the tool's help.
+- **FR-018**: The tool MUST ship with the scheme the site uses today as an example, which the
+  maintainer copies to start their own. It MUST NOT use any scheme the maintainer has not
+  chosen: the scheme file is a required argument.
+- **FR-019**: All other run settings (model, address, batch size, requests in flight,
+  retries, limits, grouping field) MUST have sensible defaults and be shown by the tool's
+  help.
 
 **Visuals and statistics**
 
@@ -325,7 +341,9 @@ features appear on the site for that cohort.
 
 - **FR-026**: A processing script MUST export a cohort from the site data format (without
   topics) into the tool's input format, and merge the tool's output and scheme back into the
-  cohort's site data, as described in User Story 6.
+  cohort's site data, as described in User Story 6. The export leaves out the cohort's
+  participant identifier; the merge tags it with the scheme's identifier topic (an option,
+  default `identifiers`, which must exist in the scheme) at 100%.
 - **FR-027**: The merge MUST change only the topic fields: the manifest's `topics`, each
   dictionary entry's `topics`, and element 5 of each index row. It MUST report tags for
   unknown variables and variables left untagged, without stopping.
@@ -334,8 +352,8 @@ features appear on the site for that cohort.
 
 ### Key Entities
 
-- **Variable metadata**: One variable to tag: data file, name, label, value labels, and
-  optionally sweep.
+- **Variable metadata**: One variable to tag: data file, name, label, value labels, and any
+  other fields (such as sweep), kept only for grouping in the statistics.
 - **Topic scheme**: Topic areas, each with topics (id, label, description), plus the
   guidance given to the model; named and versioned. Its version changes whenever its content
   does.

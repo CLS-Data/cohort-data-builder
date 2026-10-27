@@ -397,7 +397,8 @@ contains each section and makes no external references.
   - `below_default`, the share of variables whose strongest tag is under 0.5;
   - `mean_topics`;
   - `per_file` with tagged and failed;
-  - `domain_by_sweep`, left empty when there are no sweeps;
+  - `group_by`, `per_group` and `domain_by_group` for the grouping field (default `sweep`;
+    another field when passed), left empty when no variable has it;
   - `speed`.
 - [ ] T042 [P] [US5] `TT/tests/test_svg.py`. `bars(items)`, `histogram(bins)`, `heat_grid(rows, cols, values)` and `line(points)` each return an `<svg>` string that:
   - has a `viewBox` and a `<title>`;
@@ -416,7 +417,8 @@ contains each section and makes no external references.
     and prints a summary containing tagged, failed, run time, speed, mean topics, share below
     50%, the 10 leading topics, and the unused count.
   - **After Ctrl-C:** the report is written too.
-  - **`report DIR`:** rebuilds `report.html` from an existing folder (exit 0).
+  - **`report DIR`:** rebuilds `report.html` from an existing folder (exit 0);
+    `report DIR --group-by FIELD` regroups without tagging again.
 
 ### Implementation for User Story 5
 
@@ -448,14 +450,17 @@ values.
 - [ ] T049 [US6] Move `tests/python/data/checks.py` to `scripts/checks.py` with `git mv`. Add `pythonpath = ["scripts"]` to `[tool.pytest.ini_options]` in the root `pyproject.toml`, and keep `from checks import …` working in `tests/python/data/test_checks.py` and `test_supplied_data.py`. Run `uv run pytest tests/python/data`: it is green, with no behaviour change. Commit as `refactor(data): move the data checks to scripts/`.
 - [ ] T050 [P] [US6] `tests/python/topics/test_export.py`. `export(cohort_dir, out)` on the `mini` fixture writes one line per index row, in index order, each with `file`, `variable`, `label` and `values` (`[value, label]` pairs from the dictionary). It also:
   - sets `sweep` to the file's `wave`;
-  - sets `identifier: true` only on the manifest `identifier`, matched ignoring case;
+  - leaves out the manifest `identifier` variable, matched ignoring case (the merge tags it);
   - reads no `topics` field.
 
   The CLI exits 0, and exits 2 on a folder with no manifest.
 - [ ] T051 [P] [US6] `tests/python/topics/test_merge.py`. Tests:
   - **Round trip:** `test_round_trip`, as above.
   - **Manifest:** `manifest.topics` has `name`, `version`, `hash` and `domains`, with no
-    `guidance`, `identifier_topic` or `fallback_topic`.
+    `guidance` or `fallback_topic`.
+  - **Identifier:** the manifest `identifier` gets `[["identifiers", 1.0]]` in every file
+    that has it (`--identifier-topic` changes the topic); a topic missing from the scheme
+    exits 2 before writing anything.
   - **Dictionaries:** `topics` is `[[id, conf], …]`, strongest first.
   - **Index:** element 5 is `[number, round(conf*100), …]`, strongest first. Untagged rows
     have exactly 5 elements.
@@ -477,6 +482,25 @@ values.
 (SC-008).
 
 ---
+
+## Phase 8a: Generalisation (branch `002-generalise`)
+
+Decided 2026-10-27 after US3: the tool must be general, so nothing study-specific stays in
+it (spec Clarifications).
+
+- [ ] T061 Tests first, in `TT/tests/`: `read_variables` keeps any extra fields in
+  `Variable.extra` and no longer has `sweep` or `identifier`; the runner sends every
+  variable to the model (no rule); the scheme has no `identifier_topic`; `tag` and
+  `check-scheme` exit 2 without a scheme; `--group-by` (default `sweep`) is recorded in
+  `run.json`; the Ollama provider's messages name Ollama and `ollama pull`, and the same
+  class with no host settings gives neutral ones ("The host … is not reachable", "model … is
+  not available at …"). Update the fixtures (`variables.jsonl` drops `identifier`;
+  `scheme_small.toml` drops `identifier_topic`).
+- [ ] T062 Implement T061 in `variables.py`, `scheme.py`, `runner.py`, `cli.py`,
+  `providers/__init__.py`, `providers/openai_compat.py` and the bundled `closer.toml`
+  (drop `identifier_topic`).
+- [ ] T063 Update `TT/README.md`: `--scheme` required in every example, extra fields and
+  `--group-by`, no identifier rule.
 
 ## Phase 9: Polish (branch `002-polish`)
 
