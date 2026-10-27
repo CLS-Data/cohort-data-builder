@@ -44,8 +44,10 @@ def test_selection_panel_opens_from_its_toggle(phone):
     inside_screen(toggle)
     toggle.click()
     expect(toggle).to_have_attribute("aria-expanded", "true")
-    expect(phone.locator("#sp-list")).to_contain_text("smoke5")
-    inside_screen(phone.locator("#sp-list"))
+    listed = phone.locator("#sp-list").get_by_text("smoke5")
+    expect(listed).to_be_visible()
+    inside_screen(listed)
+    assert phone.locator("#sp-list").bounding_box()["height"] > 20, "the list is collapsed"
     no_sideways_scroll(phone)
 
 
