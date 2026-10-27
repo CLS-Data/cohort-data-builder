@@ -20,10 +20,10 @@ def test_the_code_mentions_no_particular_scheme():
     assert found == []
 
 
-def test_the_code_names_no_topic_from_the_bundled_scheme():
+def test_the_code_names_no_topic_from_the_bundled_scheme(bundled_scheme_path):
     from topic_tagger.scheme import load_scheme
 
-    bundled = load_scheme(None)
+    bundled = load_scheme(bundled_scheme_path)
     ids = {t.id for t in bundled.topics} | {d.id for d in bundled.domains}
     code = "\n".join(p.read_text(encoding="utf-8") for p in SRC.rglob("*.py"))
     assert [i for i in sorted(ids) if re.search(rf"['\"]{i}['\"]", code)] == []

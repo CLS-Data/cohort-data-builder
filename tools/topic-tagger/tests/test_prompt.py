@@ -60,7 +60,10 @@ def test_long_value_lists_are_cut(small_scheme):
 
 
 def test_only_metadata_is_sent(small_scheme):
-    _, user = build_messages(small_scheme, batch())
+    extra = {"sweep": "5y", "site": "secret-site"}
+    vs = [Variable(v.file, v.variable, v.label, v.values, extra) for v in batch()]
+    system, user = build_messages(small_scheme, vs)
+    assert "secret-site" not in system["content"] + user["content"]
     for x in user["content"].splitlines():
         if x.startswith("{"):
             assert set(json.loads(x)) == {"id", "name", "label", "values"}

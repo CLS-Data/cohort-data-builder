@@ -63,18 +63,17 @@ def test_batches_and_tags_every_variable(tmp_path, small_scheme, variables_path,
     assert result.tagged == 60 and result.failed == []
 
 
-def test_the_identifier_is_tagged_by_rule(tmp_path, small_scheme, variables_path, clock):
+def test_every_variable_goes_to_the_model(tmp_path, small_scheme, variables_path, clock):
     stub = StubProvider(answer())
     _, records, _ = run(tmp_path, small_scheme, stub, read_variables(variables_path), clock)
-    (pid,) = [r for r in records if r["variable"] == "PID"]
-    assert pid["topics"] == [["identifiers", 1.0]] and pid["model"] == "rule"
+    assert {r["model"] for r in records} == {"stub:test"}
     sent = [
         json.loads(x)["name"]
         for m, _ in stub.calls
         for x in m[1]["content"].splitlines()
         if x.startswith("{")
     ]
-    assert "PID" not in sent
+    assert len(sent) == 60 and "PID" in sent
 
 
 def test_a_failing_batch_is_retried(tmp_path, small_scheme, variables_path, clock):
@@ -178,7 +177,7 @@ def test_request_stop_lets_running_batches_finish_and_starts_no_more(
     result = runner.run(read_variables(variables_path))
     assert len(stub.calls) == 2
     assert result.stopped is True
-    assert result.tagged == 1 + 40  # the identifier, and the two batches that ran
+    assert result.tagged == 40  # the two batches that ran
     assert result.failed == []
 
 

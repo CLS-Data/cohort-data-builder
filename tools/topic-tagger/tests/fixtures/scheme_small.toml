@@ -1,7 +1,6 @@
 # A small scheme for tests: 3 domains, 8 topics.
 name = "Test topics"
 version = 1
-identifier_topic = "identifiers"
 fallback_topic = "other"
 guidance = """
 Tag each variable with the topics it measures.

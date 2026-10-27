@@ -2,14 +2,17 @@ import json
 
 import pytest
 
-from conftest import StubProvider
+from conftest import FIXTURES, StubProvider
 from test_runner import answer
 from topic_tagger.cli import main
 from topic_tagger.providers import ProviderError
 
+SMALL = str(FIXTURES / "scheme_small.toml")
+
 
 def tag(variables_path, out, stub, *extra, clock=None):
-    argv = ["tag", str(variables_path), "--out", str(out), *extra]
+    scheme = [] if "--scheme" in extra else ["--scheme", SMALL]
+    argv = ["tag", str(variables_path), "--out", str(out), *scheme, *extra]
     return main(argv, provider_factory=lambda args: stub, clock=clock)
 
 
@@ -32,10 +35,13 @@ def test_tags_every_variable(tmp_path, variables_path, small_scheme_path, small_
     assert "60" in capsys.readouterr().out
 
 
-def test_uses_the_bundled_scheme_by_default(tmp_path, variables_path):
-    stub = StubProvider(answer("smoking", 0.7))
-    assert tag(variables_path, tmp_path / "out", stub) == 0
-    assert json.loads((tmp_path / "out" / "scheme.json").read_text())["name"] == "CLOSER topics"
+def test_a_scheme_must_be_chosen(tmp_path, variables_path, capsys):
+    stub = StubProvider(answer())
+    argv = ["tag", str(variables_path), "--out", str(tmp_path / "out")]
+    with pytest.raises(SystemExit) as e:
+        main(argv, provider_factory=lambda args: stub)
+    assert e.value.code == 2 and "--scheme" in capsys.readouterr().err
+    assert stub.calls == [] and not (tmp_path / "out").exists()
 
 
 def test_a_missing_input_file_exits_2(tmp_path, capsys):
@@ -94,7 +100,8 @@ def test_settings_reach_the_provider_factory(tmp_path, variables_path, monkeypat
         return StubProvider(answer())
 
     monkeypatch.setenv("TOPIC_TAGGER_BASE_URL", "http://box:1/v1")
-    argv = ["tag", str(variables_path), "--out", str(tmp_path), "--model", "m1", "--timeout", "7"]
+    argv = ["tag", str(variables_path), "--out", str(tmp_path), "--scheme", SMALL]
+    argv += ["--model", "m1", "--timeout", "7"]
     assert main(argv, provider_factory=factory) == 0
     assert seen["base_url"] == "http://box:1/v1"
     assert seen["model"] == "m1" and seen["timeout"] == 7.0
@@ -109,6 +116,7 @@ def test_help_lists_every_option(capsys):
     out = capsys.readouterr().out
     for opt in (
         "--scheme",
+        "--group-by",
         "--provider",
         "--base-url",
         "--model",
@@ -231,6 +239,7 @@ def test_a_finished_run_writes_run_json(tmp_path, variables_path):
     assert run["counts"]["total"] == 60 and run["counts"]["tagged"] == 60
     assert run["counts"]["requests"] == 6
     assert run["settings"]["batch_size"] == 10 and run["settings"]["model"] == "gpt-oss:20b"
+    assert run["settings"]["group_by"] == "sweep" and run["settings"]["scheme"] == SMALL
     assert run["failed"] == []
     assert "api_key" not in json.dumps(run).lower()
 
@@ -238,8 +247,21 @@ def test_a_finished_run_writes_run_json(tmp_path, variables_path):
 # --- The scheme commands (US3) -----------------------------------------------------------
 
 
-def test_check_scheme_summarises_the_bundled_scheme(capsys):
-    assert main(["check-scheme"]) == 0
+def test_group_by_is_recorded(tmp_path, variables_path):
+    tag(variables_path, tmp_path, StubProvider(answer()), "--group-by", "questionnaire")
+    assert (
+        json.loads((tmp_path / "run.json").read_text())["settings"]["group_by"] == "questionnaire"
+    )
+
+
+def test_check_scheme_needs_a_file(capsys):
+    with pytest.raises(SystemExit) as e:
+        main(["check-scheme"])
+    assert e.value.code == 2
+
+
+def test_check_scheme_summarises_a_scheme(bundled_scheme_path, capsys):
+    assert main(["check-scheme", str(bundled_scheme_path)]) == 0
     out = capsys.readouterr().out
     assert "15 domains, 107 topics" in out and "hash" in out
 

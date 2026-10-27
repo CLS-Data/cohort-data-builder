@@ -12,7 +12,6 @@ def test_loads_the_small_scheme(small_scheme):
     assert s.name == "Test topics"
     assert s.version == 1
     assert "Tag each variable" in s.guidance
-    assert s.identifier_topic == "identifiers"
     assert s.fallback_topic == "other"
     assert [d.id for d in s.domains] == ["demographics", "health", "survey"]
     assert s.topic_ids == [
@@ -67,7 +66,6 @@ def test_to_json_has_the_documented_shape(small_scheme):
         "version",
         "hash",
         "guidance",
-        "identifier_topic",
         "fallback_topic",
         "domains",
     }
@@ -82,11 +80,12 @@ def test_to_json_has_the_documented_shape(small_scheme):
     json.dumps(data)  # serialisable
 
 
-def test_the_bundled_scheme_loads():
-    s = load_scheme(None)
+def test_the_bundled_scheme_loads(bundled_scheme_path):
+    s = load_scheme(bundled_scheme_path)
     assert len(s.domains) == 15
     assert len(s.topic_ids) > 90
-    assert s.identifier_topic == "identifiers" and s.fallback_topic == "other"
+    assert s.fallback_topic == "other"
+    assert not hasattr(s, "identifier_topic")
     assert s.topic_number(s.fallback_topic) == len(s.topic_ids) - 1
 
 
@@ -96,7 +95,6 @@ GOOD = {
     "name": "S",
     "version": 1,
     "guidance": "g",
-    "identifier_topic": "ids",
     "fallback_topic": "other",
     "domains": [
         {
@@ -161,7 +159,6 @@ def test_a_good_scheme_has_no_problems():
         (lambda r: r.pop("guidance"), "guidance", "missing"),
         (lambda r: r.pop("name"), "name", "missing"),
         (lambda r: r.update(version="one"), "version", "whole number"),
-        (lambda r: r.update(identifier_topic="nope"), "identifier_topic", "not a topic"),
         (lambda r: r.update(fallback_topic="b"), "fallback_topic", "not a topic"),
         (lambda r: r.update(domains=[]), "domains", "no domains"),
     ],

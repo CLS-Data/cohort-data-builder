@@ -1,4 +1,4 @@
-{"file": "alpha", "variable": "PID", "label": "Participant identifier", "sweep": "0y", "identifier": true}
+{"file": "alpha", "variable": "PID", "label": "Participant identifier", "sweep": "0y"}
 {"file": "alpha", "variable": "A01AGE", "label": "Fictional question about age (alpha 1)", "values": [["1", "Yes"], ["2", "No"]], "sweep": "0y"}
 {"file": "alpha", "variable": "A02SEX", "label": "Fictional question about sex (alpha 2)", "values": [["1", "Yes"], ["2", "No"]], "sweep": "0y"}
 {"file": "alpha", "variable": "A03SMOK", "label": "Fictional question about smoking (alpha 3)", "values": [["1", "Yes"], ["2", "No"]], "sweep": "0y"}
