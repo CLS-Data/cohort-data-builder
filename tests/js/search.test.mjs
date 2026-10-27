@@ -71,6 +71,69 @@ test("the file filter keeps one file", () => {
   ]);
 });
 
+const smoking = { kind: "t", i: 0 };
+const alcohol = { kind: "t", i: 1 };
+const housing = { kind: "d", i: 1 };
+
+test("the topic filter keeps variables tagged at or above the threshold", () => {
+  const f = (topicSel, topicMode, minConf) =>
+    names(filterVariables(vars, manifest, { ...any, topicSel, topicMode, minConf }).matches);
+  assert.deepEqual(f([smoking], "any", 50), ["smoke5"]);
+  assert.deepEqual(f([alcohol], "any", 50), ["smoke5"]);
+  assert.deepEqual(f([alcohol], "any", 30), ["smoke5", "alc10"]);
+  assert.deepEqual(f([smoking, alcohol], "any", 30), ["smoke5", "alc10"]);
+  assert.deepEqual(f([smoking, alcohol], "all", 30), ["smoke5"]);
+  assert.deepEqual(f([housing], "any", 50), ["tenure5", "tenure10"]);
+  assert.deepEqual(f([housing], "any", 70), ["tenure10"]);
+  assert.deepEqual(f([], "all", 50).length, 16);
+});
+
+test("perLevel and perWave respect the topic filter", () => {
+  const r = filterVariables(vars, manifest, { ...any, topicSel: [housing], minConf: 50 });
+  assert.deepEqual(Object.fromEntries(r.perLevel), { 0: 2 });
+  assert.deepEqual(r.perWave, [1, 1, 0]);
+});
+
+test("the topic tally ignores the sweep and topic filters but not query, file or level", () => {
+  const base = { ...any, topicSel: [smoking], topicMode: "any", minConf: 30 };
+  const counts = (filters) => {
+    const { tally } = filterVariables(vars, manifest, filters);
+    return [tally.topics.map((r) => [...r]), tally.domains.map((r) => [...r])];
+  };
+  assert.deepEqual(counts({ ...base, wave: 1 }), [
+    [
+      [1, 0, 0],
+      [1, 1, 0],
+      [1, 1, 0],
+    ],
+    [
+      [1, 1, 0],
+      [1, 1, 0],
+    ],
+  ]);
+  assert.deepEqual(counts({ ...base, query: "tenure" })[0], [
+    [0, 0, 0],
+    [0, 0, 0],
+    [1, 1, 0],
+  ]);
+  assert.deepEqual(counts({ ...base, level: 1 })[0], [
+    [0, 0, 0],
+    [0, 1, 0],
+    [0, 0, 0],
+  ]);
+  assert.deepEqual(counts({ ...base, file: 0 })[1], [
+    [1, 0, 0],
+    [1, 0, 0],
+  ]);
+});
+
+test("a cohort without topics ignores the topic filter and tallies nothing", () => {
+  const plain = { ...manifest, topics: undefined };
+  const r = filterVariables(vars, plain, { ...any, topicSel: [smoking], minConf: 50 });
+  assert.equal(r.matches.length, 16);
+  assert.deepEqual(r.tally, { topics: [], domains: [] });
+});
+
 test("no match gives empty matches and zero counts", () => {
   const r = filterVariables(vars, manifest, { ...any, query: "zzzz" });
   assert.deepEqual(r.matches, []);
