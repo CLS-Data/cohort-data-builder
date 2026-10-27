@@ -342,3 +342,58 @@ def test_the_summary_matches_the_stored_tags(tmp_path, variables_path, capsys):
     out = capsys.readouterr().out
     n = len(records(tmp_path))
     assert f"Tagged {n} of 60" in out and n == 59
+
+
+# --- The statistics and the report (US5) -------------------------------------------------
+
+
+def test_a_finished_run_writes_stats_a_report_and_a_summary(tmp_path, variables_path, capsys):
+    assert tag(variables_path, tmp_path, StubProvider(answer("smoking", 0.7))) == 0
+    run = json.loads((tmp_path / "run.json").read_text())
+    assert run["stats"]["per_topic"]["smoking"] == 60
+    assert run["timeline"] and run["settings"]["variables"] == str(variables_path)
+    html = (tmp_path / "report.html").read_text()
+    assert "<svg" in html
+    out = capsys.readouterr().out
+    for part in (
+        "Tagged 60 of 60",
+        "0 failed",
+        "Run time",
+        "/min",
+        "Mean topics per variable: 1.0",
+        "Only below 50%: 0%",
+        "Leading topics",
+        "Smoking 60",
+        "Unused topics: 7 of 8",
+        "report.html",
+    ):
+        assert part in out, out
+
+
+def test_a_stopped_run_writes_the_report_too(tmp_path, variables_path):
+    box = []
+
+    def stop_first(messages, schema):
+        box[0].request_stop()
+        return answer()(messages, schema)
+
+    stub = StubProvider(stop_first)
+    argv = ["tag", str(variables_path), "--out", str(tmp_path), "--scheme", SMALL, "--workers", "1"]
+    assert main(argv, provider_factory=lambda a: stub, runner_created=box.append) == 130
+    assert json.loads((tmp_path / "run.json").read_text())["status"] == "stopped"
+    assert (tmp_path / "report.html").exists()
+
+
+def test_report_rebuilds_and_can_regroup(tmp_path, variables_path, capsys):
+    tag(variables_path, tmp_path, StubProvider(answer()))
+    (tmp_path / "report.html").unlink()
+    assert main(["report", str(tmp_path)]) == 0
+    assert (tmp_path / "report.html").exists()
+    assert main(["report", str(tmp_path), "--group-by", "file_group"]) == 0
+    stats = json.loads((tmp_path / "run.json").read_text())["stats"]
+    assert stats["group_by"] == "file_group" and stats["per_group"] == {}
+
+
+def test_report_needs_a_finished_folder(tmp_path, capsys):
+    assert main(["report", str(tmp_path)]) == 2
+    assert "run.json" in capsys.readouterr().err

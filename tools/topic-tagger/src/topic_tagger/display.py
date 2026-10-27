@@ -22,6 +22,7 @@ from topic_tagger.scheme import Scheme
 
 WINDOW = 60  # seconds the speed is measured over
 PLAIN_EVERY = 10  # seconds between plain progress lines
+TIMELINE_STEP = 10  # seconds per step of the timeline kept for the report
 TOP_DOMAINS, TOP_TOPICS = 5, 10
 
 
@@ -54,6 +55,7 @@ class RunView:
         self.domains: Counter[str] = Counter()
         self.topics: Counter[str] = Counter()
         self._recent: deque[tuple[float, int]] = deque()
+        self._timeline: Counter[int] = Counter()
         self._last_line = self.started
         # Events arrive in the main thread; the live view renders from its own.
         self._lock = threading.Lock()
@@ -64,6 +66,7 @@ class RunView:
             if kind == "batch_done":
                 self.tagged += data["n"]
                 self._recent.append((self.clock.now(), data["n"]))
+                self._timeline[int((self.clock.now() - self.started) // TIMELINE_STEP)] += data["n"]
                 for tags in data["tags"]:
                     ids = [t for t, _ in tags]
                     self.topics.update(ids)
@@ -108,6 +111,12 @@ class RunView:
                 "top_domains": domains[:TOP_DOMAINS],
                 "top_topics": topics[:TOP_TOPICS],
             }
+
+    def timeline(self) -> list[list[int]]:
+        """Variables tagged in each 10-second step of the run, as ``[seconds, variables]``."""
+        with self._lock:
+            last = max(self._timeline, default=0)
+            return [[i * TIMELINE_STEP, self._timeline[i]] for i in range(last + 1)]
 
     def plain_line(self) -> str:
         """One line of progress, for logs and terminals without a live view."""

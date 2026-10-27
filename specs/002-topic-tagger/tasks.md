@@ -389,7 +389,7 @@ contains each section and makes no external references.
 
 ### Tests for User Story 5 ⚠️ write first, see them fail
 
-- [ ] T041 [P] [US5] `TT/tests/test_stats.py`. `compute_stats(records, variables, scheme, run)` is checked against 10 hand-built records, with every field in data-model.md *Run statistics* verified:
+- [x] T041 [P] [US5] `TT/tests/test_stats.py`. `compute_stats(records, variables, scheme, run)` is checked against 10 hand-built records, with every field in data-model.md *Run statistics* verified:
   - `per_topic` includes the zeros;
   - `per_domain` counts each variable once per domain;
   - `unused`;
@@ -400,19 +400,19 @@ contains each section and makes no external references.
   - `group_by`, `per_group` and `domain_by_group` for the grouping field (default `sweep`;
     another field when passed), left empty when no variable has it;
   - `speed`.
-- [ ] T042 [P] [US5] `TT/tests/test_svg.py`. `bars(items)`, `histogram(bins)`, `heat_grid(rows, cols, values)` and `line(points)` each return an `<svg>` string that:
+- [x] T042 [P] [US5] `TT/tests/test_svg.py`. `bars(items)`, `histogram(bins)`, `heat_grid(rows, cols, values)` and `line(points)` each return an `<svg>` string that:
   - has a `viewBox` and a `<title>`;
   - has one `<rect>` per bar or bin, or one cell per grid entry;
   - labels each value as text;
   - colours only through `var(--…)` CSS variables;
   - handles empty input with a "No data" text instead of failing.
-- [ ] T043 [P] [US5] `TT/tests/test_report.py`. `render_report(run, stats, scheme)` returns HTML that:
+- [x] T043 [P] [US5] `TT/tests/test_report.py`. `render_report(run, stats, scheme)` returns HTML that:
   - contains the eight sections of contracts/formats.md `report.html`, in order;
   - names the date, model, scheme name and hash;
   - has no `<script`, `src="http`, `href="http` or `@import`;
   - has a `@media (prefers-color-scheme: dark)` block;
   - escapes the variable names it lists, so `<b>` in a label appears as text.
-- [ ] T044 [US5] Add to `TT/tests/test_cli.py`:
+- [x] T044 [US5] Add to `TT/tests/test_cli.py`:
   - **After a finished run:** the run writes `run.json` with `stats`, writes `report.html`,
     and prints a summary containing tagged, failed, run time, speed, mean topics, share below
     50%, the 10 leading topics, and the unused count.
@@ -422,10 +422,10 @@ contains each section and makes no external references.
 
 ### Implementation for User Story 5
 
-- [ ] T045 [P] [US5] Implement `TT/src/topic_tagger/stats.py` to pass T041. The runner records a `timeline` entry every 10 seconds from the clock.
-- [ ] T046 [P] [US5] Implement `TT/src/topic_tagger/svg.py` to pass T042. Load the `dataviz` skill first, and follow its colour and mark guidance.
-- [ ] T047 [US5] Implement `TT/src/topic_tagger/report.py` to pass T043. Use `html.escape` for all text, and inline CSS with light and dark tokens.
-- [ ] T048 [US5] Wire the statistics, `run.json`, the summary and the report into `TT/src/topic_tagger/cli.py`, and add the `report` command, to pass T044. Add a "Reading the report" section to `TT/README.md`.
+- [x] T045 [P] [US5] Implement `TT/src/topic_tagger/stats.py` to pass T041. The runner records a `timeline` entry every 10 seconds from the clock.
+- [x] T046 [P] [US5] Implement `TT/src/topic_tagger/svg.py` to pass T042. Load the `dataviz` skill first, and follow its colour and mark guidance.
+- [x] T047 [US5] Implement `TT/src/topic_tagger/report.py` to pass T043. Use `html.escape` for all text, and inline CSS with light and dark tokens.
+- [x] T048 [US5] Wire the statistics, `run.json`, the summary and the report into `TT/src/topic_tagger/cli.py`, and add the `report` command, to pass T044. Add a "Reading the report" section to `TT/README.md`.
 
 **Checkpoint**: after a real run, `report.html` opens offline and its numbers match the
 terminal summary.

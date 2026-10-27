@@ -88,7 +88,7 @@ One time the tool is run. Saved as `run.json`.
 |---|---|
 | `started`, `ended` | ISO times. |
 | `status` | `finished`, `stopped` (Ctrl-C) or `error`. |
-| `settings` | The settings used: provider, base URL, model, batch size, workers, timeout, retries, files, limit, retag, scheme path and hash. |
+| `settings` | The settings used: provider, base URL, model, batch size, workers, timeout, retries, files, limit, retag, grouping field, variables path (so `report` can regroup), scheme path and hash. |
 | `counts` | `total`, `todo`, `tagged`, `skipped` (already current), `failed`, `requests`, `retries`, `singles` (variables retried one at a time). |
 | `failed` | List of `file/variable` that could not be tagged (FR-022). |
 | `timeline` | Variables done per 10-second interval, for the speed chart. |

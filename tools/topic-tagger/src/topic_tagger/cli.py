@@ -16,8 +16,10 @@ from topic_tagger.clock import SystemClock
 from topic_tagger.display import RunView
 from topic_tagger.prompt import build_messages
 from topic_tagger.providers import Provider, ProviderError, get_provider
+from topic_tagger.report import render_report
 from topic_tagger.runner import Runner, Settings, install_stop_handler
-from topic_tagger.scheme import SchemeError, bundled_scheme_text, load_scheme
+from topic_tagger.scheme import SchemeError, bundled_scheme_text, load_scheme, scheme_from_json
+from topic_tagger.stats import compute_stats
 from topic_tagger.store import LockedError, StaleLockError, TagStore
 from topic_tagger.variables import InputError, read_variables
 
@@ -51,6 +53,8 @@ def main(
         return _check_scheme(args.scheme)
     if args.command == "init-scheme":
         return _init_scheme(args.path)
+    if args.command == "report":
+        return _report(args.folder, args.group_by)
     _parser().print_help(sys.stderr)
     return BAD_INPUT
 
@@ -103,6 +107,9 @@ def _parser() -> argparse.ArgumentParser:
     check.add_argument("scheme", type=Path, help="the scheme file")
     init = sub.add_parser("init-scheme", help="copy the bundled example scheme to a file, to edit")
     init.add_argument("path", type=Path, help="where to write it; never overwrites")
+    report = sub.add_parser("report", help="rebuild report.html from a tagged folder")
+    report.add_argument("folder", type=Path, help="the folder given to tag --out")
+    report.add_argument("--group-by", help="input field to group by (default: the run's)")
     return parser
 
 
@@ -195,13 +202,17 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
         restore()
     store.compact()
 
-    _write_run(
-        args, store, scheme, started, clock.now(), result, len(variables), len(todo), skipped
+    run = _run_record(
+        args, scheme, started, clock.now(), result, len(variables), len(todo), skipped
     )
+    run["timeline"] = view.timeline()
+    store.load()
+    stats = _save(store.folder, run, store.records.values(), variables, scheme, args.group_by)
     print(
         f"Tagged {result.tagged} of {len(todo)} variables in "
         f"{result.requests} requests; {len(result.failed)} failed."
     )
+    print(_summary(run, stats, scheme, store.folder))
     if result.stopped:
         _err("Stopped. Run the same command again to carry on.")
     if result.failed:
@@ -217,9 +228,9 @@ def _iso(t: float) -> str:
     return datetime.fromtimestamp(t, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _write_run(args, store, scheme, started, ended, result, total, todo, skipped) -> None:
-    """Write ``run.json``: the settings, counts and failures of this run."""
-    run = {
+def _run_record(args, scheme, started, ended, result, total, todo, skipped) -> dict:
+    """This run's settings, counts and failures, as saved in ``run.json``."""
+    return {
         "started": _iso(started),
         "ended": _iso(ended),
         "status": "stopped" if result.stopped else "finished",
@@ -236,6 +247,7 @@ def _write_run(args, store, scheme, started, ended, result, total, todo, skipped
             "limit": args.limit,
             "retag": args.retag,
             "group_by": args.group_by,
+            "variables": str(args.variables),
             "scheme": str(args.scheme),
             "scheme_hash": scheme.hash,
         },
@@ -251,8 +263,80 @@ def _write_run(args, store, scheme, started, ended, result, total, todo, skipped
         },
         "failed": result.failed,
     }
-    text = json.dumps(run, ensure_ascii=False, indent=1)
-    (store.folder / "run.json").write_text(text + "\n", encoding="utf-8")
+
+
+def _save(folder: Path, run: dict, records, variables, scheme, group_by: str) -> dict:
+    """Work out the statistics, then write ``run.json`` with them and ``report.html``."""
+    run.pop("stats", None)
+    stats = compute_stats(records, variables, scheme, run, group_by)
+    (folder / "report.html").write_text(render_report(run, stats, scheme), encoding="utf-8")
+    text = json.dumps({**run, "stats": stats}, ensure_ascii=False, indent=1)
+    (folder / "run.json").write_text(text + "\n", encoding="utf-8")
+    return stats
+
+
+def _summary(run: dict, stats: dict, scheme, folder: Path) -> str:
+    """The end-of-run statistics, as lines for the terminal."""
+    s = run["settings"]
+    domain = {d.id: d.label for d in scheme.domains}
+    topic = {t.id: t.label for t in scheme.topics}
+
+    def counts(pairs, label=str) -> str:
+        return ", ".join(f"{label(k)} {n}" for k, n in pairs) or "none"
+
+    areas = sorted(stats["per_domain"].items(), key=lambda x: -x[1])
+    leading = sorted(stats["per_topic"].items(), key=lambda x: -x[1])[:10]
+    bins = stats["confidence_histogram"]
+    run_time = _hms(_seconds_between(run["started"], run["ended"]))
+    lines = [
+        f"Run time {run_time}, {stats['speed']:g} variables/min; "
+        f"{run['counts']['skipped']} already tagged were skipped.",
+        f"Model {s['provider']}:{s['model']}; scheme {scheme.name} version {scheme.version} "
+        f"(hash {scheme.hash}).",
+        f"Mean topics per variable: {stats['mean_topics']:.1f}. "
+        f"Only below 50%: {stats['below_default']:.0%}.",
+        "Confidence (tags per tenth, 0 to 1): " + " ".join(str(b) for b in bins),
+        f"Topic areas: {counts([a for a in areas if a[1]], domain.get)}",
+        f"Leading topics: {counts([t for t in leading if t[1]], topic.get)}",
+        f"Unused topics: {len(stats['unused'])} of {len(topic)}",
+        "By file: " + counts((f, c["tagged"]) for f, c in stats["per_file"].items()),
+    ]
+    if stats["per_group"]:
+        lines.append(f"By {stats['group_by']}: {counts(stats['per_group'].items())}")
+    lines.append(f"Report: {folder / 'report.html'}")
+    return "\n".join(lines)
+
+
+def _hms(seconds: float) -> str:
+    s = round(seconds)
+    return f"{s // 3600:02d}:{s // 60 % 60:02d}:{s % 60:02d}"
+
+
+def _seconds_between(start: str, end: str) -> float:
+    def parse(t: str) -> datetime:
+        return datetime.fromisoformat(t.replace("Z", "+00:00"))
+
+    return (parse(end) - parse(start)).total_seconds()
+
+
+def _report(folder: Path, group_by: str | None) -> int:
+    try:
+        run = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+        scheme = scheme_from_json(json.loads((folder / "scheme.json").read_text(encoding="utf-8")))
+    except (OSError, ValueError, KeyError) as e:
+        _err(f"{folder} has no usable run.json and scheme.json from a tagging run: {e}")
+        return BAD_INPUT
+    try:
+        variables = read_variables(Path(run["settings"]["variables"]))
+    except InputError as e:
+        _err(f"the variables file this run tagged is needed to group the statistics: {e}")
+        return BAD_INPUT
+    store = TagStore(folder)
+    store.load()
+    group_by = group_by or run["settings"].get("group_by", "sweep")
+    _save(folder, run, store.records.values(), variables, scheme, group_by)
+    print(f"Wrote {folder / 'report.html'}")
+    return OK
 
 
 def _check_scheme(path: Path) -> int:
