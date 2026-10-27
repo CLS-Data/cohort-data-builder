@@ -65,7 +65,13 @@ def _parser() -> argparse.ArgumentParser:
     tag.add_argument("variables", type=Path, help="the variables.jsonl file to tag")
     tag.add_argument("--out", type=Path, required=True, help="output folder for the tags")
     tag.add_argument(
-        "--scheme", type=Path, help="scheme file (default: the bundled example scheme)"
+        "--scheme",
+        type=Path,
+        required=True,
+        help="scheme file: the topics and instructions (start one with init-scheme)",
+    )
+    tag.add_argument(
+        "--group-by", default="sweep", help="input field the statistics are grouped by"
     )
     tag.add_argument("--provider", default="ollama", help="the model host")
     tag.add_argument(
@@ -91,8 +97,8 @@ def _parser() -> argparse.ArgumentParser:
     tag.add_argument("--force", action="store_true", help="clear a lock left by a run that ended")
 
     check = sub.add_parser("check-scheme", help="check a scheme file and list every mistake")
-    check.add_argument("scheme", type=Path, nargs="?", help="the file (default: the bundled one)")
-    init = sub.add_parser("init-scheme", help="copy the bundled scheme to a file, to edit")
+    check.add_argument("scheme", type=Path, help="the scheme file")
+    init = sub.add_parser("init-scheme", help="copy the bundled example scheme to a file, to edit")
     init.add_argument("path", type=Path, help="where to write it; never overwrites")
     return parser
 
@@ -122,7 +128,7 @@ def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
         return BAD_INPUT
 
     if args.dry_run:
-        batch = [v for v in variables if not v.identifier][: args.batch_size]
+        batch = variables[: args.batch_size]
         system, user = build_messages(scheme, batch)
         print(system["content"], user["content"], sep="\n\n---\n\n")
         return OK
@@ -182,9 +188,8 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
     _write_run(
         args, store, scheme, started, clock.now(), result, len(variables), len(todo), skipped
     )
-    rule = sum(v.identifier for v in todo)
     print(
-        f"Tagged {result.tagged} of {len(todo)} variables ({rule} by rule) in "
+        f"Tagged {result.tagged} of {len(todo)} variables in "
         f"{result.requests} requests; {len(result.failed)} failed."
     )
     if result.stopped:
@@ -220,7 +225,8 @@ def _write_run(args, store, scheme, started, ended, result, total, todo, skipped
             "files": args.files,
             "limit": args.limit,
             "retag": args.retag,
-            "scheme": str(args.scheme) if args.scheme else "(bundled)",
+            "group_by": args.group_by,
+            "scheme": str(args.scheme),
             "scheme_hash": scheme.hash,
         },
         "counts": {
@@ -239,7 +245,7 @@ def _write_run(args, store, scheme, started, ended, result, total, todo, skipped
     (store.folder / "run.json").write_text(text + "\n", encoding="utf-8")
 
 
-def _check_scheme(path: Path | None) -> int:
+def _check_scheme(path: Path) -> int:
     try:
         scheme = load_scheme(path)
     except SchemeError as e:

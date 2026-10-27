@@ -55,8 +55,8 @@ def test_batches_and_tags_every_variable(tmp_path, small_scheme, variables_path,
     variables = read_variables(variables_path)
     stub = StubProvider(answer())
     result, records, _ = run(tmp_path, small_scheme, stub, variables, clock)
-    assert len(stub.calls) == 3  # 59 to send, in batches of 20
-    assert sorted(len(ids_in(m)) for m, _ in stub.calls) == [19, 20, 20]
+    assert len(stub.calls) == 3  # 60 to send, in batches of 20
+    assert sorted(len(ids_in(m)) for m, _ in stub.calls) == [20, 20, 20]
     assert {(r["file"], r["variable"]) for r in records} == {
         (v.file, v.variable) for v in variables
     }

@@ -8,9 +8,9 @@ progress; when it finishes you get a summary and a report with charts.
 It reads variable metadata only (names, labels, value labels), never study data.
 
 Nothing in the tool is specific to any topic scheme or study: the topics, their
-descriptions and the instructions all come from a scheme file you choose. An example scheme
-is bundled (based on the CLOSER Discovery topics for UK cohort studies) and used when you
-do not choose one.
+descriptions and the instructions all come from a scheme file you choose with `--scheme`.
+An example scheme is bundled (based on the CLOSER Discovery topics for UK cohort studies)
+for you to copy and adapt; the tool never uses it unless you pass it.
 
 This folder is a self-contained project: copy it anywhere and it works on its own.
 
@@ -31,15 +31,18 @@ You need [Ollama](https://ollama.com) running and a model pulled, for example:
 ollama pull gpt-oss:20b
 ```
 
-Then, from this folder:
+Then, from this folder, start a scheme from the example and tag with it:
 
 ```sh
-uv run topic-tagger tag variables.jsonl --out tags/
+uv run topic-tagger init-scheme my-scheme.toml
+uv run topic-tagger tag variables.jsonl --out tags/ --scheme my-scheme.toml
 ```
 
-`variables.jsonl` has one variable per line: `file`, `variable`, and optionally `label`,
-`values` (`[value, label]` pairs), `sweep` and `identifier` (true for the participant
-identifier, which is tagged by rule without the model). The output folder gets
+`variables.jsonl` has one variable per line: `file`, `variable`, and optionally `label` and
+`values` (`[value, label]` pairs), which are what the model sees. Every variable is sent to
+the model; leave out any you do not want tagged. A line may carry any other fields, such
+as `"sweep": "5y"` or `"questionnaire": "parent"`: they are kept, never sent, and the
+statistics group by the one named with `--group-by` (default `sweep`). The output folder gets
 `tags.jsonl` (each variable's topics with a confidence from 0 to 1) and `scheme.json` (the
 topics used). Every reply is checked, so only topics from the scheme and confidences from
 0 to 1 are ever stored; a batch that fails is retried, then its variables are sent one at
@@ -48,7 +51,7 @@ a time.
 Check what will be sent first, without sending anything (works with Ollama stopped):
 
 ```sh
-uv run topic-tagger tag variables.jsonl --out tags/ --dry-run
+uv run topic-tagger tag variables.jsonl --out tags/ --scheme my-scheme.toml --dry-run
 ```
 
 `uv run topic-tagger tag --help` lists every option with its default. The ones you are
@@ -80,8 +83,8 @@ The output folder also gets `run.json`, recording each run's settings and counts
 ## Editing the topics and instructions
 
 Everything the model is told lives in one file: the topic areas (domains), the topics in
-each with a description, and the general guidance. The tool ships with a scheme based on
-the CLOSER Discovery topics (15 areas, 107 topics). To change it, copy it and edit the copy:
+each with a description, and the general guidance. The bundled example is based on the
+CLOSER Discovery topics (15 areas, 107 topics). Copy it and edit the copy:
 
 ```sh
 uv run topic-tagger init-scheme my-scheme.toml      # never overwrites an existing file
@@ -94,7 +97,6 @@ The file looks like this:
 ```toml
 name = "CLOSER topics"
 version = 1
-identifier_topic = "identifiers"   # given, by rule, to the participant identifier
 fallback_topic = "other"           # what the model should use when nothing fits
 guidance = '''
 You are classifying variables from a UK longitudinal cohort study by topic...

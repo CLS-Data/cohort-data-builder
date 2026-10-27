@@ -76,7 +76,6 @@ class Scheme:
         name: The scheme's name.
         version: The maintainer's own version number.
         guidance: The instructions given to the model.
-        identifier_topic: The topic given to the participant identifier, by rule.
         fallback_topic: The topic for variables that fit nothing else.
         domains: The topic areas, in order.
         hash: 12 hex characters identifying the content; any edit changes it.
@@ -85,7 +84,6 @@ class Scheme:
     name: str
     version: int
     guidance: str
-    identifier_topic: str
     fallback_topic: str
     domains: tuple[Domain, ...]
     hash: str
@@ -124,7 +122,6 @@ class Scheme:
             "version": self.version,
             "hash": self.hash,
             "guidance": self.guidance,
-            "identifier_topic": self.identifier_topic,
             "fallback_topic": self.fallback_topic,
             "domains": [
                 {
@@ -146,11 +143,11 @@ def bundled_scheme_text() -> str:
     return (resources.files("topic_tagger") / "schemes" / "closer.toml").read_text(encoding="utf-8")
 
 
-def load_scheme(path: Path | None) -> Scheme:
+def load_scheme(path: Path) -> Scheme:
     """Load a scheme file.
 
     Args:
-        path: The TOML file, or None for the bundled example scheme.
+        path: The TOML file.
 
     Returns:
         The scheme.
@@ -159,7 +156,7 @@ def load_scheme(path: Path | None) -> Scheme:
         SchemeError: If the file cannot be read or parsed.
     """
     try:
-        text = bundled_scheme_text() if path is None else Path(path).read_text(encoding="utf-8")
+        text = Path(path).read_text(encoding="utf-8")
         raw = tomllib.loads(text)
     except OSError as e:
         raise SchemeError(f"cannot read {path}: {e.strerror}") from e
@@ -167,8 +164,7 @@ def load_scheme(path: Path | None) -> Scheme:
         raise SchemeError(f"{path}: not valid TOML: {e}") from e
     problems = validate(raw)
     if problems:
-        where = path or "the bundled scheme"
-        raise SchemeError(f"{where} has {len(problems)} problem(s):", problems)
+        raise SchemeError(f"{path} has {len(problems)} problem(s):", problems)
 
     # The hash is over the parsed content, so comments and layout do not change it.
     canonical = json.dumps(raw, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
@@ -176,7 +172,6 @@ def load_scheme(path: Path | None) -> Scheme:
         name=raw["name"],
         version=raw["version"],
         guidance=raw["guidance"].strip(),
-        identifier_topic=raw["identifier_topic"],
         fallback_topic=raw["fallback_topic"],
         domains=tuple(
             Domain(
@@ -255,8 +250,6 @@ def validate(raw: dict) -> list[SchemeProblem]:
             text(t, "label", tat)
             text(t, "description", tat)
 
-    for name in ("identifier_topic", "fallback_topic"):
-        value = raw.get(name)
-        if value not in topic_ids:
-            problem(name, f"{value!r} is not a topic in this scheme")
+    if raw.get("fallback_topic") not in topic_ids:
+        problem("fallback_topic", f"{raw.get('fallback_topic')!r} is not a topic in this scheme")
     return problems

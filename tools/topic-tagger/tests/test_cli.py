@@ -182,7 +182,7 @@ def test_resume_after_interrupt(tmp_path, variables_path, small_scheme_path):
 
     second = StubProvider(answer("smoking", 0.7))
     assert tag(variables_path, out, second, *scheme) == 0
-    assert len(sent_names(second)) == 59 - 40  # only what the first run did not tag
+    assert len(sent_names(second)) == 60 - 40  # only what the first run did not tag
     assert topics_by_key(out) == topics_by_key(whole)
     assert len(records(out)) == 60  # compacted: one line per variable
 
@@ -193,7 +193,7 @@ def test_a_scheme_change_redoes_everything(tmp_path, variables_path, small_schem
     edited.write_text(small_scheme_path.read_text().replace("Tobacco use.", "Tobacco and vaping."))
     again = StubProvider(answer())
     assert tag(variables_path, tmp_path, again, "--scheme", str(edited)) == 0
-    assert len(sent_names(again)) == 59
+    assert len(sent_names(again)) == 60
 
 
 def test_current_tags_are_skipped_unless_retag(tmp_path, variables_path, capsys):
@@ -205,7 +205,7 @@ def test_current_tags_are_skipped_unless_retag(tmp_path, variables_path, capsys)
     assert "60 already tagged, 0 to do" in capsys.readouterr().err
     retag = StubProvider(answer())
     assert tag(variables_path, tmp_path, retag, "--retag") == 0
-    assert len(sent_names(retag)) == 59
+    assert len(sent_names(retag)) == 60
 
 
 def test_files_limits_the_run(tmp_path, variables_path):

@@ -102,26 +102,22 @@ class Runner:
     def run(self, variables: list[Variable]) -> RunResult:
         """Tag the variables, storing each batch's records as it completes."""
         result = RunResult()
-        rule = [v for v in variables if v.identifier]
-        rest = [v for v in variables if not v.identifier]
-        if rule:
-            tags = [(self.scheme.identifier_topic, 1.0)]
-            self._store(result, _Outcome(tagged=[(v, tags) for v in rule]), model="rule")
-
         size = self.settings.batch_size
-        batches = [rest[i : i + size] for i in range(0, len(rest), size)]
+        batches = [variables[i : i + size] for i in range(0, len(variables), size)]
         with ThreadPoolExecutor(max_workers=self.settings.workers) as pool:
             futures = [pool.submit(self._batch, b) for b in batches]
             # Results are stored here, in the main thread, as each batch completes.
             for future in as_completed(futures):
-                self._store(result, future.result(), model=self.settings.model)
+                self._store(result, future.result())
         result.stopped = self._stop.is_set()
         return result
 
-    def _store(self, result: RunResult, out: _Outcome, model: str) -> None:
+    def _store(self, result: RunResult, out: _Outcome) -> None:
         now = self.clock.now()
         h = self.scheme.hash
-        self.store.append([make_record(v, tags, h, model, now) for v, tags in out.tagged])
+        self.store.append(
+            [make_record(v, tags, h, self.settings.model, now) for v, tags in out.tagged]
+        )
         for _ in range(out.retries):
             self.on_event("retry", {})
         if out.tagged:

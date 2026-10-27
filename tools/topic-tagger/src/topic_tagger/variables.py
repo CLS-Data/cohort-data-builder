@@ -1,14 +1,18 @@
 """Reading the variables to tag from ``variables.jsonl``.
 
-One JSON object per line: ``file`` and ``variable`` (required), and optionally ``label``,
-``values`` (``[value, label]`` pairs), ``sweep`` and ``identifier``. See docs/formats.md.
+One JSON object per line: ``file`` and ``variable`` (required), and optionally ``label`` and
+``values`` (``[value, label]`` pairs). Any other fields are kept as given, for grouping the
+statistics, and are never sent to the model. See docs/formats.md.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+
+KNOWN = ("file", "variable", "label", "values")
 
 
 class InputError(Exception):
@@ -24,16 +28,14 @@ class Variable:
         variable: Its name.
         label: Its label, or None.
         values: Its value labels as ``(value, label)`` pairs.
-        sweep: The sweep it was collected in, or None.
-        identifier: True for the participant identifier, which is tagged by rule.
+        extra: Any other fields from its input line, as given.
     """
 
     file: str
     variable: str
     label: str | None = None
     values: tuple[tuple[str, str], ...] = ()
-    sweep: str | None = None
-    identifier: bool = False
+    extra: dict[str, Any] = field(default_factory=dict, hash=False)
 
     @property
     def key(self) -> str:
@@ -89,9 +91,9 @@ def _parse(line: str) -> Variable:
         raise ValueError(f"not valid JSON ({e.msg})") from e
     if not isinstance(data, dict):
         raise ValueError("not a JSON object")
-    for field in ("file", "variable"):
-        if not isinstance(data.get(field), str) or not data[field]:
-            raise ValueError(f"'{field}' is missing or empty")
+    for name in ("file", "variable"):
+        if not isinstance(data.get(name), str) or not data[name]:
+            raise ValueError(f"'{name}' is missing or empty")
     values = data.get("values") or []
     if not all(isinstance(v, list) and len(v) == 2 for v in values):
         raise ValueError("'values' must be a list of [value, label] pairs")
@@ -100,6 +102,5 @@ def _parse(line: str) -> Variable:
         variable=data["variable"],
         label=data.get("label") or None,
         values=tuple((str(v), str(lab)) for v, lab in values),
-        sweep=data.get("sweep") or None,
-        identifier=bool(data.get("identifier")),
+        extra={k: v for k, v in data.items() if k not in KNOWN},
     )

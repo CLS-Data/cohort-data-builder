@@ -488,7 +488,7 @@ values.
 Decided 2026-10-27 after US3: the tool must be general, so nothing study-specific stays in
 it (spec Clarifications).
 
-- [ ] T061 Tests first, in `TT/tests/`: `read_variables` keeps any extra fields in
+- [x] T061 Tests first, in `TT/tests/`: `read_variables` keeps any extra fields in
   `Variable.extra` and no longer has `sweep` or `identifier`; the runner sends every
   variable to the model (no rule); the scheme has no `identifier_topic`; `tag` and
   `check-scheme` exit 2 without a scheme; `--group-by` (default `sweep`) is recorded in
@@ -496,10 +496,10 @@ it (spec Clarifications).
   class with no host settings gives neutral ones ("The host … is not reachable", "model … is
   not available at …"). Update the fixtures (`variables.jsonl` drops `identifier`;
   `scheme_small.toml` drops `identifier_topic`).
-- [ ] T062 Implement T061 in `variables.py`, `scheme.py`, `runner.py`, `cli.py`,
+- [x] T062 Implement T061 in `variables.py`, `scheme.py`, `runner.py`, `cli.py`,
   `providers/__init__.py`, `providers/openai_compat.py` and the bundled `closer.toml`
   (drop `identifier_topic`).
-- [ ] T063 Update `TT/README.md`: `--scheme` required in every example, extra fields and
+- [x] T063 Update `TT/README.md`: `--scheme` required in every example, extra fields and
   `--group-by`, no identifier rule.
 
 ## Phase 9: Polish (branch `002-polish`)
