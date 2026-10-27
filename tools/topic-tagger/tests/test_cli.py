@@ -233,3 +233,65 @@ def test_a_finished_run_writes_run_json(tmp_path, variables_path):
     assert run["settings"]["batch_size"] == 10 and run["settings"]["model"] == "gpt-oss:20b"
     assert run["failed"] == []
     assert "api_key" not in json.dumps(run).lower()
+
+
+# --- The scheme commands (US3) -----------------------------------------------------------
+
+
+def test_check_scheme_summarises_the_bundled_scheme(capsys):
+    assert main(["check-scheme"]) == 0
+    out = capsys.readouterr().out
+    assert "15 domains, 107 topics" in out and "hash" in out
+
+
+def test_check_scheme_lists_every_mistake(tmp_path, small_scheme_path, capsys):
+    text = small_scheme_path.read_text()
+    text = text.replace('id = "alcohol"', 'id = "smoking"')  # duplicate id
+    text = text.replace('id = "gender"', 'id = "Gender"')  # bad id
+    text = text.replace('description = "Tobacco use."\n', "")  # missing description
+    text += '\n[[domains]]\nid = "empty"\nlabel = "Empty"\ndescription = "None."\ntopics = []\n'
+    bad = tmp_path / "bad.toml"
+    bad.write_text(text)
+    assert main(["check-scheme", str(bad)]) == 2
+    err = capsys.readouterr().err
+    for where in (
+        "domains[1].topics[1].id",
+        "domains[0].topics[1].id",
+        "domains[1].topics[0].description",
+        "domains[3].topics",
+    ):
+        assert where in err, err
+
+
+def test_init_scheme_copies_the_bundled_scheme(tmp_path, capsys):
+    target = tmp_path / "mine.toml"
+    assert main(["init-scheme", str(target)]) == 0
+    assert "CLOSER topics" in target.read_text()
+    assert main(["check-scheme", str(target)]) == 0
+    assert main(["init-scheme", str(target)]) == 2  # never overwrites
+    assert "already exists" in capsys.readouterr().err
+
+
+def test_edits_reach_the_prompt(tmp_path, variables_path, capsys):
+    mine = tmp_path / "mine.toml"
+    main(["init-scheme", str(mine)])
+    text = mine.read_text().replace(
+        "You are classifying variables", "You are carefully classifying variables"
+    )
+    mine.write_text(text.replace("Tobacco", "Tobacco, snuff", 1))
+    capsys.readouterr()
+    stub = StubProvider(answer())
+    assert tag(variables_path, tmp_path / "out", stub, "--scheme", str(mine), "--dry-run") == 0
+    out = capsys.readouterr().out
+    assert "You are carefully classifying variables" in out and "Tobacco, snuff" in out
+
+
+def test_tag_refuses_a_broken_scheme_before_any_request(
+    tmp_path, variables_path, small_scheme_path, capsys
+):
+    bad = tmp_path / "bad.toml"
+    bad.write_text(small_scheme_path.read_text().replace('id = "alcohol"', 'id = "smoking"'))
+    stub = StubProvider(answer())
+    assert tag(variables_path, tmp_path / "out", stub, "--scheme", str(bad)) == 2
+    assert "smoking" in capsys.readouterr().err
+    assert stub.calls == [] and stub.checked == 0
