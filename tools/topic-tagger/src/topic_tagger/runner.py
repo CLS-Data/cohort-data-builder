@@ -47,6 +47,7 @@ class RunResult:
     requests: int = 0
     retries: int = 0
     singles: int = 0
+    last_error: str = ""
 
 
 @dataclass
@@ -56,6 +57,7 @@ class _Outcome:
     requests: int = 0
     retries: int = 0
     singles: int = 0
+    last_error: str = ""
 
 
 class Runner:
@@ -121,6 +123,7 @@ class Runner:
         result.requests += out.requests
         result.retries += out.retries
         result.singles += out.singles
+        result.last_error = out.last_error or result.last_error
 
     def _batch(self, batch: list[Variable]) -> _Outcome:
         out = _Outcome()
@@ -130,7 +133,8 @@ class Runner:
             try:
                 got = self._ask(batch)
                 break
-            except (ReplyError, ProviderError):
+            except (ReplyError, ProviderError) as e:
+                out.last_error = str(e)
                 if attempt < self.settings.retries:
                     out.retries += 1
         alone = batch if got is None else [v for i, v in enumerate(batch) if i not in got]
@@ -141,7 +145,8 @@ class Runner:
             out.requests += 1
             try:
                 one = self._ask([v])
-            except (ReplyError, ProviderError):
+            except (ReplyError, ProviderError) as e:
+                out.last_error = str(e)
                 one = {}
             if 0 in one:
                 out.tagged.append((v, one[0]))

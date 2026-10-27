@@ -135,6 +135,8 @@ def _tag(args: argparse.Namespace, factory, clock) -> int:
     )
     if result.failed:
         _err("Could not tag:\n  " + "\n  ".join(result.failed))
+        if result.last_error:
+            _err(f"Last error: {result.last_error}")
         return SOME_FAILED
     return OK
 

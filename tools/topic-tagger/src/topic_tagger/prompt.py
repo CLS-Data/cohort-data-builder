@@ -50,6 +50,15 @@ def _system(scheme: Scheme) -> str:
         "- Reply with every variable's id and its topics, each with a confidence from 0 to 1.",
         "- Give every variable at least one topic. "
         f"If nothing fits, use `{scheme.fallback_topic}` with a low confidence.",
+        # Said in words as well as sent as a schema: some hosts ignore the schema.
+        "- Reply with JSON only, in this form:",
+        json.dumps(
+            {
+                "variables": [
+                    {"id": 0, "topics": [{"topic": scheme.topic_ids[0], "confidence": 0.9}]}
+                ]
+            }
+        ),
     ]
     return "\n".join(lines)
 

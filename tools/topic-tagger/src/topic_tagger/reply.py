@@ -53,10 +53,19 @@ def parse_reply(text: str, scheme: Scheme, batch_size: int) -> dict[int, list[tu
         ReplyError: If the reply is not valid JSON, names a topic outside the scheme, gives
             a confidence outside 0–1, or an id outside the batch.
     """
+    # A host that ignores the schema may wrap the JSON in a code fence or some words.
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end < start:
+        raise ReplyError("the reply is not JSON")
     try:
-        reply = reply_model(scheme).model_validate_json(text)
+        reply = reply_model(scheme).model_validate_json(text[start : end + 1])
     except ValidationError as e:
-        raise ReplyError(f"the reply does not match the schema: {e.error_count()} problems") from e
+        first = e.errors()[0]
+        where = ".".join(str(part) for part in first["loc"])
+        raise ReplyError(
+            f"the reply does not match the schema ({e.error_count()} problems), first at "
+            f"{where}: {first['input']!r}: {first['msg']}"
+        ) from e
 
     tags: dict[int, list[tuple[str, float]]] = {}
     for v in reply.variables:
