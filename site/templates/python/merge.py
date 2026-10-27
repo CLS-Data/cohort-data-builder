@@ -14,7 +14,11 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from load_data import (  # noqa: E402
-    apply_missing_codes, find_data_file, index_data_dir, normalise_identifier, read_columns,
+    apply_missing_codes,
+    find_data_file,
+    index_data_dir,
+    normalise_identifier,
+    read_columns,
     write_output,
 )
 
@@ -46,8 +50,8 @@ SELECTION = {
 }
 
 # The codes MISSING_TO_NA replaces, per output column: single values, and
-# ranges as [low, high] where None is an open end. Taken from the data
-# dictionary: the declared missing values plus any negative code labelled as missing.
+# ranges as [low, high] where None is an open end. Copied from the data
+# dictionary's missing-value codes. Negative codes that are real answers are not here.
 MISSING_CODES = {
 {{missing_codes}}
 }
@@ -66,6 +70,7 @@ VALUE_LABELS = {
 
 
 def main() -> None:
+    """Read the selected variables from each data file and write the merged output."""
     index = index_data_dir(Path(DATA_DIR))
 
     # Check every file is present before reading any of them.

@@ -8,6 +8,7 @@ import { esc } from "../core/text.js";
 import { renderAbout } from "./overview.js";
 import { renderPanel, wirePanel } from "./panel.js";
 import { refreshSelection, resetForCohort, runSearch, wireResults } from "./results.js";
+import { wireReview } from "./review.js";
 import { onSelectionChange, restoreOptions, restoreSelection, storage } from "./selected.js";
 import { state } from "./state.js";
 import { switchView } from "./views.js";
@@ -95,6 +96,7 @@ async function boot() {
   restoreOptions();
   wireResults();
   wirePanel();
+  wireReview();
   onSelectionChange(() => {
     renderPanel();
     refreshSelection();
