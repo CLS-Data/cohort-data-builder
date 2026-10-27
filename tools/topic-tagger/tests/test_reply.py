@@ -68,17 +68,34 @@ def test_variables_without_tags_are_left_out(small_scheme):
     [
         "```json\n{}\n```",
         "```\n{}\n```",
-        "Here are the tags:\n{}\nDone.",
     ],
 )
-def test_json_wrapped_in_fences_or_text_is_accepted(small_scheme, wrap):
+def test_json_in_a_code_fence_is_accepted(small_scheme, wrap):
     text = wrap.replace("{}", reply((0, [("smoking", 0.9)])))
     assert parse_reply(text, small_scheme, 1) == {0: [("smoking", 0.9)]}
 
 
-def test_plain_text_is_still_rejected(small_scheme):
+@pytest.mark.parametrize(
+    "text", ["0 A01AGE age:0.9 gender:0.1", 'Here are the tags: {"variables": []} Done.']
+)
+def test_text_that_is_not_json_is_rejected(small_scheme, text):
     with pytest.raises(ReplyError):
-        parse_reply("0 A01AGE age:0.9 gender:0.1", small_scheme, 1)
+        parse_reply(text, small_scheme, 1)
+
+
+def test_parsing_goes_through_the_langchain_parser(small_scheme, monkeypatch):
+    from langchain_core.output_parsers import PydanticOutputParser
+
+    seen = []
+    original = PydanticOutputParser.parse
+
+    def spy(self, text):
+        seen.append(text)
+        return original(self, text)
+
+    monkeypatch.setattr(PydanticOutputParser, "parse", spy)
+    parse_reply(reply((0, [("smoking", 0.9)])), small_scheme, 1)
+    assert len(seen) == 1
 
 
 def test_the_error_names_what_was_wrong(small_scheme):
