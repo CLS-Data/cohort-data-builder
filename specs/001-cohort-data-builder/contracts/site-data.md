@@ -71,9 +71,9 @@ One compact row per variable:
 converted when asked; `kept` codes are never converted; `lossy` codes are converted but
 flagged in the interface.
 
-Optional fields: `na` itself (absent = no codes; about 7,800 of the launch variables), and
-within it `kept` and `lossy` (absent = empty; present on about 2,100). `values`, `measurement`,
-`missing`, `type`, `pos` and `topics` may also be absent.
+Optional fields: `na` itself (absent or `null` = no codes; about 7,800 of the launch
+variables), and within it `kept` and `lossy` (absent = empty; present on about 2,100).
+`values`, `measurement`, `missing`, `type`, `pos` and `topics` may also be absent or `null`.
 
 ## Format checks (CI; any error blocks publishing)
 
