@@ -20,8 +20,9 @@ import {
   toItem,
 } from "../core/selection.js";
 import { esc, highlight, levelName } from "../core/text.js";
-import { renderSpine, wireOverview } from "./overview.js";
-import { setSelection } from "./selected.js";
+import { ensure, flatten, rowTopics, toggle as toggleTopic } from "../core/topics.js";
+import { renderSpine, renderTopicGrid, wireOverview } from "./overview.js";
+import { saveOptions, setSelection } from "./selected.js";
 import { DRAG_MIME, state } from "./state.js";
 import { switchView } from "./views.js";
 
@@ -30,6 +31,7 @@ const n = (x) => x.toLocaleString("en-GB");
 const keyOf = rowKey;
 const waveKey = (i) => state.manifest.wave.list[i].key;
 const fileOf = (row) => state.manifest.files[row[2]];
+const domainOf = (t) => state.domains[state.topics[t].domain];
 
 /* ── Searching ───────────────────────────────────────────────────────── */
 
@@ -44,15 +46,20 @@ export function runSearch({ keepPlace = false } = {}) {
     wave: state.waveFilter,
     file: state.fileFilter,
     level: state.levelFilter,
+    topicSel: state.topicSel,
+    topicMode: state.topicMode,
+    minConf: state.options.minConf,
   });
   state.matches = r.matches;
   state.levelCounts = r.perLevel;
+  state.tally = r.tally;
   if (!keepPlace) {
     state.shown = PAGE;
     $("#vscroll").scrollTop = 0;
   }
   renderResults();
   renderSpine(r.perWave, isFiltered());
+  renderTopicGrid();
   renderLevelSelect();
   renderFilters();
   renderSelectAll();
@@ -69,7 +76,8 @@ const isFiltered = () =>
   Boolean(state.query.trim()) ||
   state.waveFilter !== null ||
   state.fileFilter !== null ||
-  state.levelFilter !== null;
+  state.levelFilter !== null ||
+  state.topicSel.length > 0;
 
 /** Forget the filters and open rows: called when another cohort is opened. */
 export function resetForCohort() {
@@ -78,6 +86,11 @@ export function resetForCohort() {
     waveFilter: null,
     fileFilter: null,
     levelFilter: null,
+    topicSel: [],
+    topicMode: "any",
+    gridExpanded: new Set(),
+    domains: state.manifest.topics?.domains || [],
+    topics: flatten(state.manifest.topics),
     expanded: new Set(),
     allValues: new Set(),
     anchor: null,
@@ -113,6 +126,20 @@ function renderFilters() {
       `<button class="chip" data-clear="file" title="Show every file">${esc(state.manifest.files[state.fileFilter].name)} ✕</button>`,
     );
   }
+  for (const s of state.topicSel) {
+    const label = s.kind === "d" ? state.domains[s.i].label : state.topics[s.i].label;
+    chips.push(
+      `<button class="chip chip-topic" data-unselect="${s.kind}:${s.i}" title="Remove this topic">${esc(label)} ✕</button>`,
+    );
+  }
+  // The any/all switch, once there is something for it to combine.
+  if (state.topicSel.length > 1) {
+    const all = state.topicMode === "all";
+    chips.push(`<span class="match-mode" role="group" aria-label="Combine topics">
+      <button data-mode="any" aria-pressed="${!all}" title="Variables with any of these topics">any</button>
+      <button data-mode="all" aria-pressed="${all}" title="Variables with every one of these topics">all</button>
+    </span>`);
+  }
   $("#active-filters").innerHTML = chips.join("");
   $("#clear-filters").hidden = !isFiltered();
   const count = state.matches.length;
@@ -134,7 +161,17 @@ function rowHtml(row, i, q) {
   const attrs = why
     ? `aria-disabled="true" title="${esc(why)}"`
     : `aria-pressed="${isIn}" title="Click to ${isIn ? "remove" : "select"} · Shift-click for a range" draggable="true"`;
-  return `<li class="vrow${open ? " is-open" : ""}${isIn ? " is-in" : ""}${why ? " is-fixed" : ""}" data-key="${esc(key)}">
+  // Up to two topics, strongest first, and a stripe in the colour of the strongest's domain.
+  const ts = state.topics.length ? rowTopics(row, state.options.minConf) : [];
+  const tags = ts
+    .slice(0, 2)
+    .map(
+      ([t]) => `<span class="topic-chip" data-domain="${esc(domainOf(t).id)}"
+       title="${esc(domainOf(t).label)} › ${esc(state.topics[t].label)}">${esc(state.topics[t].label)}</span>`,
+    )
+    .join("");
+  const stripe = ts.length ? ` data-domain="${esc(domainOf(ts[0][0]).id)}"` : "";
+  return `<li class="vrow${open ? " is-open" : ""}${isIn ? " is-in" : ""}${why ? " is-fixed" : ""}" data-key="${esc(key)}"${stripe}>
     <div class="vrow-main">
       <button class="vrow-btn" data-i="${i}" ${attrs}>
         <span class="v-check" aria-hidden="true">${mark}</span>
@@ -142,7 +179,7 @@ function rowHtml(row, i, q) {
         <span class="v-label" title="${esc(label)}">${highlight(label, q)}</span>
         <span class="v-wave" title="${esc(wave.label || "")}">${esc(wave.key)}</span>
         <span class="v-file" title="${esc(file.description || file.name)}">${esc(file.name)}</span>
-        <span class="v-topics"></span>
+        <span class="v-topics">${tags}</span>
       </button>
       <button class="v-expand" data-expand="${i}" aria-expanded="${open}"
           ${open ? `aria-controls="more-${esc(key)}"` : ""}
@@ -163,7 +200,7 @@ export function renderResults() {
   } else {
     $("#results").innerHTML =
       `<li class="vhead" aria-hidden="true"><span></span><span>Variable</span><span>Label</span>
-         <span>${esc(state.manifest.wave.term)}</span><span class="v-file">File</span><span class="v-topics"></span><span></span></li>` +
+         <span>${esc(state.manifest.wave.term)}</span><span class="v-file">File</span><span class="v-topics">${state.topics.length ? "Topics" : ""}</span><span></span></li>` +
       rows.map((row, i) => rowHtml(row, i, q)).join("");
   }
   const more = $("#more");
@@ -243,6 +280,23 @@ function sameLabelHtml(row) {
   return `<div class="vm-also"><span class="vm-key">Same label</span>${links}${more ? `<span class="vm-dim">+ ${more} more</span>` : ""}</div>`;
 }
 
+/* Every topic in the dictionary entry, with its confidence; those under the threshold are
+   dimmed rather than hidden. Clicking one filters by it. */
+function topicsHtml(entry) {
+  const byId = new Map(state.topics.map((t, i) => [t.id, i]));
+  const tags = (entry.topics || [])
+    .filter(([id]) => byId.has(id))
+    .map(([id, conf]) => {
+      const i = byId.get(id);
+      const pct = Math.round(conf * 100);
+      const domain = domainOf(i);
+      return `<button class="vm-topic${pct < state.options.minConf ? " is-below" : ""}" data-topic-open="${i}"
+        data-domain="${esc(domain.id)}" title="${esc(domain.label)} › ${esc(state.topics[i].label)} · filter by this topic">${esc(state.topics[i].label)} <span class="vm-pct">${pct}%</span></button>`;
+    })
+    .join("");
+  return tags ? `<div class="vm-topics"><span class="vm-key">Topics</span>${tags}</div>` : "";
+}
+
 function moreHtml(row) {
   const entry = dictEntry(row);
   if (entry === undefined) return `<p class="vm-note">Loading…</p>`;
@@ -262,6 +316,7 @@ function moreHtml(row) {
         )
         .join(" · ");
   return `${valuesHtml(row, d)}
+    ${topicsHtml(entry)}
     ${sameLabelHtml(row)}
     ${file.hasId ? "" : `<p class="vm-note vm-warn">This file has no ${esc(state.manifest.identifier)} column, so it cannot be merged.</p>`}
     <div class="vm-meta"><span>${facts}</span>
@@ -387,7 +442,13 @@ async function jumpTo(key) {
   if (!row) return;
   // Its details first, so the row is scrolled to at its full height.
   await fillMore(row);
-  Object.assign(state, { query: row[1], waveFilter: null, fileFilter: null, levelFilter: null });
+  Object.assign(state, {
+    query: row[1],
+    waveFilter: null,
+    fileFilter: null,
+    levelFilter: null,
+    topicSel: [],
+  });
   state.expanded = new Set([key]);
   $("#q").value = row[1];
   runSearch();
@@ -408,8 +469,24 @@ export function filterToFile(fileIdx) {
   $("#filterbar").scrollIntoView({ block: "start" });
 }
 
+/* Change the topic filter with `change` (toggle or ensure from core/topics.js) and search
+   again. A domain with one of its topics chosen opens, so the choice is never hidden. */
+function selectTopic(change, kind, i) {
+  state.topicSel = change(state.topicSel, kind, i, state.topics);
+  if (kind === "t" && state.topicSel.some((s) => s.kind === "t" && s.i === i)) {
+    state.gridExpanded.add(state.topics[i].domain);
+  }
+  runSearch();
+}
+
 function clearAll() {
-  Object.assign(state, { query: "", waveFilter: null, fileFilter: null, levelFilter: null });
+  Object.assign(state, {
+    query: "",
+    waveFilter: null,
+    fileFilter: null,
+    levelFilter: null,
+    topicSel: [],
+  });
   $("#q").value = "";
   runSearch();
 }
@@ -438,6 +515,8 @@ export function wireResults() {
       if (row && el) el.innerHTML = moreHtml(row);
       return;
     }
+    const tag = e.target.closest("[data-topic-open]");
+    if (tag) return selectTopic(ensure, "t", Number(tag.dataset.topicOpen));
     const jump = e.target.closest("[data-jump]");
     if (jump) return jumpTo(jump.dataset.jump);
     const file = e.target.closest("[data-file-open]");
@@ -455,16 +534,41 @@ export function wireResults() {
     renderResults();
   });
 
-  wireOverview((wave) => {
-    state.waveFilter = state.waveFilter === wave ? null : wave;
-    runSearch();
+  wireOverview({
+    onWave: (wave) => {
+      state.waveFilter = state.waveFilter === wave ? null : wave;
+      runSearch();
+    },
+    onTopic: (kind, i) => selectTopic(toggleTopic, kind, i),
+    // A cell: that topic at that sweep. The same cell again lets go of the sweep only.
+    onCell: (kind, i, wave) => {
+      const already =
+        state.waveFilter === wave && state.topicSel.some((s) => s.kind === kind && s.i === i);
+      state.waveFilter = already ? null : wave;
+      selectTopic(ensure, kind, i);
+    },
+    onOptions: () => {
+      saveOptions();
+      runSearch();
+    },
   });
 
   $("#active-filters").addEventListener("click", (e) => {
     const chip = e.target.closest("[data-clear]");
-    if (!chip) return;
-    state[`${chip.dataset.clear}Filter`] = null;
-    runSearch();
+    if (chip) {
+      state[`${chip.dataset.clear}Filter`] = null;
+      return runSearch();
+    }
+    const un = e.target.closest("[data-unselect]");
+    if (un) {
+      const [kind, i] = un.dataset.unselect.split(":");
+      return selectTopic(toggleTopic, kind, Number(i));
+    }
+    const mode = e.target.closest("[data-mode]");
+    if (mode) {
+      state.topicMode = mode.dataset.mode;
+      runSearch();
+    }
   });
 
   $("#level").addEventListener("change", (e) => {
