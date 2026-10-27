@@ -138,6 +138,33 @@ class Scheme:
         }
 
 
+def scheme_from_json(data: dict) -> Scheme:
+    """Rebuild a scheme from the ``scheme.json`` written beside the tags.
+
+    Args:
+        data: The parsed ``scheme.json``.
+
+    Returns:
+        The scheme, with the hash it was saved with.
+    """
+    return Scheme(
+        name=data["name"],
+        version=data["version"],
+        guidance=data["guidance"],
+        fallback_topic=data["fallback_topic"],
+        domains=tuple(
+            Domain(
+                id=d["id"],
+                label=d["label"],
+                description=d["description"],
+                topics=tuple(Topic(t["id"], t["label"], t["description"]) for t in d["topics"]),
+            )
+            for d in data["domains"]
+        ),
+        hash=data["hash"],
+    )
+
+
 def bundled_scheme_text() -> str:
     """The text of the bundled example scheme, ``schemes/closer.toml``."""
     return (resources.files("topic_tagger") / "schemes" / "closer.toml").read_text(encoding="utf-8")

@@ -86,6 +86,32 @@ with `--plain`, it writes one line every 10 seconds instead, and one at the end:
 
 Progress goes to stderr; stdout gets only the final summary.
 
+## Reading the report
+
+When a run ends, even one you stopped, the tool prints a summary and saves the same figures
+in the output folder: `run.json` (under `stats`) and `report.html`, a single file that opens
+in any browser with no network connection and follows your light or dark setting. It has:
+
+1. **Run**: when, which model, which scheme (name, version, hash) and the settings, so
+   reports from different runs can be compared side by side.
+2. **Summary**: variables tagged, failed, run time, speed, mean topics per variable, and the
+   share of variables with no tag at 50% or above (the site hides those by default).
+3. **Topic areas**: how many variables have a topic in each area.
+4. **Topics**: the used topics in each area, then every topic never used. Many unused
+   topics, or one topic taking most variables, suggests the scheme or guidance needs work.
+5. **Confidence**: every tag's confidence, in tenths.
+6. **Topic areas by group**: a grid of areas against the values of the `--group-by` field
+   (default `sweep`); left out when no variable has the field.
+7. **Speed**: variables per minute over the run.
+8. **Data files**: tagged and failed per file, and the variables that could not be tagged.
+
+Hover over a bar or cell for its exact figure; each chart can also be shown as a table.
+To rebuild the report, for example grouped by another field, without tagging again:
+
+```sh
+uv run topic-tagger report tags/ --group-by questionnaire
+```
+
 ## Stopping and carrying on
 
 Tags are saved after every batch, so you can stop a run at any point with **Ctrl-C**. The
