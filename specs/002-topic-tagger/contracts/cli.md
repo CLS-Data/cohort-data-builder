@@ -3,20 +3,22 @@
 ## `topic-tagger` (the tool, in `tools/topic-tagger/`)
 
 ```text
-topic-tagger tag VARIABLES.jsonl --out DIR [options]
-topic-tagger check-scheme [SCHEME.toml]
-topic-tagger init-scheme PATH            copy the bundled CLOSER scheme for editing
-topic-tagger report DIR                  rebuild report.html from DIR's tags and run.json
+topic-tagger tag VARIABLES.jsonl --out DIR --scheme SCHEME.toml [options]
+topic-tagger check-scheme SCHEME.toml
+topic-tagger init-scheme PATH            copy the bundled example scheme, to edit
+topic-tagger report DIR [--group-by F]   rebuild report.html from DIR's tags and run.json
 ```
 
-`tag` options. Each has a default, and `--help` lists them all (FR-019):
+`--scheme` is required: the tool never picks a scheme itself (FR-018). Every other `tag`
+option has a default, and `--help` lists them all (FR-019):
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--scheme PATH` | bundled `closer.toml` | Scheme and guidance file. |
+| `--scheme PATH` | required | Scheme and guidance file. |
 | `--provider NAME` | `ollama` | The model host. `ollama` is the only one for now. |
 | `--base-url URL` | `http://localhost:11434/v1` | Where the host is. Also read from `TOPIC_TAGGER_BASE_URL`. |
 | `--model NAME` | `gpt-oss:20b` | Model name on the host. |
+| `--group-by FIELD` | `sweep` | Input field the statistics and report group by. |
 | `--batch-size N` | 20 | Variables per request. |
 | `--workers N` | 2 | Requests in flight. |
 | `--timeout S` | 120 | Seconds before a request is abandoned and retried. |
@@ -57,7 +59,8 @@ uv run python scripts/topics.py merge  site/data/<key> --tags DIR
 **`export`**:
 - Writes every variable in every dictionary file of the cohort, in index order.
 - Takes `sweep` from the file's `wave`.
-- Sets `identifier: true` when the name matches the manifest `identifier`, ignoring case.
+- Leaves out the manifest's `identifier` variable (matched ignoring case), which the merge
+  tags itself.
 - Exits 0 when done, 2 on unreadable data.
 
 **`merge`** (FR-026, FR-027):
@@ -65,17 +68,20 @@ uv run python scripts/topics.py merge  site/data/<key> --tags DIR
    equals the scheme hash.
 2. Writes the manifest's `topics`: `name`, `version`, `hash`, and the `domains` with their
    `id`, `label`, `description` and `topics` (`id`, `label`, `description`).
-3. Writes each tagged variable's dictionary `topics` as `[[id, confidence], …]`, strongest
+3. Tags the manifest's `identifier` variable, in every file that has it, with
+   `[[IDENTIFIER_TOPIC, 1.0]]` (option `--identifier-topic`, default `identifiers`); stops
+   with exit 2 if the scheme has no such topic.
+4. Writes each tagged variable's dictionary `topics` as `[[id, confidence], …]`, strongest
    first.
-4. Writes each index row's element 5 as `[number, round(confidence × 100), …]`, strongest
+5. Writes each index row's element 5 as `[number, round(confidence × 100), …]`, strongest
    first. Untagged rows keep exactly 5 elements.
-5. Reports, without stopping:
+6. Reports, without stopping:
    - records for variables not in the cohort;
    - variables with no record;
    - records left out because their scheme hash is stale.
-6. Writes JSON in the same style as the existing files (no extra whitespace), each file to
+7. Writes JSON in the same style as the existing files (no extra whitespace), each file to
    a temporary file first and then renamed.
-7. Runs the site's data checks on the cohort and prints any problems.
+8. Runs the site's data checks on the cohort and prints any problems.
 
 Exit codes: 0 when merged and the checks pass; 1 when merged but the checks report
 problems; 2 on bad input.

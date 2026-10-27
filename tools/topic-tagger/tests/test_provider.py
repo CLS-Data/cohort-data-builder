@@ -98,18 +98,39 @@ def test_check_passes_when_the_model_is_installed(fake):
     assert fake.requests[0]["path"] == "/v1/models"
 
 
-def test_check_names_a_missing_model_and_how_to_get_it(fake):
+def ollama(url, model="gpt-oss:20b"):
+    return get_provider("ollama", base_url=url, model=model, timeout=5)
+
+
+def test_ollama_names_a_missing_model_and_how_to_get_it(fake):
     with pytest.raises(ProviderError) as err:
-        provider(fake.url, model="llama9").check()
+        ollama(fake.url, model="llama9").check()
     assert "llama9 is not installed" in str(err.value)
     assert "ollama pull llama9" in str(err.value)
 
 
-def test_check_says_when_the_host_is_not_reachable():
-    url = "http://127.0.0.1:9/v1"  # the discard port: nothing listens there
+def test_another_host_names_a_missing_model_without_mentioning_ollama(fake):
     with pytest.raises(ProviderError) as err:
-        provider(url).check()
-    assert f"is not reachable at {url}" in str(err.value)
+        provider(fake.url, model="llama9").check()
+    assert f"model llama9 is not available at {fake.url}" in str(err.value)
+    assert "ollama" not in str(err.value).lower()
+
+
+DISCARD = "http://127.0.0.1:9/v1"  # the discard port: nothing listens there
+
+
+def test_ollama_says_when_it_is_not_reachable():
+    with pytest.raises(ProviderError) as err:
+        ollama(DISCARD).check()
+    assert f"Ollama is not reachable at {DISCARD}" in str(err.value)
+
+
+def test_another_host_says_when_it_is_not_reachable_without_mentioning_ollama():
+    for call in (lambda p: p.check(), lambda p: p.complete([], SCHEMA)):
+        with pytest.raises(ProviderError) as err:
+            call(provider(DISCARD))
+        assert f"The host at {DISCARD} is not reachable" in str(err.value)
+        assert "ollama" not in str(err.value).lower()
 
 
 def test_complete_sends_the_schema_and_returns_the_content(fake):
@@ -153,7 +174,11 @@ def test_a_slow_reply_times_out_as_a_provider_error(fake):
     ],
 )
 def test_is_remote(url, model, remote):
-    assert provider(url, model=model).is_remote() is remote
+    assert ollama(url, model=model).is_remote() is remote
+
+
+def test_only_ollama_treats_cloud_models_as_remote():
+    assert provider("http://localhost:8000/v1", model="x-cloud").is_remote() is False
 
 
 def test_get_provider_knows_ollama():

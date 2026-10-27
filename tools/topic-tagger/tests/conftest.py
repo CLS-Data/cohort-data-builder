@@ -87,6 +87,15 @@ def small_scheme_path() -> Path:
 
 
 @pytest.fixture
+def bundled_scheme_path(tmp_path) -> Path:
+    from topic_tagger.scheme import bundled_scheme_text
+
+    path = tmp_path / "bundled.toml"
+    path.write_text(bundled_scheme_text(), encoding="utf-8")
+    return path
+
+
+@pytest.fixture
 def small_scheme(small_scheme_path):
     from topic_tagger.scheme import load_scheme
 

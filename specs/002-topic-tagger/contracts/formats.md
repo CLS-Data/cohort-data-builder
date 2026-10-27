@@ -9,16 +9,18 @@ them and on nothing else (FR-028). All files are UTF-8. Entity rules are in
 One JSON object per line. Blank lines are ignored.
 
 ```json
-{"file": "bcs1derived", "variable": "BCSID", "label": "Cohort member ID", "identifier": true}
 {"file": "bcs1derived", "variable": "BD1SMOKE", "label": "Mother smoked in pregnancy", "values": [["1", "Yes"], ["2", "No"]], "sweep": "0y"}
 ```
+
+Only `file`, `variable`, `label` and `values` mean anything to the tool, and only the last
+three are sent to the model. Any other field (here `sweep`) is kept and can be used to
+group the statistics with `--group-by`.
 
 ## Scheme: `scheme.toml`
 
 ```toml
 name = "CLOSER topics"
 version = 1
-identifier_topic = "identifiers"
 fallback_topic = "other"
 guidance = """
 You are classifying variables from a UK longitudinal cohort study by topic...
@@ -37,8 +39,9 @@ cessda = "Health"
   closer = "10603"
 ```
 
-The tool ships `topic_tagger/schemes/closer.toml`, converted from the PoC scheme. `topic-tagger
-init-scheme` copies it out so it can be edited.
+The tool bundles `topic_tagger/schemes/closer.toml`, converted from the PoC scheme, as an
+example only: the tool never uses it unless it is passed with `--scheme`. `topic-tagger
+init-scheme PATH` copies it out to edit.
 
 ## Output folder
 
@@ -63,12 +66,12 @@ with one line per variable, sorted by `file` then `variable`.
 
 ### `scheme.json`
 
-This has the same shape as the site's manifest `topics` object, plus `guidance`,
-`identifier_topic` and `fallback_topic`:
+This has the same shape as the site's manifest `topics` object, plus `guidance` and
+`fallback_topic`:
 
 ```json
 {"name": "CLOSER topics", "version": 1, "hash": "c87a35ec8bc2", "guidance": "...",
- "identifier_topic": "identifiers", "fallback_topic": "other",
+ "fallback_topic": "other",
  "domains": [{"id": "health_behaviour", "label": "Health behaviour", "description": "...",
               "topics": [{"id": "smoking", "label": "Smoking", "description": "..."}]}]}
 ```
@@ -90,7 +93,8 @@ A single file with no external requests and no scripts. Sections:
 3. variables per topic area: bars;
 4. variables per topic within each area: bars, with unused topics listed;
 5. confidence histogram;
-6. topic areas by sweep: heat grid, left out when there are no sweeps;
+6. topic areas by the grouping field (`--group-by`, default `sweep`): heat grid, left out
+   when no variable has the field;
 7. speed over time: line;
 8. per-file table, and the list of failed variables.
 

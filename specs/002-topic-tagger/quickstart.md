@@ -43,7 +43,8 @@ sent, so this also works with Ollama stopped.
 ## 4. A real run, stopped and resumed (US1, US2, US4, US5)
 
 ```sh
-uv run topic-tagger tag tests/fixtures/variables.jsonl --out "$TMPDIR/out" --model gpt-oss:20b
+uv run topic-tagger tag tests/fixtures/variables.jsonl --out "$TMPDIR/out" \
+  --scheme my-scheme.toml --model gpt-oss:20b-cloud --yes
 ```
 
 Expect a live display showing:
@@ -58,7 +59,8 @@ remainder. When it finishes, open `$TMPDIR/out/report.html` with networking off:
 shows, and the counts match the terminal summary.
 
 With Ollama stopped, the same command exits with code 3 and the message "Ollama is not
-reachable at http://localhost:11434". It makes no requests.
+reachable at http://localhost:11434/v1". It makes no requests. Leaving out `--scheme` exits
+with code 2 before anything else happens.
 
 ## 5. Publish to the site (US6, SC-008)
 
@@ -66,7 +68,8 @@ From the repository root, with a cohort folder whose topics have been removed:
 
 ```sh
 uv run python scripts/topics.py export site/data/<key> --out "$TMPDIR/vars.jsonl"
-(cd tools/topic-tagger && uv run topic-tagger tag "$TMPDIR/vars.jsonl" --out "$TMPDIR/tags")
+(cd tools/topic-tagger && uv run topic-tagger tag "$TMPDIR/vars.jsonl" --out "$TMPDIR/tags" \
+  --scheme ../../scripts/closer-topics.toml)
 uv run python scripts/topics.py merge site/data/<key> --tags "$TMPDIR/tags"
 uv run pytest tests/python/data
 ```

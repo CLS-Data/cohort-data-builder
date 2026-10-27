@@ -1,8 +1,9 @@
 """Model hosts. Each one is a ``Provider``; ``get_provider`` picks one by name.
 
 To add a host, write a class with the three methods of ``Provider`` and register it in
-``_PROVIDERS``. A host with an OpenAI-compatible API needs no new class, only its base URL
-(and an API key in ``TOPIC_TAGGER_API_KEY``).
+``get_provider``. A host with an OpenAI-compatible API needs no new class: register
+``OpenAICompatProvider`` with the host's own wording for its error messages, or none for
+neutral ones. Its API key, if any, comes from ``TOPIC_TAGGER_API_KEY``.
 """
 
 from __future__ import annotations
@@ -48,7 +49,14 @@ def get_provider(
     """
     from topic_tagger.providers.openai_compat import OpenAICompatProvider
 
-    providers = {"ollama": OpenAICompatProvider}
+    # Each host's own wording for its messages, and its own rules for what is remote.
+    providers = {
+        "ollama": (
+            OpenAICompatProvider,
+            {"host": "Ollama", "install": "ollama pull {model}", "remote_suffix": "-cloud"},
+        ),
+    }
     if name not in providers:
         raise ProviderError(f"unknown provider '{name}'; known: {', '.join(providers)}")
-    return providers[name](base_url=base_url, model=model, timeout=timeout, api_key=api_key)
+    cls, extra = providers[name]
+    return cls(base_url=base_url, model=model, timeout=timeout, api_key=api_key, **extra)

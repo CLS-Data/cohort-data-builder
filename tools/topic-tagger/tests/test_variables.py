@@ -14,21 +14,27 @@ def write(tmp_path, lines):
 def test_reads_the_fixture_in_file_order(variables_path):
     rows = read_variables(variables_path)
     assert len(rows) == 60
-    assert rows[0] == Variable("alpha", "PID", "Participant identifier", (), "0y", True)
+    assert rows[0] == Variable("alpha", "PID", "Participant identifier", (), {"sweep": "0y"})
     assert rows[1].key == "alpha/A01AGE"
     assert rows[1].values == (("1", "Yes"), ("2", "No"))
-    assert sum(r.identifier for r in rows) == 1
 
 
 def test_missing_optional_fields_are_absent(tmp_path):
     (row,) = read_variables(write(tmp_path, ['{"file": "f", "variable": "v"}']))
-    assert row == Variable("f", "v", None, (), None, False)
+    assert row == Variable("f", "v", None, (), {})
 
 
 def test_null_optional_fields_are_absent(tmp_path):
-    line = '{"file": "f", "variable": "v", "label": null, "values": null, "sweep": null}'
+    line = '{"file": "f", "variable": "v", "label": null, "values": null}'
     (row,) = read_variables(write(tmp_path, [line]))
-    assert row == Variable("f", "v", None, (), None, False)
+    assert row == Variable("f", "v", None, (), {})
+
+
+def test_any_other_fields_are_kept_as_given(tmp_path):
+    line = '{"file": "f", "variable": "v", "sweep": "5y", "wave": 3, "questionnaire": null}'
+    (row,) = read_variables(write(tmp_path, [line]))
+    assert row.extra == {"sweep": "5y", "wave": 3, "questionnaire": None}
+    assert not hasattr(row, "sweep") and not hasattr(row, "identifier")
 
 
 def test_blank_lines_are_ignored(tmp_path):

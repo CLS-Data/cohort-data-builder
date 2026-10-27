@@ -1,4 +1,4 @@
-# The bundled topic scheme for Topic Tagger.
+# An example topic scheme for Topic Tagger, bundled with it. Pass it with `--scheme`.
 #
 # Two levels: DOMAINS (topic areas) and the TOPICS inside them. The model tags each
 # variable with one or more topics, each with a confidence from 0 to 1.
@@ -19,7 +19,6 @@
 
 name = "CLOSER topics"
 version = 1
-identifier_topic = "identifiers"
 fallback_topic = "other"
 
 # Instructions given to the model, before the topics.

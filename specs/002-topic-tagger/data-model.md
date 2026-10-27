@@ -12,8 +12,7 @@ One variable to tag. One line of `variables.jsonl`.
 | `variable` | string | Required, not empty. `file` + `variable` is unique, ignoring case. |
 | `label` | string \| null | Optional. |
 | `values` | list of `[value, label]` | Optional. Only the first 30 are sent to the model (edge case: huge value lists). |
-| `sweep` | string \| null | Optional. Used only for statistics. |
-| `identifier` | bool | Optional, default false. True marks the participant identifier, tagged by rule (FR-007). |
+| any other field | any JSON value | Optional, kept as given, never sent to the model. `--group-by FIELD` (default `sweep`) chooses the one the statistics group by. |
 
 **Key**: `file/variable`, compared ignoring case. A duplicate key in the input is an error
 that stops the run before tagging, listing the duplicates with their line numbers.
@@ -27,7 +26,6 @@ Loaded from `scheme.toml` (FR-016).
 | `name` | string | Required. |
 | `version` | int | Required; the maintainer's own label. |
 | `guidance` | string | Required: the instructions given to the model. |
-| `identifier_topic` | topic id | Required. Must be a topic in the scheme. |
 | `fallback_topic` | topic id | Required. Must be a topic in the scheme ("other"). |
 | `domains[]` | list of Domain | At least one. |
 | `hash` | string | Derived, not written by hand: the first 12 hex characters of SHA-256 over the canonical JSON of everything above. |
@@ -43,7 +41,7 @@ its location, for example `domains[3].topics[2].id`. The problems it checks for 
 - an id used twice anywhere in the scheme, by a domain or a topic;
 - a domain with no topics;
 - a missing label or description;
-- `identifier_topic` or `fallback_topic` not naming a topic in the scheme.
+- `fallback_topic` not naming a topic in the scheme.
 
 **Topic number**: each topic's position across the scheme, in order and counting from 0.
 The processing script uses it for the site index.
@@ -67,7 +65,7 @@ All the tags for one variable. One line of `tags.jsonl`.
 | `file`, `variable` | string | The input key. |
 | `topics` | list of Tag | At least one. |
 | `scheme` | string | The scheme hash the tags were made with. |
-| `model` | string | `provider:model`, e.g. `ollama:gpt-oss:20b`, or `rule` for the identifier. |
+| `model` | string | `provider:model`, e.g. `ollama:gpt-oss:20b`. |
 | `tagged` | string | ISO 8601 UTC time. |
 
 **State** for each variable, worked out at the start of a run:
@@ -109,5 +107,7 @@ with `tags.jsonl` (SC-004). Saved inside `run.json` as `stats`.
 | `below_default` | Share of variables whose strongest tag is under 0.5. |
 | `mean_topics` | Average number of tags per variable. |
 | `per_file` | `{file: {tagged, failed}}`. |
-| `domain_by_sweep` | `{sweep: {domain id: variables}}`; left empty when no input record has a sweep. |
+| `group_by` | The grouping field used (default `sweep`). |
+| `per_group` | `{value: variables}` for the grouping field. |
+| `domain_by_group` | `{value: {domain id: variables}}`; left empty when no input record has the field. |
 | `speed` | Mean variables per minute over the run; the timeline gives speed over time. |
