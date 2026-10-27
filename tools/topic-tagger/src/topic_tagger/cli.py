@@ -14,7 +14,7 @@ from topic_tagger.clock import SystemClock
 from topic_tagger.prompt import build_messages
 from topic_tagger.providers import Provider, ProviderError, get_provider
 from topic_tagger.runner import Runner, Settings, install_stop_handler
-from topic_tagger.scheme import SchemeError, load_scheme
+from topic_tagger.scheme import SchemeError, bundled_scheme_text, load_scheme
 from topic_tagger.store import LockedError, StaleLockError, TagStore
 from topic_tagger.variables import InputError, read_variables
 
@@ -44,6 +44,10 @@ def main(
     args = _parser().parse_args(argv)
     if args.command == "tag":
         return _tag(args, provider_factory or _provider, clock or SystemClock(), runner_created)
+    if args.command == "check-scheme":
+        return _check_scheme(args.scheme)
+    if args.command == "init-scheme":
+        return _init_scheme(args.path)
     _parser().print_help(sys.stderr)
     return BAD_INPUT
 
@@ -60,7 +64,9 @@ def _parser() -> argparse.ArgumentParser:
     )
     tag.add_argument("variables", type=Path, help="the variables.jsonl file to tag")
     tag.add_argument("--out", type=Path, required=True, help="output folder for the tags")
-    tag.add_argument("--scheme", type=Path, help="scheme file (default: the bundled CLOSER one)")
+    tag.add_argument(
+        "--scheme", type=Path, help="scheme file (default: the bundled example scheme)"
+    )
     tag.add_argument("--provider", default="ollama", help="the model host")
     tag.add_argument(
         "--base-url",
@@ -83,6 +89,11 @@ def _parser() -> argparse.ArgumentParser:
     tag.add_argument("--yes", action="store_true", help="do not ask before using a remote model")
     tag.add_argument("--plain", action="store_true", help="plain progress lines, no live display")
     tag.add_argument("--force", action="store_true", help="clear a lock left by a run that ended")
+
+    check = sub.add_parser("check-scheme", help="check a scheme file and list every mistake")
+    check.add_argument("scheme", type=Path, nargs="?", help="the file (default: the bundled one)")
+    init = sub.add_parser("init-scheme", help="copy the bundled scheme to a file, to edit")
+    init.add_argument("path", type=Path, help="where to write it; never overwrites")
     return parser
 
 
@@ -226,6 +237,28 @@ def _write_run(args, store, scheme, started, ended, result, total, todo, skipped
     }
     text = json.dumps(run, ensure_ascii=False, indent=1)
     (store.folder / "run.json").write_text(text + "\n", encoding="utf-8")
+
+
+def _check_scheme(path: Path | None) -> int:
+    try:
+        scheme = load_scheme(path)
+    except SchemeError as e:
+        _err(str(e))
+        return BAD_INPUT
+    print(
+        f"{scheme.name} (version {scheme.version}): {len(scheme.domains)} domains, "
+        f"{len(scheme.topic_ids)} topics, hash {scheme.hash}"
+    )
+    return OK
+
+
+def _init_scheme(path: Path) -> int:
+    if path.exists():
+        _err(f"{path} already exists; choose another name or delete it first")
+        return BAD_INPUT
+    path.write_text(bundled_scheme_text(), encoding="utf-8")
+    print(f"Wrote {path}. Edit it, check it with: topic-tagger check-scheme {path}")
+    return OK
 
 
 def _confirm_remote(args: argparse.Namespace) -> bool:
