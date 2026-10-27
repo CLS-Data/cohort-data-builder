@@ -83,3 +83,16 @@ def test_plain_mode_writes_a_line_every_10_seconds(small_scheme, clock):
 def test_the_plain_line_format(small_scheme, clock):
     view = busy_view(small_scheme, clock)
     assert view.plain_line() == "[00:01:40] 120/600 (20%) 72/min eta 00:06:40 failed 0 retries 1"
+
+
+def test_the_timeline_counts_variables_per_10_seconds(small_scheme, clock):
+    view = busy_view(small_scheme, clock)
+    assert view.timeline() == [[t, 0] for t in range(0, 40, 10)] + [
+        [40, 48],
+        [50, 0],
+        [60, 0],
+        [70, 0],
+        [80, 0],
+        [90, 0],
+        [100, 72],
+    ]
