@@ -4,6 +4,7 @@
 
 import { restore } from "../core/selection.js";
 import { read, storeKey, write } from "../core/storage.js";
+import { validConf } from "../core/topics.js";
 import { state } from "./state.js";
 
 /** Browser storage, or undefined when the browser blocks it (the site then forgets). */
@@ -60,7 +61,7 @@ export function restoreOptions() {
     if (langs.length) o.languages = langs;
   }
   o.missingToNa = saved.missingToNa === true;
-  if ([30, 50, 70, 90].includes(saved.minConf)) o.minConf = saved.minConf;
+  o.minConf = validConf(saved.minConf);
   o.gridShade = saved.gridShade === "abs" ? "abs" : "row";
   if (["csv", "dta", "sav"].includes(saved.outputFormat)) o.outputFormat = saved.outputFormat;
   o.panelOpen = saved.panelOpen === true;

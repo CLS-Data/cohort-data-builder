@@ -4,6 +4,8 @@
    The search is a substring scan over the index the page already holds, so it finds a
    fragment of a half-remembered name as well as a word in a label, and needs no server. */
 
+import { count, DEFAULT_CONF, flatten, newTally, passes, rowDomains, rowTopics } from "./topics.js";
+
 /** Rows drawn at a time; "show more" draws the next lot. */
 export const PAGE = 200;
 
@@ -12,32 +14,52 @@ const SAME_LABEL_MAX = 40; // a label shared this widely is boilerplate, not a q
 const SAME_LABEL_MIN_LENGTH = 10; // shorter labels ("Area code") match by accident
 
 /**
- * Filter the index rows and count what each filter choice would give.
+ * Filter the index rows and count what each filter choice would give, in one pass.
  * @param {Array[]} vars Index rows: [name, label, fileIdx, waveIdx, levelIdx, topics?].
- * @param {{wave: {list: object[]}}} manifest The cohort manifest.
- * @param {{query: string, wave: number|null, file: number|null, level: number|null}} filters
- *   Each null (or an empty query) means "any"; level -1 means no recorded level.
- * @returns {{matches: Array[], perWave: number[], perLevel: Map<number, number>}} The
- *   matching rows in index order; per-sweep counts of the matches (one per sweep, zeros
- *   included); per-level counts with every filter applied except the level filter.
+ * @param {{wave: {list: object[]}, topics?: object}} manifest The cohort manifest.
+ * @param {{query: string, wave: number|null, file: number|null, level: number|null,
+ *   topicSel?: object[], topicMode?: "any"|"all", minConf?: number}} filters Each null (or
+ *   an empty query or topic selection) means "any"; level -1 means no recorded level. The
+ *   topic filter (see topics.js) is ignored when the cohort has no topics.
+ * @returns {{matches: Array[], perWave: number[], perLevel: Map<number, number>,
+ *   tally: {topics: Uint32Array[], domains: Uint32Array[]}}} The matching rows in index
+ *   order; per-sweep counts of the matches (one per sweep, zeros included); per-level counts
+ *   with every filter applied except the level filter; and per-sweep counts for each topic
+ *   and domain with every filter applied except the sweep and topic filters, because the
+ *   topic overview is where those are chosen.
  */
 export function filterVariables(vars, manifest, filters) {
   const q = (filters.query || "").trim().toLowerCase();
   const { wave, file, level } = filters;
+  const sel = filters.topicSel || [];
+  const mode = filters.topicMode || "any";
+  const minConf = filters.minConf ?? DEFAULT_CONF;
+  const topics = flatten(manifest.topics);
+  const tagged = topics.length > 0;
+  const tally = newTally(manifest);
   const matches = [];
   const perWave = new Array(manifest.wave.list.length).fill(0);
   const perLevel = new Map();
   for (const row of vars) {
     if (file !== null && row[2] !== file) continue;
-    if (wave !== null && row[3] !== wave) continue;
     if (q && !row[0].toLowerCase().includes(q) && !row[1].toLowerCase().includes(q)) continue;
     const rowLevel = row[4] ?? -1;
+    const levelOk = level === null || rowLevel === level;
+    let topicOk = true;
+    if (tagged) {
+      const ts = rowTopics(row, minConf).map(([t]) => t);
+      const ds = rowDomains(ts, topics);
+      topicOk = passes(sel, mode, ts, ds);
+      if (levelOk) count(tally, ts, ds, row[3]);
+    }
+    if (wave !== null && row[3] !== wave) continue;
+    if (!topicOk) continue;
     perLevel.set(rowLevel, (perLevel.get(rowLevel) || 0) + 1);
-    if (level !== null && rowLevel !== level) continue;
+    if (!levelOk) continue;
     matches.push(row);
     perWave[row[3]] += 1;
   }
-  return { matches, perWave, perLevel };
+  return { matches, perWave, perLevel, tally };
 }
 
 /**
