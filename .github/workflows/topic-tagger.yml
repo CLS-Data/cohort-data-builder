@@ -1,0 +1,59 @@
+# Lint and tests for the standalone topic tagger in tools/topic-tagger/.
+# It runs on every push and pull request, with no `paths` filter: a required check that
+# never runs stays "pending" for ever and blocks the merge. When nothing under the tool
+# changed, the first step says so and the rest are skipped, so the job still passes.
+
+name: Topic tagger
+
+on:
+  push:
+    branches: [main, 002-topic-tagger]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  topic-tagger:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/topic-tagger
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Did the tool change?
+        id: changed
+        working-directory: .
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # A new branch's first push has no "before"; test everything then.
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
+             || git diff --name-only "$BASE" HEAD \
+                | grep -qE '^(tools/topic-tagger/|\.github/workflows/topic-tagger\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "topic-tagger unchanged: nothing to test"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.changed.outputs.run == 'true'
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/topic-tagger/uv.lock
+      - if: steps.changed.outputs.run == 'true'
+        name: Install
+        run: uv sync --locked
+      - if: steps.changed.outputs.run == 'true'
+        name: Lint
+        run: uv run ruff check .
+      - if: steps.changed.outputs.run == 'true'
+        name: Format
+        run: uv run ruff format --check .
+      - if: steps.changed.outputs.run == 'true'
+        name: Tests
+        run: uv run pytest

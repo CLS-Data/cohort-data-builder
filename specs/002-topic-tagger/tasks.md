@@ -55,7 +55,7 @@ which area.
 
 ## Phase 1: Setup (branch `002-setup`)
 
-- [ ] T003 Create `TT/pyproject.toml`:
+- [x] T003 Create `TT/pyproject.toml`:
   - project `topic-tagger`, `requires-python = ">=3.12"`;
   - dependencies `openai`, `pydantic>=2` and `rich`, at the latest releases at least two
     weeks old, pinned with `>=` and locked by `uv.lock`;
@@ -69,8 +69,8 @@ which area.
   Create `TT/src/topic_tagger/__init__.py` (a module docstring and `__version__ = "0.1.0"`),
   `TT/src/topic_tagger/__main__.py` (calls `cli.main()`), and a `TT/src/topic_tagger/cli.py`
   stub whose `main()` returns 0. Run `uv lock` in `TT/`.
-- [ ] T004 [P] In the root `pyproject.toml`, add `"tools"` to ruff's `extend-exclude`. Add `TT/.gitignore` with `.venv/`, `__pycache__/` and `.pytest_cache/`.
-- [ ] T005 [P] Add `.github/workflows/topic-tagger.yml`:
+- [x] T004 [P] In the root `pyproject.toml`, add `"tools"` to ruff's `extend-exclude`. Add `TT/.gitignore` with `.venv/`, `__pycache__/` and `.pytest_cache/`.
+- [x] T005 [P] Add `.github/workflows/topic-tagger.yml`:
   - triggers: every `push` and `pull_request`, with no `paths` filter. A required check
     that never runs stays "pending" for ever and blocks the merge;
   - a first step (`actions/checkout` with `fetch-depth: 0`, then `git diff --name-only`
@@ -82,7 +82,7 @@ which area.
   - steps: `actions/checkout` and `astral-sh/setup-uv`, pinned to SHAs as in `ci.yml`, then
     `uv sync --locked`, `uv run ruff check .`, `uv run ruff format --check .` and
     `uv run pytest`.
-- [ ] T006 [P] Write a skeleton `TT/README.md`: what the tool does, install (`uv sync` in this folder, or `uv tool install .`), and a one-line usage. The rest is filled in later phases.
+- [x] T006 [P] Write a skeleton `TT/README.md`: what the tool does, install (`uv sync` in this folder, or `uv tool install .`), and a one-line usage. The rest is filled in later phases.
 
 **Checkpoint**: `uv run pytest` in `TT/` reports no tests and exits cleanly. The root CI is
 unchanged and green.
