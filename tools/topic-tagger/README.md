@@ -72,6 +72,50 @@ same command again: it reports how many variables are already tagged and does on
 
 The output folder also gets `run.json`, recording each run's settings and counts.
 
+## Editing the topics and instructions
+
+Everything the model is told lives in one file: the topic areas (domains), the topics in
+each with a description, and the general guidance. The tool ships with a scheme based on
+the CLOSER Discovery topics (15 areas, 107 topics). To change it, copy it and edit the copy:
+
+```sh
+uv run topic-tagger init-scheme my-scheme.toml      # never overwrites an existing file
+uv run topic-tagger check-scheme my-scheme.toml     # lists every mistake, with where it is
+uv run topic-tagger tag variables.jsonl --out tags/ --scheme my-scheme.toml --dry-run
+```
+
+The file looks like this:
+
+```toml
+name = "CLOSER topics"
+version = 1
+identifier_topic = "identifiers"   # given, by rule, to the participant identifier
+fallback_topic = "other"           # what the model should use when nothing fits
+guidance = '''
+You are classifying variables from a UK longitudinal cohort study by topic...
+'''
+
+[[domains]]
+id = "health_behaviour"
+label = "Health behaviour"
+description = "..."
+
+  [[domains.topics]]
+  id = "smoking"
+  label = "Smoking"
+  description = "Tobacco and e-cigarette use."   # the model reads this
+```
+
+- Ids are lower-case letters, digits and `_`, start with a letter, and are unique across
+  the whole file. Every domain needs at least one topic, and every domain and topic a label
+  and description. `check-scheme` (and `tag`, before it sends anything) lists every
+  mistake, for example `domains[1].topics[0].id: 'smoking' is also used at
+  domains[1].topics[1].id` (positions count from 0).
+- **Any** edit, even to a description or the guidance, makes existing tags out of date,
+  so the next run redoes them. Comments and layout do not count.
+- Ids are what gets stored: rename one only if you mean to retag.
+- Keep as many scheme files as you like and choose one per run with `--scheme`.
+
 **Exit codes**
 
 | Code | Meaning |

@@ -310,7 +310,7 @@ four problems and their locations on stderr.
 
 ### Tests for User Story 3 ⚠️ write first, see them fail
 
-- [ ] T032 [P] [US3] Add to `TT/tests/test_scheme.py`: `validate(raw)` returns a list of `SchemeProblem(location, message)`, and `load_scheme` raises `SchemeError(problems)` when that list is not empty. It must find:
+- [x] T032 [P] [US3] Add to `TT/tests/test_scheme.py`: `validate(raw)` returns a list of `SchemeProblem(location, message)`, and `load_scheme` raises `SchemeError(problems)` when that list is not empty. It must find:
   - an id that does not match `^[a-z][a-z0-9_]*$`, at e.g. `domains[1].topics[0].id`;
   - an id used twice anywhere in the scheme, naming both locations;
   - a domain with no topics;
@@ -320,7 +320,7 @@ four problems and their locations on stderr.
   - invalid TOML, with its line number.
 
   Every problem is reported, not only the first.
-- [ ] T033 [US3] Add to `TT/tests/test_cli.py`:
+- [x] T033 [US3] Add to `TT/tests/test_cli.py`:
   - **`check-scheme`:** exits 0 and prints "N domains, M topics, hash …" for the bundled
     scheme.
   - **Mistakes:** `test_check_scheme_lists_every_mistake`, as above.
@@ -332,9 +332,9 @@ four problems and their locations on stderr.
 
 ### Implementation for User Story 3
 
-- [ ] T034 [US3] Implement `validate` in `TT/src/topic_tagger/scheme.py`, and call it from `load_scheme`, to pass T032.
-- [ ] T035 [US3] Implement `check-scheme` and `init-scheme` in `TT/src/topic_tagger/cli.py` to pass T033.
-- [ ] T036 [US3] Add an "Editing the topics and instructions" section to `TT/README.md`:
+- [x] T034 [US3] Implement `validate` in `TT/src/topic_tagger/scheme.py`, and call it from `load_scheme`, to pass T032.
+- [x] T035 [US3] Implement `check-scheme` and `init-scheme` in `TT/src/topic_tagger/cli.py` to pass T033.
+- [x] T036 [US3] Add an "Editing the topics and instructions" section to `TT/README.md`:
   - the file layout, with an annotated excerpt;
   - which edits make tags out of date (all of them);
   - "rename an id only if you mean to retag";
