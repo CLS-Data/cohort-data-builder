@@ -356,7 +356,7 @@ seconds.
 
 ### Tests for User Story 4 ⚠️ write first, see them fail
 
-- [ ] T037 [P] [US4] `TT/tests/test_display.py`. `RunView(total, todo, scheme, clock)` is updated by runner events.
+- [x] T037 [P] [US4] `TT/tests/test_display.py`. `RunView(total, todo, scheme, clock)` is updated by runner events.
   - **`.snapshot()`** returns `done`, `left`, `percent`, `elapsed`, `eta`, `per_minute`
     (over the last 60 s), `failed`, `retries`, `top_domains` (the leading 5, with counts) and
     `top_topics` (the leading 10).
@@ -364,15 +364,15 @@ seconds.
     and refreshes at 4 per second.
   - **Plain mode** writes a line every 10 seconds to stderr, in the form
     `[00:01:40] 120/600 (20%) 72/min eta 00:06:40 failed 0 retries 1`.
-- [ ] T038 [US4] Add to `TT/tests/test_cli.py`: with stderr not a terminal, or with `--plain`, the run writes plain lines and no ANSI escape codes. The final summary's counts equal the number of records in `tags.jsonl` (SC-004).
+- [x] T038 [US4] Add to `TT/tests/test_cli.py`: with stderr not a terminal, or with `--plain`, the run writes plain lines and no ANSI escape codes. The final summary's counts equal the number of records in `tags.jsonl` (SC-004).
 
 ### Implementation for User Story 4
 
-- [ ] T039 [US4] Implement `TT/src/topic_tagger/display.py` to pass T037:
+- [x] T039 [US4] Implement `TT/src/topic_tagger/display.py` to pass T037:
   - a `rich.live.Live` holding a `Progress` (bar, percent, elapsed, remaining, rate) and two
     `Table`s (leading topic areas and leading topics);
   - a footer with failed and retried counts.
-- [ ] T040 [US4] Wire `RunView` into `TT/src/topic_tagger/cli.py` and `TT/src/topic_tagger/runner.py` to pass T038. Mode selection: `--plain`, or `not sys.stderr.isatty()`, gives plain mode. Add a screenshot description and the plain format to `TT/README.md`.
+- [x] T040 [US4] Wire `RunView` into `TT/src/topic_tagger/cli.py` and `TT/src/topic_tagger/runner.py` to pass T038. Mode selection: `--plain`, or `not sys.stderr.isatty()`, gives plain mode. Add a screenshot description and the plain format to `TT/README.md`.
 
 **Checkpoint**: a real run shows progress, speed, remaining time and leading topics live.
 

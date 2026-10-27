@@ -62,6 +62,30 @@ and `--workers` (requests at once, default 2).
 memory runs partly on the CPU and can take minutes per request; a smaller model, or a
 smaller `--batch-size`, helps.
 
+## Watching a run
+
+In a terminal, a live view redraws four times a second:
+
+```text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  100%  60/60  elapsed 00:00:34  remaining 00:00:00  105/min
+Leading topic areas                          Leading topics
+ Physical health                  18          Anthropometry                 12
+ Demographics                     12          Age                            6
+ ...                                          ...
+Failed 0   Retried 1
+```
+
+It shows progress, elapsed and remaining time, speed over the last minute, the five leading
+topic areas and ten leading topics so far, and how many variables failed and how many
+requests were retried. When the output is not a terminal (a log file, a pipe, a CI job), or
+with `--plain`, it writes one line every 10 seconds instead, and one at the end:
+
+```text
+[00:01:40] 120/600 (20%) 72/min eta 00:06:40 failed 0 retries 1
+```
+
+Progress goes to stderr; stdout gets only the final summary.
+
 ## Stopping and carrying on
 
 Tags are saved after every batch, so you can stop a run at any point with **Ctrl-C**. The
