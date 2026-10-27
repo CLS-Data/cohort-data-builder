@@ -79,3 +79,10 @@ def test_json_wrapped_in_fences_or_text_is_accepted(small_scheme, wrap):
 def test_plain_text_is_still_rejected(small_scheme):
     with pytest.raises(ReplyError):
         parse_reply("0 A01AGE age:0.9 gender:0.1", small_scheme, 1)
+
+
+def test_the_error_names_what_was_wrong(small_scheme):
+    with pytest.raises(ReplyError) as err:
+        parse_reply(reply((0, [("smoking", 0.9), ("vaping", 0.8)])), small_scheme, 1)
+    assert "'vaping'" in str(err.value)
+    assert "variables.0.topics.1.topic" in str(err.value)
