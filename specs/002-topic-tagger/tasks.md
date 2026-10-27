@@ -258,7 +258,7 @@ untagged variables, and the final `tags.jsonl` equals that of an uninterrupted r
 
 ### Tests for User Story 2 ⚠️ write first, see them fail
 
-- [ ] T027 [P] [US2] Add to `TT/tests/test_store.py`:
+- [x] T027 [P] [US2] Add to `TT/tests/test_store.py`:
   - **States:** `.load()` reads existing records, the last line for each key wins, and a
     truncated final line is ignored. `.state(key, scheme_hash)` returns `missing`, `stale` or
     `current`.
@@ -267,7 +267,7 @@ untagged variables, and the final `tags.jsonl` equals that of an uninterrupted r
   - **Lock:** `.lock()` creates `.lock` containing the process id. A second `.lock()` while
     that process is alive raises `LockedError`. A lock whose process id is not running raises
     `StaleLockError`, unless called with `force=True`. `.unlock()` removes the lock.
-- [ ] T028 [US2] Add to `TT/tests/test_cli.py`:
+- [x] T028 [US2] Add to `TT/tests/test_cli.py`:
   - **Resume:** `test_resume_after_interrupt`, as above.
   - **Scheme change:** after a description is changed in a copy of the scheme, every
     variable is re-sent.
@@ -281,8 +281,8 @@ untagged variables, and the final `tags.jsonl` equals that of an uninterrupted r
 
 ### Implementation for User Story 2
 
-- [ ] T029 [US2] Implement loading, states, compacting and locking in `TT/src/topic_tagger/store.py` to pass T027. Use `os.kill(pid, 0)` to check whether a process is alive, falling back on Windows to treating the lock as live, so the user must pass `--force`.
-- [ ] T030 [US2] Update `TT/src/topic_tagger/runner.py` and `TT/src/topic_tagger/cli.py` to pass T028:
+- [x] T029 [US2] Implement loading, states, compacting and locking in `TT/src/topic_tagger/store.py` to pass T027. Use `os.kill(pid, 0)` to check whether a process is alive, falling back on Windows to treating the lock as live, so the user must pass `--force`.
+- [x] T030 [US2] Update `TT/src/topic_tagger/runner.py` and `TT/src/topic_tagger/cli.py` to pass T028:
   - **Selecting:** pick variables by state, `--retag`, `--files` and `--limit`.
   - **Lock:** take it before any request and release it in `finally`.
   - **Stopping:** `Runner.request_stop()` sets a `threading.Event`, and workers take no new
@@ -293,7 +293,7 @@ untagged variables, and the final `tags.jsonl` equals that of an uninterrupted r
     for the batches in flight, compact, write `run.json` (status, settings, counts and
     failed), and exit 130.
   - **Second Ctrl-C:** exit at once.
-- [ ] T031 [US2] Add a "Stopping and resuming" section to `TT/README.md`: what is redone and when, plus `--retag`, `--files`, `--limit` and `--force`.
+- [x] T031 [US2] Add a "Stopping and resuming" section to `TT/README.md`: what is redone and when, plus `--retag`, `--files`, `--limit` and `--force`.
 
 **Checkpoint**: stopping and restarting a real run repeats only the batches that were in
 flight.

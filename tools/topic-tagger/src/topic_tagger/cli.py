@@ -3,20 +3,22 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 
 from topic_tagger.clock import SystemClock
 from topic_tagger.prompt import build_messages
 from topic_tagger.providers import Provider, ProviderError, get_provider
-from topic_tagger.runner import Runner, Settings
+from topic_tagger.runner import Runner, Settings, install_stop_handler
 from topic_tagger.scheme import SchemeError, load_scheme
-from topic_tagger.store import TagStore
+from topic_tagger.store import LockedError, StaleLockError, TagStore
 from topic_tagger.variables import InputError, read_variables
 
-OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED = 0, 1, 2, 3, 4
+OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED, STOPPED = 0, 1, 2, 3, 4, 130
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 
 
@@ -24,6 +26,7 @@ def main(
     argv: list[str] | None = None,
     provider_factory: Callable[[argparse.Namespace], Provider] | None = None,
     clock=None,
+    runner_created: Callable[[Runner], None] | None = None,
 ) -> int:
     """Run the command line.
 
@@ -32,13 +35,15 @@ def main(
         provider_factory: Makes the model host from the parsed options; tests pass a
             stand-in. Defaults to the provider named by ``--provider``.
         clock: The clock; defaults to the real time.
+        runner_created: Called with the runner before it starts; tests use it to stop a
+            run part way.
 
     Returns:
         The exit code.
     """
     args = _parser().parse_args(argv)
     if args.command == "tag":
-        return _tag(args, provider_factory or _provider, clock or SystemClock())
+        return _tag(args, provider_factory or _provider, clock or SystemClock(), runner_created)
     _parser().print_help(sys.stderr)
     return BAD_INPUT
 
@@ -96,7 +101,7 @@ def _err(message: str) -> None:
     print(message, file=sys.stderr)
 
 
-def _tag(args: argparse.Namespace, factory, clock) -> int:
+def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
     try:
         variables = read_variables(args.variables)
         scheme = load_scheme(args.scheme)
@@ -111,6 +116,32 @@ def _tag(args: argparse.Namespace, factory, clock) -> int:
         print(system["content"], user["content"], sep="\n\n---\n\n")
         return OK
 
+    store = TagStore(args.out)
+    try:
+        store.lock(force=args.force)
+    except (LockedError, StaleLockError) as e:
+        _err(str(e))
+        return LOCKED
+    try:
+        return _run(args, variables, scheme, provider, store, clock, runner_created)
+    finally:
+        store.unlock()
+
+
+def _run(args, variables, scheme, provider, store, clock, runner_created) -> int:
+    store.load()
+    chosen = variables
+    if args.files:
+        wanted = {f.strip() for f in args.files.split(",")}
+        chosen = [v for v in chosen if v.file in wanted]
+    todo = [v for v in chosen if args.retag or store.state(v.key, scheme.hash) != "current"]
+    skipped = len(chosen) - len(todo)
+    if args.limit is not None:
+        todo = todo[: args.limit]
+    _err(f"{skipped} already tagged, {len(todo)} to do")
+    if not todo:
+        return OK
+
     if provider.is_remote() and not args.yes and not _confirm_remote(args):
         return BAD_INPUT
     try:
@@ -119,7 +150,6 @@ def _tag(args: argparse.Namespace, factory, clock) -> int:
         _err(str(e))
         return NO_HOST
 
-    store = TagStore(args.out)
     store.write_scheme(scheme)
     settings = Settings(
         batch_size=args.batch_size,
@@ -127,18 +157,75 @@ def _tag(args: argparse.Namespace, factory, clock) -> int:
         retries=args.retries,
         model=f"{args.provider}:{args.model}",
     )
-    result = Runner(scheme, provider, store, settings, clock).run(variables)
-    rule = sum(v.identifier for v in variables)
+    runner = Runner(scheme, provider, store, settings, clock)
+    if runner_created:
+        runner_created(runner)
+    started = clock.now()
+    restore = install_stop_handler(runner)
+    try:
+        result = runner.run(todo)
+    finally:
+        restore()
+    store.compact()
+
+    _write_run(
+        args, store, scheme, started, clock.now(), result, len(variables), len(todo), skipped
+    )
+    rule = sum(v.identifier for v in todo)
     print(
-        f"Tagged {result.tagged} of {len(variables)} variables ({rule} by rule) in "
+        f"Tagged {result.tagged} of {len(todo)} variables ({rule} by rule) in "
         f"{result.requests} requests; {len(result.failed)} failed."
     )
+    if result.stopped:
+        _err("Stopped. Run the same command again to carry on.")
     if result.failed:
         _err("Could not tag:\n  " + "\n  ".join(result.failed))
         if result.last_error:
             _err(f"Last error: {result.last_error}")
-        return SOME_FAILED
-    return OK
+    if result.stopped:
+        return STOPPED
+    return SOME_FAILED if result.failed else OK
+
+
+def _iso(t: float) -> str:
+    return datetime.fromtimestamp(t, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _write_run(args, store, scheme, started, ended, result, total, todo, skipped) -> None:
+    """Write ``run.json``: the settings, counts and failures of this run."""
+    run = {
+        "started": _iso(started),
+        "ended": _iso(ended),
+        "status": "stopped" if result.stopped else "finished",
+        # No API key here: it is only ever read from the environment.
+        "settings": {
+            "provider": args.provider,
+            "base_url": args.base_url,
+            "model": args.model,
+            "batch_size": args.batch_size,
+            "workers": args.workers,
+            "timeout": args.timeout,
+            "retries": args.retries,
+            "files": args.files,
+            "limit": args.limit,
+            "retag": args.retag,
+            "scheme": str(args.scheme) if args.scheme else "(bundled)",
+            "scheme_hash": scheme.hash,
+        },
+        "counts": {
+            "total": total,
+            "todo": todo,
+            "tagged": result.tagged,
+            "skipped": skipped,
+            "failed": len(result.failed),
+            "requests": result.requests,
+            "retries": result.retries,
+            "singles": result.singles,
+        },
+        "failed": result.failed,
+    }
+    text = json.dumps(run, ensure_ascii=False, indent=1)
+    (store.folder / "run.json").write_text(text + "\n", encoding="utf-8")
 
 
 def _confirm_remote(args: argparse.Namespace) -> bool:

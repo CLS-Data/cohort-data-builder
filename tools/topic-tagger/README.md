@@ -54,6 +54,24 @@ and `--workers` (requests at once, default 2).
 memory runs partly on the CPU and can take minutes per request; a smaller model, or a
 smaller `--batch-size`, helps.
 
+## Stopping and carrying on
+
+Tags are saved after every batch, so you can stop a run at any point with **Ctrl-C**. The
+batches already sent finish and are saved; press Ctrl-C again to quit at once. Then run the
+same command again: it reports how many variables are already tagged and does only the rest.
+
+- **Changing the scheme or the guidance** makes every existing tag out of date (each tag
+  records the scheme it was made with), so the next run redoes them all.
+- `--retag` redoes every variable, even ones with current tags.
+- `--files alpha,beta` tags only those data files; `--limit 100` at most 100 variables.
+  Both are handy for trying a model or a scheme change on a sample first.
+- Variables that could not be tagged get no tags, so the next run tries them again.
+- Only one run can use an output folder at a time. If a run was killed without cleaning
+  up (for example the machine shut down), the next one says so: check nothing else is
+  running and add `--force`.
+
+The output folder also gets `run.json`, recording each run's settings and counts.
+
 **Exit codes**
 
 | Code | Meaning |
@@ -62,6 +80,8 @@ smaller `--batch-size`, helps.
 | 1 | Finished, but some variables could not be tagged; they are listed. |
 | 2 | Bad input, scheme or options; nothing was sent. |
 | 3 | Ollama could not be reached or the model is not installed; nothing was sent. |
+| 4 | Another run is using the output folder, or one left its lock (see `--force`). |
+| 130 | Stopped with Ctrl-C; what was tagged is saved. |
 
 **Privacy.** Only variable metadata (names, labels, value labels) is sent, never study
 data. With a local model it never leaves your machine. A model on another machine, or an
