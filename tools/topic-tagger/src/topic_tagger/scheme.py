@@ -1,7 +1,8 @@
 """The topic scheme: topic areas (domains), their topics, and the model's guidance.
 
-It is read from a TOML file the maintainer edits (see docs/formats.md). The tool ships one,
-``schemes/closer.toml``, used when no file is given.
+It is read from a TOML file the maintainer edits (see docs/formats.md). Everything the model
+is told about topics comes from that file; the code depends on no particular scheme. An
+example scheme is bundled (``schemes/closer.toml``) and used when no file is given.
 """
 
 from __future__ import annotations
@@ -141,7 +142,7 @@ class Scheme:
 
 
 def bundled_scheme_text() -> str:
-    """The text of the bundled CLOSER scheme, ``schemes/closer.toml``."""
+    """The text of the bundled example scheme, ``schemes/closer.toml``."""
     return (resources.files("topic_tagger") / "schemes" / "closer.toml").read_text(encoding="utf-8")
 
 
@@ -149,7 +150,7 @@ def load_scheme(path: Path | None) -> Scheme:
     """Load a scheme file.
 
     Args:
-        path: The TOML file, or None for the bundled CLOSER scheme.
+        path: The TOML file, or None for the bundled example scheme.
 
     Returns:
         The scheme.

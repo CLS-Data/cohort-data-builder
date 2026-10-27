@@ -7,6 +7,11 @@ progress; when it finishes you get a summary and a report with charts.
 
 It reads variable metadata only (names, labels, value labels), never study data.
 
+Nothing in the tool is specific to any topic scheme or study: the topics, their
+descriptions and the instructions all come from a scheme file you choose. An example scheme
+is bundled (based on the CLOSER Discovery topics for UK cohort studies) and used when you
+do not choose one.
+
 This folder is a self-contained project: copy it anywhere and it works on its own.
 
 ## Install

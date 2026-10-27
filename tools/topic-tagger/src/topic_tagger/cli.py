@@ -64,7 +64,9 @@ def _parser() -> argparse.ArgumentParser:
     )
     tag.add_argument("variables", type=Path, help="the variables.jsonl file to tag")
     tag.add_argument("--out", type=Path, required=True, help="output folder for the tags")
-    tag.add_argument("--scheme", type=Path, help="scheme file (default: the bundled CLOSER one)")
+    tag.add_argument(
+        "--scheme", type=Path, help="scheme file (default: the bundled example scheme)"
+    )
     tag.add_argument("--provider", default="ollama", help="the model host")
     tag.add_argument(
         "--base-url",
