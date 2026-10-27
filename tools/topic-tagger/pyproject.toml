@@ -8,6 +8,7 @@ description = "Tag survey variables by topic with a local language model."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "langchain-core>=1.6.10",
     "openai>=3.29.0",
     "pydantic>=2.14.1",
     "rich>=15.0.0",

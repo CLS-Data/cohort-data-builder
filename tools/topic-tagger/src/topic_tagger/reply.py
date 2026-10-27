@@ -5,6 +5,8 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
+from langchain_core.exceptions import OutputParserException
+from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, create_model
 
 from topic_tagger.scheme import Scheme
@@ -36,6 +38,20 @@ def reply_model(scheme: Scheme) -> type[BaseModel]:
     return _model(tuple(scheme.topic_ids))
 
 
+def output_parser(scheme: Scheme) -> PydanticOutputParser:
+    """LangChain's parser for a reply.
+
+    It reads JSON, in a code fence or not, and checks it against ``reply_model``. Its
+    format instructions go in the prompt.
+    """
+    return _parser(tuple(scheme.topic_ids))
+
+
+@lru_cache(maxsize=8)
+def _parser(topic_ids: tuple[str, ...]) -> PydanticOutputParser:
+    return PydanticOutputParser(pydantic_object=_model(topic_ids))
+
+
 def parse_reply(text: str, scheme: Scheme, batch_size: int) -> dict[int, list[tuple[str, float]]]:
     """Check a reply and return each variable's tags.
 
@@ -53,19 +69,18 @@ def parse_reply(text: str, scheme: Scheme, batch_size: int) -> dict[int, list[tu
         ReplyError: If the reply is not valid JSON, names a topic outside the scheme, gives
             a confidence outside 0–1, or an id outside the batch.
     """
-    # A host that ignores the schema may wrap the JSON in a code fence or some words.
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end < start:
-        raise ReplyError("the reply is not JSON")
     try:
-        reply = reply_model(scheme).model_validate_json(text[start : end + 1])
-    except ValidationError as e:
-        first = e.errors()[0]
-        where = ".".join(str(part) for part in first["loc"])
-        raise ReplyError(
-            f"the reply does not match the schema ({e.error_count()} problems), first at "
-            f"{where}: {first['input']!r}: {first['msg']}"
-        ) from e
+        reply = output_parser(scheme).parse(text)
+    except OutputParserException as e:
+        cause = e.__cause__
+        if isinstance(cause, ValidationError):
+            first = cause.errors()[0]
+            where = ".".join(str(part) for part in first["loc"])
+            raise ReplyError(
+                f"the reply does not match the schema ({cause.error_count()} problems), first "
+                f"at {where}: {first['input']!r}: {first['msg']}"
+            ) from e
+        raise ReplyError("the reply is not JSON") from e
 
     tags: dict[int, list[tuple[str, float]]] = {}
     for v in reply.variables:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from topic_tagger.reply import reply_model
+from topic_tagger.reply import output_parser, reply_model
 from topic_tagger.scheme import Scheme
 from topic_tagger.variables import Variable
 
@@ -51,14 +51,8 @@ def _system(scheme: Scheme) -> str:
         "- Give every variable at least one topic. "
         f"If nothing fits, use `{scheme.fallback_topic}` with a low confidence.",
         # Said in words as well as sent as a schema: some hosts ignore the schema.
-        "- Reply with JSON only, in this form:",
-        json.dumps(
-            {
-                "variables": [
-                    {"id": 0, "topics": [{"topic": scheme.topic_ids[0], "confidence": 0.9}]}
-                ]
-            }
-        ),
+        "",
+        output_parser(scheme).get_format_instructions(),
     ]
     return "\n".join(lines)
 

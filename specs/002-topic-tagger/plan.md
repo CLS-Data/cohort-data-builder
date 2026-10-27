@@ -18,7 +18,8 @@ The tagger is a standalone Python command-line tool, `topic-tagger`, in
 
 A standard-library processing script, `scripts/topics.py`, in the site's part of the
 repository, exports a cohort from `site/data` and merges the tags back. The tool's design
-ports the PoC tagger (`PoC/enrich/`) without LangChain or YAML.
+ports the PoC tagger (`PoC/enrich/`), keeping LangChain only for its `PydanticOutputParser`
+(from `langchain-core`) and dropping YAML.
 
 ## Technical Context
 
@@ -26,7 +27,8 @@ ports the PoC tagger (`PoC/enrich/`) without LangChain or YAML.
 
 **Primary Dependencies**:
 - Tool: `openai` (the model client; it brings in `httpx` and `pydantic`), `pydantic`
-  (validating replies) and `rich` (the live display).
+  (validating replies), `langchain-core` (its `PydanticOutputParser` parses replies and
+  writes the format instructions, R3) and `rich` (the live display).
 - Dev: `pytest`, `ruff`.
 - Processing script: standard library only.
 
@@ -66,7 +68,7 @@ maintainer at a time.
 | I. Test-driven development | Pass | Every module is test-first. The tests are deterministic: a stand-in model and a local fake server, no real network or Ollama. Times are injected through a clock. Both test suites run in CI on every push and pull request. |
 | II. Documented code | Pass | Google-style docstrings throughout. The tool has its own `README.md` (install, use, scheme editing, formats). The formats are documented in `tools/topic-tagger/docs/formats.md`, from contracts/formats.md. The site's `docs/data-format.md` gets a "Adding topics" section, and the root README links to the tool. |
 | III. Static GitHub Pages deployment | Pass (not affected) | Neither the tool nor the script ships with the site or runs in the browser. The site still only reads static files. The Pages build does not include `tools/` or `scripts/`. |
-| IV. Simplicity | Pass, with notes | Three runtime dependencies, each needed (R1, R3, R4): `openai` for the model protocol and future hosts, `pydantic` for one definition of schema and validation, `rich` for the live display the spec asks for. Charts are hand-written SVG instead of a plotting library (R5). The scheme is TOML, read by the standard library, instead of YAML (R2). The `Provider` interface is the one new abstraction, recorded below. |
+| IV. Simplicity | Pass, with notes | Four runtime dependencies, each needed (R1, R3, R4): `openai` for the model protocol and future hosts, `pydantic` for one definition of schema and validation, `langchain-core` for the standard reply parser (chosen in review over hand-written parsing), `rich` for the live display the spec asks for. Charts are hand-written SVG instead of a plotting library (R5). The scheme is TOML, read by the standard library, instead of YAML (R2). The `Provider` interface is the one new abstraction, recorded below. |
 | Quality gates | Pass | `ci` gains the processing script's tests. A new `topic-tagger` workflow runs the tool's lint and tests. Every pull request has a "How to review" section. |
 
 **After design**: still passes. The design adds no runtime code to the site and no
