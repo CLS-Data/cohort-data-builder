@@ -134,3 +134,102 @@ def test_failures_say_why(tmp_path, variables_path, capsys):
     assert tag(variables_path, tmp_path / "out", stub) == 1
     err = capsys.readouterr().err
     assert "Last error: the reply is not JSON" in err
+
+
+# --- Stopping and carrying on (US2) ------------------------------------------------------
+
+
+def sent_names(stub):
+    return [
+        json.loads(x)["name"]
+        for m, _ in stub.calls
+        for x in m[1]["content"].splitlines()
+        if x.startswith("{")
+    ]
+
+
+def topics_by_key(out):
+    return {(r["file"], r["variable"]): r["topics"] for r in records(out)}
+
+
+def test_resume_after_interrupt(tmp_path, variables_path, small_scheme_path):
+    scheme = ["--scheme", str(small_scheme_path), "--workers", "1"]
+    whole = tmp_path / "whole"
+    assert tag(variables_path, whole, StubProvider(answer("smoking", 0.7)), *scheme) == 0
+
+    out = tmp_path / "out"
+    box = []
+
+    def stop_on_second(messages, schema):
+        if len(first.calls) == 2:
+            box[0].request_stop()
+        return answer("smoking", 0.7)(messages, schema)
+
+    first = StubProvider(stop_on_second)
+    argv = ["tag", str(variables_path), "--out", str(out), *scheme]
+    assert main(argv, provider_factory=lambda a: first, runner_created=box.append) == 130
+    run = json.loads((out / "run.json").read_text())
+    assert run["status"] == "stopped"
+    assert not (out / ".lock").exists()
+
+    second = StubProvider(answer("smoking", 0.7))
+    assert tag(variables_path, out, second, *scheme) == 0
+    assert len(sent_names(second)) == 59 - 40  # only what the first run did not tag
+    assert topics_by_key(out) == topics_by_key(whole)
+    assert len(records(out)) == 60  # compacted: one line per variable
+
+
+def test_a_scheme_change_redoes_everything(tmp_path, variables_path, small_scheme_path):
+    tag(variables_path, tmp_path, StubProvider(answer()), "--scheme", str(small_scheme_path))
+    edited = tmp_path / "edited.toml"
+    edited.write_text(small_scheme_path.read_text().replace("Tobacco use.", "Tobacco and vaping."))
+    again = StubProvider(answer())
+    assert tag(variables_path, tmp_path, again, "--scheme", str(edited)) == 0
+    assert len(sent_names(again)) == 59
+
+
+def test_current_tags_are_skipped_unless_retag(tmp_path, variables_path, capsys):
+    tag(variables_path, tmp_path, StubProvider(answer()))
+    capsys.readouterr()
+    again = StubProvider(answer())
+    assert tag(variables_path, tmp_path, again) == 0
+    assert again.calls == []
+    assert "60 already tagged, 0 to do" in capsys.readouterr().err
+    retag = StubProvider(answer())
+    assert tag(variables_path, tmp_path, retag, "--retag") == 0
+    assert len(sent_names(retag)) == 59
+
+
+def test_files_limits_the_run(tmp_path, variables_path):
+    stub = StubProvider(answer())
+    assert tag(variables_path, tmp_path, stub, "--files", "beta") == 0
+    assert {r["file"] for r in records(tmp_path)} == {"beta"}
+    assert len(sent_names(stub)) == 20
+
+
+def test_limit_caps_the_run(tmp_path, variables_path):
+    stub = StubProvider(answer())
+    assert tag(variables_path, tmp_path, stub, "--limit", "5") == 0
+    assert len(records(tmp_path)) == 5
+
+
+def test_a_live_lock_exits_4_and_sends_nothing(tmp_path, variables_path, capsys):
+    import os
+
+    tmp_path.mkdir(exist_ok=True)
+    (tmp_path / ".lock").write_text(str(os.getpid()))
+    stub = StubProvider(answer())
+    assert tag(variables_path, tmp_path, stub) == 4
+    assert "another run" in capsys.readouterr().err
+    assert stub.calls == [] and stub.checked == 0
+
+
+def test_a_finished_run_writes_run_json(tmp_path, variables_path):
+    tag(variables_path, tmp_path, StubProvider(answer()), "--batch-size", "10")
+    run = json.loads((tmp_path / "run.json").read_text())
+    assert run["status"] == "finished"
+    assert run["counts"]["total"] == 60 and run["counts"]["tagged"] == 60
+    assert run["counts"]["requests"] == 6
+    assert run["settings"]["batch_size"] == 10 and run["settings"]["model"] == "gpt-oss:20b"
+    assert run["failed"] == []
+    assert "api_key" not in json.dumps(run).lower()
