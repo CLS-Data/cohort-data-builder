@@ -95,13 +95,13 @@ These block every story.
 
 ### Fixtures and test harness
 
-- [ ] T007 [P] Create `TT/tests/fixtures/`:
+- [x] T007 [P] Create `TT/tests/fixtures/`:
   - `variables.jsonl`: 60 fictional variables across 3 files (`alpha`, `beta`, `gamma`) and
     2 sweeps (`0y`, `5y`). It includes one `identifier: true` row (`PID`), one row with no
     label, one with 200 value labels, and one with no sweep. No real study data.
   - `scheme_small.toml`: 3 domains and 8 topics, including `identifiers` and `other`, with
     `identifier_topic` and `fallback_topic` set.
-- [ ] T008 Create `TT/tests/conftest.py` with:
+- [x] T008 Create `TT/tests/conftest.py` with:
   - `StubProvider`: implements the `Provider` protocol (T011). It is built from a function
     `(messages, schema) -> str`, or from a queue of replies or exceptions. It records every
     call.
@@ -110,7 +110,7 @@ These block every story.
 
 ### Core modules (tests first)
 
-- [ ] T009 [P] Write `TT/tests/test_variables.py` (tests fail first). `read_variables(path)`:
+- [x] T009 [P] Write `TT/tests/test_variables.py` (tests fail first). `read_variables(path)`:
   - returns `Variable(file, variable, label, values, sweep, identifier)` records in file
     order;
   - ignores blank lines;
@@ -120,7 +120,7 @@ These block every story.
   - raises `InputError` naming the line on bad JSON, or on an empty `file` or `variable`.
 
   `Variable.key` is `"file/variable"`.
-- [ ] T010 [P] Write `TT/tests/test_scheme.py`, loading only (validation is in US3). Tests:
+- [x] T010 [P] Write `TT/tests/test_scheme.py`, loading only (validation is in US3). Tests:
   - `load_scheme(path)` returns a `Scheme` with `name`, `version`, `guidance`,
     `identifier_topic`, `fallback_topic` and `domains`;
   - `scheme.topic_ids` is in order;
@@ -130,13 +130,13 @@ These block every story.
     description or the guidance changes;
   - `scheme.to_json()` has the shape in contracts/formats.md `scheme.json`;
   - loading the bundled scheme with `load_scheme(None)` works.
-- [ ] T011 Implement `TT/src/topic_tagger/variables.py` to pass T009.
-- [ ] T012 Implement `TT/src/topic_tagger/scheme.py` to pass T010:
+- [x] T011 Implement `TT/src/topic_tagger/variables.py` to pass T009.
+- [x] T012 Implement `TT/src/topic_tagger/scheme.py` to pass T010:
   - `tomllib` and dataclasses;
   - hash is `sha256(json.dumps(content, sort_keys=True, separators=(",", ":")))`, first 12
     characters;
   - `load_scheme(None)` reads `importlib.resources.files("topic_tagger") / "schemes/closer.toml"`.
-- [ ] T013 [P] Create `TT/src/topic_tagger/schemes/closer.toml` by converting `PoC/schema/topics.yaml` once, by hand or with a one-off script that is not committed:
+- [x] T013 [P] Create `TT/src/topic_tagger/schemes/closer.toml` by converting `PoC/schema/topics.yaml` once, by hand or with a one-off script that is not committed:
   - all 15 domains and about 100 topics, with their descriptions, `closer`, `cessda` and
     `added`;
   - the guidance text;
@@ -144,7 +144,7 @@ These block every story.
 
   Keep the explanatory header comment, rewritten for TOML. Add a test to
   `TT/tests/test_scheme.py` that it loads, with 15 domains and more than 90 topics.
-- [ ] T014 Write `TT/tests/test_provider.py` (tests fail first) against a local fake server:
+- [x] T014 Write `TT/tests/test_provider.py` (tests fail first) against a local fake server:
   `http.server` on a free port in a thread, serving `/v1/models` and `/v1/chat/completions`
   with scripted responses. `OpenAICompatProvider(base_url, model, api_key, timeout)` should:
   - `.check()`: pass when the model is listed; raise `ProviderError("model … is not
@@ -160,7 +160,7 @@ These block every story.
 
   `get_provider("ollama", …)` returns it. An unknown name raises `ProviderError`, listing the
   known providers.
-- [ ] T015 Implement `TT/src/topic_tagger/providers/__init__.py` (the `Provider` Protocol with `complete`, `check` and `is_remote`; `ProviderError`; `get_provider`) and `TT/src/topic_tagger/providers/openai_compat.py` (using `openai.OpenAI(base_url=…, api_key=…, timeout=…, max_retries=0)`) to pass T014.
+- [x] T015 Implement `TT/src/topic_tagger/providers/__init__.py` (the `Provider` Protocol with `complete`, `check` and `is_remote`; `ProviderError`; `get_provider`) and `TT/src/topic_tagger/providers/openai_compat.py` (using `openai.OpenAI(base_url=…, api_key=…, timeout=…, max_retries=0)`) to pass T014.
 
 **Checkpoint**: foundation tests pass; `topic-tagger` runs (it does nothing yet).
 

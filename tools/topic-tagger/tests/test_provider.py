@@ -4,6 +4,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
+
 from topic_tagger.providers import ProviderError, get_provider
 from topic_tagger.providers.openai_compat import OpenAICompatProvider
 
@@ -33,7 +34,9 @@ class FakeOllama:
                 self.wfile.write(data)
 
             def do_GET(self):
-                fake.requests.append({"path": self.path, "headers": dict(self.headers)})
+                fake.requests.append(
+                    {"path": self.path, "headers": {k.lower(): v for k, v in self.headers.items()}}
+                )
                 self._send(
                     {
                         "object": "list",
@@ -47,7 +50,11 @@ class FakeOllama:
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 fake.requests.append(
-                    {"path": self.path, "body": body, "headers": dict(self.headers)}
+                    {
+                        "path": self.path,
+                        "body": body,
+                        "headers": {k.lower(): v for k, v in self.headers.items()},
+                    }
                 )
                 time.sleep(fake.delay)
                 self._send(
@@ -68,7 +75,7 @@ class FakeOllama:
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}/v1"
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        threading.Thread(target=self.server.serve_forever, args=(0.05,), daemon=True).start()
 
     def close(self):
         self.server.shutdown()
@@ -122,9 +129,9 @@ def test_complete_sends_the_schema_and_returns_the_content(fake):
 
 def test_the_api_key_defaults_to_a_placeholder_and_can_be_given(fake):
     provider(fake.url).check()
-    assert fake.requests[-1]["headers"]["Authorization"] == "Bearer ollama"
+    assert fake.requests[-1]["headers"]["authorization"] == "Bearer ollama"
     provider(fake.url, api_key="sekret").check()
-    assert fake.requests[-1]["headers"]["Authorization"] == "Bearer sekret"
+    assert fake.requests[-1]["headers"]["authorization"] == "Bearer sekret"
 
 
 def test_a_slow_reply_times_out_as_a_provider_error(fake):

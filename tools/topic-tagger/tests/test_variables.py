@@ -1,6 +1,7 @@
 import json
 
 import pytest
+
 from topic_tagger.variables import InputError, Variable, read_variables
 
 
