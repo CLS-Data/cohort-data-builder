@@ -447,14 +447,14 @@ values.
 
 ### Tests for User Story 6 ⚠️ write first, see them fail
 
-- [ ] T049 [US6] Move `tests/python/data/checks.py` to `scripts/checks.py` with `git mv`. Add `pythonpath = ["scripts"]` to `[tool.pytest.ini_options]` in the root `pyproject.toml`, and keep `from checks import …` working in `tests/python/data/test_checks.py` and `test_supplied_data.py`. Run `uv run pytest tests/python/data`: it is green, with no behaviour change. Commit as `refactor(data): move the data checks to scripts/`.
-- [ ] T050 [P] [US6] `tests/python/topics/test_export.py`. `export(cohort_dir, out)` on the `mini` fixture writes one line per index row, in index order, each with `file`, `variable`, `label` and `values` (`[value, label]` pairs from the dictionary). It also:
+- [x] T049 [US6] Move `tests/python/data/checks.py` to `scripts/checks.py` with `git mv`. Add `pythonpath = ["scripts"]` to `[tool.pytest.ini_options]` in the root `pyproject.toml`, and keep `from checks import …` working in `tests/python/data/test_checks.py` and `test_supplied_data.py`. Run `uv run pytest tests/python/data`: it is green, with no behaviour change. Commit as `refactor(data): move the data checks to scripts/`.
+- [x] T050 [P] [US6] `tests/python/topics/test_export.py`. `export(cohort_dir, out)` on the `mini` fixture writes one line per index row, in index order, each with `file`, `variable`, `label` and `values` (`[value, label]` pairs from the dictionary). It also:
   - sets `sweep` to the file's `wave`;
   - leaves out the manifest `identifier` variable, matched ignoring case (the merge tags it);
   - reads no `topics` field.
 
   The CLI exits 0, and exits 2 on a folder with no manifest.
-- [ ] T051 [P] [US6] `tests/python/topics/test_merge.py`. Tests:
+- [x] T051 [P] [US6] `tests/python/topics/test_merge.py`. Tests:
   - **Round trip:** `test_round_trip`, as above.
   - **Manifest:** `manifest.topics` has `name`, `version`, `hash` and `domains`, with no
     `guidance` or `fallback_topic`.
@@ -471,12 +471,12 @@ values.
     byte for byte.
   - **Exit codes:** 1 when the checks find problems, for example after a hand-corrupted
     `scheme.json`; 2 on bad input.
-- [ ] T052 [P] [US6] `tests/python/topics/test_independence.py`: `scripts/topics.py` does not import from `tools` or `topic_tagger`, and no file under `site/` refers to `tools/`.
+- [x] T052 [P] [US6] `tests/python/topics/test_independence.py`: `scripts/topics.py` does not import from `tools` or `topic_tagger`, and no file under `site/` refers to `tools/`.
 
 ### Implementation for User Story 6
 
-- [ ] T053 [US6] Implement `scripts/topics.py` (standard library, Google-style docstrings, `argparse` subcommands `export` and `merge`) to pass T050 to T052. Write JSON with `separators=(",", ":")` and `ensure_ascii=False`, matching the existing files. Each file goes to a temporary file and is then replaced. The merge ends by calling `checks.check_data`.
-- [ ] T054 [US6] Add an "Adding topics" section to `docs/data-format.md`: data arriving without topics, then export, the tool, merge, and the checks, with the three commands. Link to `tools/topic-tagger/README.md`.
+- [x] T053 [US6] Implement `scripts/topics.py` (standard library, Google-style docstrings, `argparse` subcommands `export` and `merge`) to pass T050 to T052. Write JSON with `separators=(",", ":")` and `ensure_ascii=False`, matching the existing files. Each file goes to a temporary file and is then replaced. The merge ends by calling `checks.check_data`.
+- [x] T054 [US6] Add an "Adding topics" section to `docs/data-format.md`: data arriving without topics, then export, the tool, merge, and the checks, with the three commands. Link to `tools/topic-tagger/README.md`.
 
 **Checkpoint**: a cohort without topics can be published with topics in three commands
 (SC-008).
