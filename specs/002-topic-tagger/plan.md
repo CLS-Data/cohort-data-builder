@@ -135,7 +135,7 @@ tests/python/topics/
 ├── test_merge.py
 └── test_independence.py             scripts/topics.py imports nothing from tools/
 
-.github/workflows/topic-tagger.yml   runs on changes under tools/topic-tagger/
+.github/workflows/topic-tagger.yml   runs on every PR; tests only when tools/topic-tagger/ changed
 ```
 
 **Structure decision**:
@@ -164,7 +164,7 @@ tests/python/topics/
   5. Variables the reply left out go straight to step 3.
 - **Events:** the runner sends simple events (`batch_done`, `retry`, `failed`) to the
   display and the statistics, so the display can be tested without a terminal.
-- **Ctrl-C:** stops the workers from taking new batches and waits up to `timeout` for the
+- **Ctrl-C:** a SIGINT handler in the main thread calls `Runner.request_stop()`, which stops the workers from taking new batches and waits up to `timeout` for the
   batches in flight. Then it compacts the store, writes `run.json` and the report, and exits
   with code 130. A second Ctrl-C exits at once; the store is still valid because it is
   append-only.

@@ -71,7 +71,13 @@ which area.
   stub whose `main()` returns 0. Run `uv lock` in `TT/`.
 - [ ] T004 [P] In the root `pyproject.toml`, add `"tools"` to ruff's `extend-exclude`. Add `TT/.gitignore` with `.venv/`, `__pycache__/` and `.pytest_cache/`.
 - [ ] T005 [P] Add `.github/workflows/topic-tagger.yml`:
-  - triggers: `push` and `pull_request`, with `paths: ["tools/topic-tagger/**", ".github/workflows/topic-tagger.yml"]`;
+  - triggers: every `push` and `pull_request`, with no `paths` filter. A required check
+    that never runs stays "pending" for ever and blocks the merge;
+  - a first step (`actions/checkout` with `fetch-depth: 0`, then `git diff --name-only`
+    against the pull request's base, or against the previous commit on a push) decides
+    whether anything under `tools/topic-tagger/` or this workflow file changed. When nothing
+    did, it prints "topic-tagger unchanged: nothing to test" and the remaining steps are
+    skipped with `if:`, so the job still reports success;
   - one job, `topic-tagger`, on `ubuntu-latest`, with `working-directory: tools/topic-tagger`;
   - steps: `actions/checkout` and `astral-sh/setup-uv`, pinned to SHAs as in `ci.yml`, then
     `uv sync --locked`, `uv run ruff check .`, `uv run ruff format --check .` and
@@ -173,7 +179,9 @@ the scheme, and every confidence is from 0 to 1.
 
 - [ ] T016 [P] [US1] `TT/tests/test_prompt.py`. `build_messages(scheme, batch)` returns `[system, user]`:
   - **System message:** contains the guidance, every topic as `id: label — description`
-    under its domain label, and the reply rules.
+    under its domain label, and the reply rules. The rules include "if nothing fits, use
+    `<fallback_topic>` with a low confidence", naming the scheme's `fallback_topic`. A test
+    with a different `fallback_topic` shows the name comes from the scheme.
   - **User message:** one JSON line per variable with `id` (the position in the batch, 0…n-1),
     `name`, `label` and `values`. `values` holds at most 30 entries, followed by `"… and N
     more"` when it is cut.
@@ -244,7 +252,8 @@ the scheme, and every confidence is from 0 to 1.
 the lock and Ctrl-C all work.
 
 **Independent test**: `test_cli.py::test_resume_after_interrupt`. The stand-in provider
-raises `KeyboardInterrupt` on its 2nd call. The run exits 130. A second run sends only the
+calls `runner.request_stop()` on its 2nd call; a real Ctrl-C reaches the same method through
+the CLI's SIGINT handler. The run exits 130. A second run sends only the
 untagged variables, and the final `tags.jsonl` equals that of an uninterrupted run.
 
 ### Tests for User Story 2 ⚠️ write first, see them fail
@@ -267,6 +276,8 @@ untagged variables, and the final `tags.jsonl` equals that of an uninterrupted r
   - **`--limit 5`:** sends 5.
   - **Lock:** a run whose output folder holds a live lock exits 4.
   - **Ctrl-C:** after an interrupt, `run.json` has `status: "stopped"`, and the lock is gone.
+  - **Signal path:** during a run, `signal.raise_signal(signal.SIGINT)` from the main thread
+    calls `request_stop()`, and a second SIGINT exits at once. Skipped on Windows.
 
 ### Implementation for User Story 2
 
@@ -274,7 +285,11 @@ untagged variables, and the final `tags.jsonl` equals that of an uninterrupted r
 - [ ] T030 [US2] Update `TT/src/topic_tagger/runner.py` and `TT/src/topic_tagger/cli.py` to pass T028:
   - **Selecting:** pick variables by state, `--retag`, `--files` and `--limit`.
   - **Lock:** take it before any request and release it in `finally`.
-  - **First Ctrl-C:** set a stop flag so workers take no new batches, wait up to `timeout`
+  - **Stopping:** `Runner.request_stop()` sets a `threading.Event`, and workers take no new
+    batches once it is set. Python delivers Ctrl-C only to the main thread, so the CLI
+    installs a SIGINT handler there that calls `request_stop()`. Never rely on
+    `KeyboardInterrupt` raised inside a worker.
+  - **First Ctrl-C** (or `request_stop()`): workers take no new batches, wait up to `timeout`
     for the batches in flight, compact, write `run.json` (status, settings, counts and
     failed), and exit 130.
   - **Second Ctrl-C:** exit at once.
@@ -349,7 +364,7 @@ seconds.
     and refreshes at 4 per second.
   - **Plain mode** writes a line every 10 seconds to stderr, in the form
     `[00:01:40] 120/600 (20%) 72/min eta 00:06:40 failed 0 retries 1`.
-- [ ] T038 [US4] Add to `TT/tests/test_cli.py`: with stdout not a terminal, or with `--plain`, the run writes plain lines and no ANSI escape codes. The final summary's counts equal the number of records in `tags.jsonl` (SC-004).
+- [ ] T038 [US4] Add to `TT/tests/test_cli.py`: with stderr not a terminal, or with `--plain`, the run writes plain lines and no ANSI escape codes. The final summary's counts equal the number of records in `tags.jsonl` (SC-004).
 
 ### Implementation for User Story 4
 
@@ -446,8 +461,9 @@ values.
     have exactly 5 elements.
   - **Reports without stopping:** records for unknown variables, variables with no record,
     and stale records whose scheme hash differs are each reported. Stale records are skipped.
-  - **Nothing else changes:** apart from the topic fields, every byte of each file is
-    unchanged.
+  - **Nothing else changes:** with the topic fields removed, each file parses to the same
+    JSON as before the merge. A second merge of the same tags leaves every file unchanged,
+    byte for byte.
   - **Exit codes:** 1 when the checks find problems, for example after a hand-corrupted
     `scheme.json`; 2 on bad input.
 - [ ] T052 [P] [US6] `tests/python/topics/test_independence.py`: `scripts/topics.py` does not import from `tools` or `topic_tagger`, and no file under `site/` refers to `tools/`.
@@ -472,7 +488,7 @@ values.
   - the licence, the same as the repository's;
   - "using this outside Cohort Data Builder".
 - [ ] T057 [P] Update the root `README.md`: a "Topic tagging" paragraph linking `tools/topic-tagger/README.md` and `docs/data-format.md#adding-topics`.
-- [ ] T058 Speed check in `TT/tests/test_store.py`: loading a generated `tags.jsonl` of 35,000 records takes under 2 s, and the stand-in provider's overhead for 1,000 variables in batches of 20 is under 1 s.
+- [ ] T058 Speed check in `TT/tests/test_speed.py`. Mark it `@pytest.mark.slow` and leave it out of the default run (`addopts = "-m 'not slow'"` and a registered `slow` marker in `TT/pyproject.toml`), because timings depend on the machine (Constitution I). T059 runs it with `uv run pytest -m slow`. It checks that loading a generated `tags.jsonl` of 35,000 records takes under 2 s, and the stand-in provider's overhead for 1,000 variables in batches of 20 is under 1 s.
 - [ ] T059 Run `specs/002-topic-tagger/quickstart.md` sections 1–6 by hand, including a real Ollama run on the fixtures and on one real cohort exported from `site/data`. Record the results (model, speed, leading topics, share below 50%) in the integration pull request.
 - [ ] T060 Integration pull request from `002-topic-tagger` to `main`. After the merge, tag `v0.2.0` and publish a GitHub Release whose notes name the tool and the processing script.
 

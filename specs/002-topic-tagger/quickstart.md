@@ -78,5 +78,6 @@ the topic chips and the topic filter.
 ## 6. CI
 
 - The site's `ci` workflow runs `tests/python/topics/`, the processing script's tests.
-- The `topic-tagger` workflow runs the tool's lint and tests, but only on changes under
-  `tools/topic-tagger/`.
+- The `topic-tagger` workflow runs on every pull request. It runs the tool's lint and tests
+  when `tools/topic-tagger/` changed, and otherwise passes at once, so it can be a required
+  check.

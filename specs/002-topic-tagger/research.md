@@ -74,7 +74,7 @@ applied to what comes back (FR-006). Pydantic is already a dependency of `openai
 ## R4. Live display
 
 **Decision**: `rich` (`Live`, `Progress`, `Table`). With no live terminal (`not
-sys.stdout.isatty()`, or `--plain`), plain progress lines go to stderr every 10 seconds.
+sys.stderr.isatty()`, or `--plain`), plain progress lines go to stderr every 10 seconds.
 
 **Rationale**:
 - `rich` is the standard for terminal dashboards in Python, and the PoC already used it.
@@ -83,6 +83,9 @@ sys.stdout.isatty()`, or `--plain`), plain progress lines go to stderr every 10 
 
 **Alternatives considered**: `tqdm` (progress bars only, no tables); `textual` (a full TUI
 framework, more than needed).
+
+The live display and progress lines go to stderr, and stdout carries only the final summary.
+So it is stderr that decides whether there is a live terminal.
 
 ## R5. Final report
 
@@ -159,8 +162,10 @@ refuses unless `--yes` is given.
 - Python 3.12.
 
 The root `pyproject.toml` excludes `tools/` from ruff and pytest. A separate workflow,
-`.github/workflows/topic-tagger.yml`, runs the tool's lint and tests on changes under
-`tools/topic-tagger/`.
+`.github/workflows/topic-tagger.yml`, runs on every push and pull request. It runs the
+tool's lint and tests only when something under `tools/topic-tagger/` changed; otherwise it
+passes at once. It has no `paths` filter, because a required check that never runs stays
+pending and blocks the merge.
 
 **Rationale**:
 - FR-023 and FR-024 require independence, and SC-006 requires that the folder can be copied
