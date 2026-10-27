@@ -177,7 +177,7 @@ the scheme, and every confidence is from 0 to 1.
 
 ### Tests for User Story 1 ⚠️ write first, see them fail
 
-- [ ] T016 [P] [US1] `TT/tests/test_prompt.py`. `build_messages(scheme, batch)` returns `[system, user]`:
+- [x] T016 [P] [US1] `TT/tests/test_prompt.py`. `build_messages(scheme, batch)` returns `[system, user]`:
   - **System message:** contains the guidance, every topic as `id: label — description`
     under its domain label, and the reply rules. The rules include "if nothing fits, use
     `<fallback_topic>` with a low confidence", naming the scheme's `fallback_topic`. A test
@@ -188,20 +188,20 @@ the scheme, and every confidence is from 0 to 1.
 
   `reply_schema(scheme)` gives a JSON schema whose `topic` is an `enum` of exactly
   `scheme.topic_ids` and whose `confidence` has `minimum` 0 and `maximum` 1.
-- [ ] T017 [P] [US1] `TT/tests/test_reply.py`. `parse_reply(text, scheme, batch_size)` returns `{batch id: [(topic, confidence), …]}`. It must:
+- [x] T017 [P] [US1] `TT/tests/test_reply.py`. `parse_reply(text, scheme, batch_size)` returns `{batch id: [(topic, confidence), …]}`. It must:
   - reject invalid JSON, an unknown topic, a confidence outside 0–1, or an id outside the
     batch, raising `ReplyError`;
   - merge duplicate topics, keeping the highest confidence;
   - round confidences to 2 decimal places;
   - sort tags strongest first, with ties in scheme order;
   - leave out ids that have no tags, so the caller treats them as missing.
-- [ ] T018 [P] [US1] `TT/tests/test_store.py` (writing only; resuming is in US2). `TagStore(out_dir)`:
+- [x] T018 [P] [US1] `TT/tests/test_store.py` (writing only; resuming is in US2). `TagStore(out_dir)`:
   - creates the folder;
   - `.write_scheme(scheme)` writes `scheme.json`;
   - `.append(records)` appends one JSON line per record to `tags.jsonl` and flushes;
   - each record has `file`, `variable`, `topics`, `scheme`, `model` and `tagged`, with
     `tagged` in ISO UTC from the injected clock.
-- [ ] T019 [US1] `TT/tests/test_runner.py`. `Runner(scheme, provider, store, settings, clock, on_event)`:
+- [x] T019 [US1] `TT/tests/test_runner.py`. `Runner(scheme, provider, store, settings, clock, on_event)`:
   - **Batches:** with batch size 20, sends 3 batches for 60 variables.
   - **Identifier:** tags the identifier row by rule, with `[[identifier_topic, 1.0]]` and
     `model: "rule"`, and never sends it.
@@ -214,7 +214,7 @@ the scheme, and every confidence is from 0 to 1.
     with it.
   - **Events:** emits `batch_done(n, tags)`, `retry` and `failed(key)` events.
   - **Workers:** with `workers=2`, never has more than 2 calls in flight.
-- [ ] T020 [US1] `TT/tests/test_cli.py`. Tests:
+- [x] T020 [US1] `TT/tests/test_cli.py`. Tests:
   - **Tags everything:** `test_tags_every_variable`, as above.
   - **Exit 2:** `tag` on a missing input file.
   - **Exit 3:** when `provider.check()` fails, with the message on stderr and no `complete`
@@ -229,18 +229,18 @@ the scheme, and every confidence is from 0 to 1.
 
 ### Implementation for User Story 1
 
-- [ ] T021 [P] [US1] Implement `TT/src/topic_tagger/prompt.py` to pass T016.
-- [ ] T022 [P] [US1] Implement `TT/src/topic_tagger/reply.py` to pass T017: a pydantic model is built from the scheme with `Literal[*topic_ids]` and `confidence: float = Field(ge=0, le=1)`, and `reply_schema` is that model's `model_json_schema()`.
-- [ ] T023 [P] [US1] Implement the writing part of `TT/src/topic_tagger/store.py` to pass T018.
-- [ ] T024 [US1] Implement `TT/src/topic_tagger/runner.py` to pass T019: a `concurrent.futures.ThreadPoolExecutor(max_workers=workers)`, with the retry ladder as in the plan's design notes. Records are appended to the store from the main thread as futures complete.
-- [ ] T025 [US1] Implement the `tag` command in `TT/src/topic_tagger/cli.py` to pass T020:
+- [x] T021 [P] [US1] Implement `TT/src/topic_tagger/prompt.py` to pass T016.
+- [x] T022 [P] [US1] Implement `TT/src/topic_tagger/reply.py` to pass T017: a pydantic model is built from the scheme with `Literal[*topic_ids]` and `confidence: float = Field(ge=0, le=1)`, and `reply_schema` is that model's `model_json_schema()`.
+- [x] T023 [P] [US1] Implement the writing part of `TT/src/topic_tagger/store.py` to pass T018.
+- [x] T024 [US1] Implement `TT/src/topic_tagger/runner.py` to pass T019: a `concurrent.futures.ThreadPoolExecutor(max_workers=workers)`, with the retry ladder as in the plan's design notes. Records are appended to the store from the main thread as futures complete.
+- [x] T025 [US1] Implement the `tag` command in `TT/src/topic_tagger/cli.py` to pass T020:
   - `argparse`, with every option and default in contracts/cli.md;
   - the exit codes as listed there;
   - `TOPIC_TAGGER_BASE_URL` and `TOPIC_TAGGER_API_KEY` read from the environment;
   - a remote-model prompt that uses `input()` only when stdin is a terminal.
 
   For now, end with a one-line plain summary on stdout; the live display comes in US4.
-- [ ] T026 [US1] Add a "Tag a cohort" section to `TT/README.md`: prerequisites (Ollama, `ollama pull gpt-oss:20b`), the `tag` command, the dry run, the exit codes, and the privacy note about remote and `-cloud` models.
+- [x] T026 [US1] Add a "Tag a cohort" section to `TT/README.md`: prerequisites (Ollama, `ollama pull gpt-oss:20b`), the `tag` command, the dry run, the exit codes, and the privacy note about remote and `-cloud` models.
 
 **Checkpoint**: on a machine with Ollama, `uv run topic-tagger tag tests/fixtures/variables.jsonl --out /tmp/x` tags all 60 variables.
 

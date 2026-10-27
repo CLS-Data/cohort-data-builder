@@ -34,9 +34,8 @@ environment. A host without an OpenAI-compatible API gets its own `Provider` cla
   A tool that maintainers run on their own machines, possibly with API keys in their
   environment, should keep its dependency surface small. Because providers sit behind
   `Provider`, a LiteLLM provider can be added later if a host needs it.
-- **LangChain (`langchain-ollama`)**: used by the PoC. It is heavy for one call, and its
-  abstractions (output parsers, message classes) add nothing that Pydantic and a prompt
-  string do not already give.
+- **LangChain (`langchain-ollama`)**: used by the PoC. It is heavy for one call, so it is
+  not used for calling the model. Its output parser is used, though (R3).
 - **`ollama` Python client**: light, but Ollama-only, so a second host would need a second
   client anyway.
 - **Instructor**: retries and validation around many clients. The tool's retry rules (whole
@@ -70,6 +69,18 @@ PyYAML and has ambiguous types ("no" read as false). JSON: no comments.
 
 **Rationale**: One definition gives both the schema the model is held to and the check
 applied to what comes back (FR-006). Pydantic is already a dependency of `openai`.
+
+**Parsing (revised 2026-10-27, after review)**: replies are parsed with LangChain's
+`PydanticOutputParser` (from `langchain-core` only, not the rest of LangChain), built on the
+same pydantic model. Its format instructions go at the end of the system message.
+
+- **Why both the schema and the instructions:** a real run against `gpt-oss:20b-cloud`
+  showed that Ollama cloud models ignore the JSON schema and answer in plain text, so the
+  prompt must also describe the format.
+- **Why the standard parser:** the reviewer preferred it to hand-written unwrapping and
+  format text. It accepts JSON in a code fence, but rejects JSON surrounded by other words.
+- **What the tool still does itself:** the checks the parser cannot know about. These are
+  ids within the batch, merging duplicate topics, rounding, and ordering.
 
 ## R4. Live display
 
