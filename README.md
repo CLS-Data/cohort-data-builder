@@ -109,3 +109,7 @@ GitHub Actions**. The site uses only relative URLs, so it works under
 
 See [CONTRIBUTING.md](CONTRIBUTING.md): a short branch per change, the failing test committed
 before the code, Conventional Commits, and a pull request with a "How to review" section.
+
+## Licence
+
+MIT; see [`LICENSE`](LICENSE). The Topic Tagger in `tools/topic-tagger/` carries its own copy.

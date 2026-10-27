@@ -45,7 +45,7 @@ Follow `CONTRIBUTING.md`:
 - **Release:** when the feature is done, one integration pull request goes from
   `002-topic-tagger` to `main`, followed by the release `v0.2.0`.
 
-- [ ] T001 Push `002-topic-tagger` to GitHub. Ask the user to add `002-topic-tagger` to the `release-branch` ruleset, or to a new matching rule (pull request required, linear history), and to make `ci`, `pr-description` and, once T005 exists, `topic-tagger` required checks on it and on `main-protection`.
+- [x] T001 Push `002-topic-tagger` to GitHub. Ask the user to add `002-topic-tagger` to the `release-branch` ruleset, or to a new matching rule (pull request required, linear history), and to make `ci`, `pr-description` and, once T005 exists, `topic-tagger` required checks on it and on `main-protection`.
 - [x] T002 Supersede 001 FR-029 for topic tagging only: in `specs/001-cohort-data-builder/spec.md`, add a note under FR-029 that points to `specs/002-topic-tagger/spec.md`. Update `CLAUDE.md` so it names spec 002 beside 001 and gives the tool's commands (the table above).
 
 **Checkpoint**: the integration branch is protected, and the docs say which spec governs
@@ -514,7 +514,7 @@ it (spec Clarifications).
 - [x] T057 [P] Update the root `README.md`: a "Topic tagging" paragraph linking `tools/topic-tagger/README.md` and `docs/data-format.md#adding-topics`.
 - [x] T058 Speed check in `TT/tests/test_speed.py`. Mark it `@pytest.mark.slow` and leave it out of the default run (`addopts = "-m 'not slow'"` and a registered `slow` marker in `TT/pyproject.toml`), because timings depend on the machine (Constitution I). T059 runs it with `uv run pytest -m slow`. It checks that loading a generated `tags.jsonl` of 35,000 records takes under 2 s, and the stand-in provider's overhead for 1,000 variables in batches of 20 is under 1 s.
 - [x] T059 Run `specs/002-topic-tagger/quickstart.md` sections 1–6 by hand, including a real Ollama run on the fixtures and on one real cohort exported from `site/data`. Record the results (model, speed, leading topics, share below 50%) in the integration pull request.
-- [ ] T060 Integration pull request from `002-topic-tagger` to `main`. After the merge, tag `v0.2.0` and publish a GitHub Release whose notes name the tool and the processing script.
+- [x] T060 Integration pull request from `002-topic-tagger` to `main`. After the merge, tag `v0.2.0` and publish a GitHub Release whose notes name the tool and the processing script.
 
 ---
 

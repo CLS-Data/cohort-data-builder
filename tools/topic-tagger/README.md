@@ -268,5 +268,5 @@ its site data to and from these formats; do the same for yours.
 
 ## Licence
 
-The tool is part of Cohort Data Builder and is released under the same licence as that
-repository.
+MIT, as for the rest of Cohort Data Builder. The licence text is in `LICENSE` in this
+folder, so a copy of the folder carries it.
