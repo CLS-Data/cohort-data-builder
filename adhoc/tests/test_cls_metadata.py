@@ -73,3 +73,15 @@ def test_sweep_keys(sweep, key):
 )
 def test_sweep_labels(text, label):
     assert sweep_label(text) == label
+
+
+@pytest.mark.parametrize(
+    "label", ["Not appplicable", "Don''t Know", "NA,Inapplicable", "Multi-coded", "Non response"]
+)
+def test_labels_seen_in_the_csv_that_mean_missing(label):
+    assert derive_na([["-1", label]]) == {"values": [-1], "ranges": []}
+
+
+@pytest.mark.parametrize("label", ["$100,000 OR MORE", "Still alive", "HOURS VARY"])
+def test_labels_seen_in_the_csv_that_are_answers(label):
+    assert derive_na([["-1", label]])["kept"] == [[-1, label]]

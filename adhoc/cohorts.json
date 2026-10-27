@@ -1,0 +1,35 @@
+{
+  "_note": "One entry per value of the CSV's `study` column, in the order the site lists them. Fields as in docs/data-format.md (manifest.json). Check the NCDS and MCS entries: they were written for this pipeline, not copied from the live site.",
+  "1958 NCDS": {
+    "key": "ncds",
+    "name": "NCDS",
+    "fullName": "1958 National Child Development Study",
+    "description": "Follows around 17,000 people born in England, Scotland and Wales in a single week of 1958, from birth into their sixties.",
+    "identifier": "NCDSID",
+    "ukdsUrl": "https://beta.ukdataservice.ac.uk/datacatalogue/series/series?id=2000032"
+  },
+  "1970 BCS": {
+    "key": "bcs70",
+    "name": "BCS70",
+    "fullName": "1970 British Cohort Study",
+    "description": "Follows around 17,000 people born in England, Scotland and Wales in a single week of 1970, from birth into their fifties.",
+    "identifier": "bcsid",
+    "ukdsUrl": "https://beta.ukdataservice.ac.uk/datacatalogue/series/series?id=200001"
+  },
+  "NEXT STEPS": {
+    "key": "next_steps",
+    "name": "Next Steps",
+    "fullName": "Next Steps (Longitudinal Study of Young People in England)",
+    "description": "Follows around 16,000 people born in 1989–90 in England, from age 14 in 2004 into their thirties.",
+    "identifier": "NSID",
+    "ukdsUrl": "https://beta.ukdataservice.ac.uk/datacatalogue/series/series?id=2000030"
+  },
+  "MCS": {
+    "key": "mcs",
+    "name": "MCS",
+    "fullName": "Millennium Cohort Study",
+    "description": "Follows around 19,000 young people born across the UK in 2000–02, from infancy into adulthood.",
+    "identifier": "MCSID",
+    "ukdsUrl": "https://beta.ukdataservice.ac.uk/datacatalogue/series/series?id=2000031"
+  }
+}
