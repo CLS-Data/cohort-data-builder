@@ -370,6 +370,26 @@ def test_a_finished_run_writes_stats_a_report_and_a_summary(tmp_path, variables_
         assert part in out, out
 
 
+def test_the_summary_lists_at_most_ten_files_and_groups(tmp_path, capsys):
+    # 15 files, file i holding i + 1 variables, each in its own group.
+    lines = [
+        json.dumps({"file": f"f{i:02d}", "variable": f"v{j}", "group": f"g{i:02d}"})
+        for i in range(15)
+        for j in range(i + 1)
+    ]
+    path = tmp_path / "v.jsonl"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert tag(path, tmp_path / "out", StubProvider(answer()), "--group-by", "group") == 0
+    out = capsys.readouterr().out
+    by_file = next(x for x in out.splitlines() if x.startswith("By file: "))
+    by_group = next(x for x in out.splitlines() if x.startswith("By group: "))
+    # Largest first, then a count of the rest.
+    assert by_file == "By file: " + ", ".join(f"f{i:02d} {i + 1}" for i in range(14, 4, -1)) + (
+        ", and 5 more"
+    )
+    assert by_group.startswith("By group: g14 15, g13 14,") and by_group.endswith(", and 5 more")
+
+
 def test_a_stopped_run_writes_the_report_too(tmp_path, variables_path):
     box = []
 
