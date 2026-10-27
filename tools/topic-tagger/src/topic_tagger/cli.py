@@ -10,7 +10,10 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from rich.console import Console
+
 from topic_tagger.clock import SystemClock
+from topic_tagger.display import RunView
 from topic_tagger.prompt import build_messages
 from topic_tagger.providers import Provider, ProviderError, get_provider
 from topic_tagger.runner import Runner, Settings, install_stop_handler
@@ -174,13 +177,20 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
         retries=args.retries,
         model=f"{args.provider}:{args.model}",
     )
-    runner = Runner(scheme, provider, store, settings, clock)
+    view = RunView(len(variables), len(todo), scheme, clock)
+    runner = Runner(scheme, provider, store, settings, clock, on_event=view.on_event)
     if runner_created:
         runner_created(runner)
     started = clock.now()
+    # The live view needs a terminal; logs and pipes get a plain line every 10 seconds.
+    if args.plain or not sys.stderr.isatty():
+        showing = view.plain(sys.stderr)
+    else:
+        showing = view.live(Console(stderr=True))
     restore = install_stop_handler(runner)
     try:
-        result = runner.run(todo)
+        with showing:
+            result = runner.run(todo)
     finally:
         restore()
     store.compact()

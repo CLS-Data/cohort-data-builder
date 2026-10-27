@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 
@@ -317,3 +318,27 @@ def test_tag_refuses_a_broken_scheme_before_any_request(
     assert tag(variables_path, tmp_path / "out", stub, "--scheme", str(bad)) == 2
     assert "smoking" in capsys.readouterr().err
     assert stub.calls == [] and stub.checked == 0
+
+
+# --- Watching a run (US4) ----------------------------------------------------------------
+
+PLAIN = re.compile(r"^\[\d\d:\d\d:\d\d\] \d+/\d+ \(\d+%\) \d+/min eta \S+ failed \d+ retries \d+$")
+
+
+@pytest.mark.parametrize("extra", [(), ("--plain",)])
+def test_without_a_terminal_the_run_writes_plain_lines(tmp_path, variables_path, capsys, extra):
+    assert tag(variables_path, tmp_path, StubProvider(answer()), *extra) == 0
+    err = capsys.readouterr().err
+    assert "\x1b[" not in err
+    lines = [x for x in err.splitlines() if PLAIN.match(x)]
+    assert lines and lines[-1].split()[1] == "60/60"
+
+
+def test_the_summary_matches_the_stored_tags(tmp_path, variables_path, capsys):
+    stub = StubProvider(
+        answer(skip=("A05HEAL",)),
+    )
+    tag(variables_path, tmp_path, stub, "--retries", "0")
+    out = capsys.readouterr().out
+    n = len(records(tmp_path))
+    assert f"Tagged {n} of 60" in out and n == 59
