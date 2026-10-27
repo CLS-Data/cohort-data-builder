@@ -27,6 +27,7 @@ convention = "google"
 
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]
+pythonpath = ["scripts"]
 markers = [
   "e2e: browser tests against the served site",
   "needs_r: needs Rscript with the haven package",
