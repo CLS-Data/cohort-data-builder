@@ -151,11 +151,11 @@ def test_each_broken_case_is_reported_against_its_file_only(case, data):
 
 
 def test_messages_name_what_is_wrong(data):
-    BROKEN["d1_missing_field"][0](data)
+    BROKEN["d2_count_mismatch"][0](data)
     BROKEN["d6_bad_range"][0](data)
     text = "\n".join(map(str, check_data(data)))
-    assert "identifier" in text
-    assert "tenure5" in text
+    assert "datasets.json: datasets[0] (mini): 'variables' is 17" in text
+    assert "mini/dict/mini_age5.json: variable tenure5: na.ranges[0] [5, 1]" in text
 
 
 def test_every_problem_is_reported_in_one_run(data):
