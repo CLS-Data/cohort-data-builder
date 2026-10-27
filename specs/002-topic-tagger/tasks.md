@@ -504,15 +504,15 @@ it (spec Clarifications).
 
 ## Phase 9: Polish (branch `002-polish`)
 
-- [ ] T055 [P] `TT/tests/test_independence.py`. No module under `TT/src` imports anything outside the standard library, `openai`, `pydantic`, `rich` and `topic_tagger`. No source or test file refers to a path outside `TT/`, such as `../`, `site/` or `PoC`. A test copies `TT/` (without `.venv`) to a temporary folder and runs `uv run --offline pytest -q -k "not independence"` there; that test is skipped when `uv` is missing (SC-006).
-- [ ] T056 [P] Write `TT/docs/formats.md` from `specs/002-topic-tagger/contracts/formats.md`, as the tool's own copy that stands alone without the specs. Complete `TT/README.md`:
+- [x] T055 [P] `TT/tests/test_independence.py`. No module under `TT/src` imports anything outside the standard library, `openai`, `pydantic`, `rich` and `topic_tagger`. No source or test file refers to a path outside `TT/`, such as `../`, `site/` or `PoC`. A test copies `TT/` (without `.venv`) to a temporary folder and runs `uv run --offline pytest -q -k "not independence"` there; that test is skipped when `uv` is missing (SC-006).
+- [x] T056 [P] Write `TT/docs/formats.md` from `specs/002-topic-tagger/contracts/formats.md`, as the tool's own copy that stands alone without the specs. Complete `TT/README.md`:
   - a quick start that can be done in 15 minutes (SC-001);
   - every option;
   - adding a provider: implement `Provider`, register it in `get_provider`;
   - the licence, the same as the repository's;
   - "using this outside Cohort Data Builder".
-- [ ] T057 [P] Update the root `README.md`: a "Topic tagging" paragraph linking `tools/topic-tagger/README.md` and `docs/data-format.md#adding-topics`.
-- [ ] T058 Speed check in `TT/tests/test_speed.py`. Mark it `@pytest.mark.slow` and leave it out of the default run (`addopts = "-m 'not slow'"` and a registered `slow` marker in `TT/pyproject.toml`), because timings depend on the machine (Constitution I). T059 runs it with `uv run pytest -m slow`. It checks that loading a generated `tags.jsonl` of 35,000 records takes under 2 s, and the stand-in provider's overhead for 1,000 variables in batches of 20 is under 1 s.
+- [x] T057 [P] Update the root `README.md`: a "Topic tagging" paragraph linking `tools/topic-tagger/README.md` and `docs/data-format.md#adding-topics`.
+- [x] T058 Speed check in `TT/tests/test_speed.py`. Mark it `@pytest.mark.slow` and leave it out of the default run (`addopts = "-m 'not slow'"` and a registered `slow` marker in `TT/pyproject.toml`), because timings depend on the machine (Constitution I). T059 runs it with `uv run pytest -m slow`. It checks that loading a generated `tags.jsonl` of 35,000 records takes under 2 s, and the stand-in provider's overhead for 1,000 variables in batches of 20 is under 1 s.
 - [ ] T059 Run `specs/002-topic-tagger/quickstart.md` sections 1–6 by hand, including a real Ollama run on the fixtures and on one real cohort exported from `site/data`. Record the results (model, speed, leading topics, share below 50%) in the integration pull request.
 - [ ] T060 Integration pull request from `002-topic-tagger` to `main`. After the merge, tag `v0.2.0` and publish a GitHub Release whose notes name the tool and the processing script.
 

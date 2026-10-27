@@ -12,7 +12,25 @@ descriptions and the instructions all come from a scheme file you choose with `-
 An example scheme is bundled (based on the CLOSER Discovery topics for UK cohort studies)
 for you to copy and adapt; the tool never uses it unless you pass it.
 
-This folder is a self-contained project: copy it anywhere and it works on its own.
+This folder is a self-contained project: copy it anywhere and it works on its own. The
+file formats are in [docs/formats.md](docs/formats.md).
+
+## Quick start (about 15 minutes)
+
+1. Install [uv](https://docs.astral.sh/uv/) and [Ollama](https://ollama.com), and start
+   Ollama.
+2. Pull a model: `ollama pull gpt-oss:20b` (13 GB; on a machine without a large GPU, a
+   smaller model or an Ollama `-cloud` model such as `gpt-oss:20b-cloud` is much faster).
+3. From this folder: `uv sync`, then `uv run topic-tagger init-scheme my-scheme.toml`.
+4. Try it on the 60 fictional variables that come with the tests:
+
+   ```sh
+   uv run topic-tagger tag tests/fixtures/variables.jsonl --out /tmp/tags --scheme my-scheme.toml
+   ```
+
+   You see the live view, then a summary. Open `/tmp/tags/report.html` in a browser.
+5. Write your own `variables.jsonl` ([format](docs/formats.md)), edit `my-scheme.toml`
+   to your topics, and tag for real.
 
 ## Install
 
@@ -177,10 +195,10 @@ description = "..."
 
 | Code | Meaning |
 |---|---|
-| 0 | Every variable tagged (or the dry run finished). |
+| 0 | Every variable tagged, or the dry run, check or report finished. |
 | 1 | Finished, but some variables could not be tagged; they are listed. |
 | 2 | Bad input, scheme or options; nothing was sent. |
-| 3 | Ollama could not be reached or the model is not installed; nothing was sent. |
+| 3 | The host could not be reached or the model is not installed; nothing was sent. |
 | 4 | Another run is using the output folder, or one left its lock (see `--force`). |
 | 130 | Stopped with Ctrl-C; what was tagged is saved. |
 
@@ -189,3 +207,66 @@ data. With a local model it never leaves your machine. A model on another machin
 Ollama `-cloud` model (which runs on Ollama's servers even through your local Ollama),
 sends that metadata off your machine: the tool says so and asks first, unless you pass
 `--yes`.
+
+## Every option
+
+`uv run topic-tagger --help` lists the commands and `uv run topic-tagger tag --help` the
+options, with their defaults.
+
+| Command | Does |
+|---|---|
+| `tag VARIABLES --out DIR --scheme FILE` | Tag the variables, carrying on from what `DIR` already has. |
+| `init-scheme PATH` | Copy the bundled example scheme to `PATH`, to edit. Never overwrites. |
+| `check-scheme FILE` | List every mistake in a scheme, or summarise it. |
+| `report DIR [--group-by FIELD]` | Rebuild `report.html` (and the statistics in `run.json`). |
+
+| `tag` option | Default | Meaning |
+|---|---|---|
+| `--scheme FILE` | required | The topics and instructions. |
+| `--group-by FIELD` | `sweep` | Input field the statistics are grouped by. |
+| `--provider NAME` | `ollama` | The model host. |
+| `--base-url URL` | `http://localhost:11434/v1` | Where the host's API is; also `TOPIC_TAGGER_BASE_URL`. |
+| `--model NAME` | `gpt-oss:20b` | Model name on the host. |
+| `--batch-size N` | 20 | Variables per request. |
+| `--workers N` | 2 | Requests in flight at once. |
+| `--timeout S` | 120 | Seconds before a request is abandoned and retried. |
+| `--retries N` | 2 | Retries per batch before its variables are sent one at a time. |
+| `--files A,B` | all | Tag only these data files. |
+| `--limit N` | all | Tag at most N variables. |
+| `--retag` | off | Redo variables that already have current tags. |
+| `--dry-run` | off | Print the instructions and the first batch; send nothing. |
+| `--yes` | off | Do not ask before sending to a remote model. |
+| `--plain` | off | Plain progress lines instead of the live view (automatic without a terminal). |
+| `--force` | off | Clear a lock left by a run that ended without cleaning up. |
+
+A host that needs an API key reads it from `TOPIC_TAGGER_API_KEY`, never from an option,
+so it is not in your shell history or in `run.json`.
+
+## Adding a model host
+
+The tool talks to Ollama through its OpenAI-compatible API, so a host with the same API
+(vLLM, LM Studio, llama.cpp's server) already works with `--base-url` and, if it needs
+one, `TOPIC_TAGGER_API_KEY`; its error messages will still name Ollama until the host is
+registered as below.
+
+To give a host its own name, wording or rules, register it in `get_provider` in
+`src/topic_tagger/providers/__init__.py`: either the existing `OpenAICompatProvider` with
+the host's name, the command that installs a missing model and the suffix of models it
+runs remotely, or a new class with the three methods of the `Provider` protocol:
+`check()` (raise `ProviderError` unless the host and model are there), `is_remote()`, and
+`complete(messages, schema)` (return the reply's text). Replies are checked by the tool,
+not the host, so a new host needs no parsing of its own.
+
+## Using this outside Cohort Data Builder
+
+Nothing here depends on the rest of the repository: copy this folder anywhere, run
+`uv sync`, and `uv run pytest` passes. Prepare a `variables.jsonl` from your own metadata
+([format](docs/formats.md)), write a scheme for your own topics (starting from
+`init-scheme` or from scratch), and read the tags from `tags.jsonl`. Cohort Data Builder
+does this with its own script (`scripts/topics.py` in that repository), which converts
+its site data to and from these formats; do the same for yours.
+
+## Licence
+
+The tool is part of Cohort Data Builder and is released under the same licence as that
+repository.

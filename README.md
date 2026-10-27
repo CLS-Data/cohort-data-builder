@@ -28,6 +28,14 @@ project.
 4. Unzip, put the data files listed in its README into `data/` (any of `.tab`, `.csv`,
    `.dta`, `.sav`, in any subfolder), and run `R/merge.R` or `python/merge.py`.
 
+## Topic tagging
+
+Cohorts often arrive without topics. The [Topic Tagger](tools/topic-tagger/README.md) in
+`tools/topic-tagger/` assigns them with a language model run by the maintainer through
+Ollama, with live progress and an HTML report. It is a self-contained tool, usable outside
+this project. `scripts/topics.py` exports a cohort from `site/data` for it and merges the
+tags back; [docs/data-format.md](docs/data-format.md#adding-topics) has the three commands.
+
 ## Repository layout
 
 ```text
@@ -43,6 +51,8 @@ tests/
   python/generated/   runs the generated R and Python on fabricated data
   python/e2e/         browser tests (Playwright), accessibility, phone width, speed
   fixtures/data/      a tiny fictional cohort used by the tests
+tools/topic-tagger/   the Topic Tagger, a standalone Python tool
+scripts/              topics.py (export/merge for the tagger) and checks.py (data checks)
 docs/data-format.md   the supplied-data format, for the data team
 specs/                the specification, plan and task list
 ```
