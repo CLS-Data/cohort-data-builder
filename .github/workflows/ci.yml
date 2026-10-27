@@ -1,0 +1,66 @@
+# Every quality gate in the constitution, on every push and pull request. Also called by
+# pages.yml, so nothing is published unless all of it passes.
+
+name: CI
+
+on:
+  # Pushes to short-lived branches are covered by their pull request's run.
+  push:
+    branches: [main, 001-cohort-data-builder]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
+        with:
+          use-public-rspm: true
+      # Caches keep runs to minutes when GitHub's mirrors are slow.
+      - name: Cache R packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-haven-${{ runner.os }}-v1
+      - name: Install R haven
+        run: Rscript -e 'if (!requireNamespace("haven", quietly = TRUE)) install.packages("haven", repos = "https://cloud.r-project.org")'
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          uv sync --locked
+          uv run playwright install --with-deps chromium
+
+      # Supplied data first: a bad data drop fails fast with a readable list.
+      - name: Supplied-data checks
+        run: uv run pytest tests/python/data
+      - name: Python lint
+        run: uv run ruff check .
+      - name: Python format
+        run: uv run ruff format --check .
+      - name: JavaScript lint and format
+        run: npm run lint
+      - name: JavaScript tests
+        run: npm test
+      - name: Python, generated-script and browser tests
+        env:
+          CDB_REQUIRE_R: "1" # R tests must run here, never skip
+        run: uv run pytest --ignore=tests/python/data

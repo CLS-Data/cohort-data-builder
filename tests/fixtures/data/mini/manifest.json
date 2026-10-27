@@ -1,0 +1,102 @@
+{
+ "key": "mini",
+ "name": "Mini",
+ "fullName": "Mini Test Cohort",
+ "description": "A tiny fictional cohort for tests.",
+ "identifier": "PID",
+ "ukdsUrl": "https://example.org/mini",
+ "built": "2026-10-26",
+ "wave": {
+  "term": "sweep",
+  "plural": "sweeps",
+  "list": [
+   {
+    "key": "5y",
+    "label": "Age 5"
+   },
+   {
+    "key": "10y",
+    "label": "Age 10"
+   },
+   {
+    "key": "xwave",
+    "label": "Cross-sweep files"
+   }
+  ]
+ },
+ "levels": [
+  "NOMINAL",
+  "ORDINAL",
+  "SCALE"
+ ],
+ "files": [
+  {
+   "name": "mini_age5",
+   "wave": "5y",
+   "study": "0000",
+   "description": "Age 5 interview",
+   "hasId": true
+  },
+  {
+   "name": "mini_age10",
+   "wave": "10y",
+   "study": "0000",
+   "description": "Age 10 interview",
+   "hasId": true
+  },
+  {
+   "name": "mini_grid",
+   "wave": "10y",
+   "study": "0000",
+   "description": "Age 10 household grid, one row per household member",
+   "hasId": true
+  },
+  {
+   "name": "mini_noid",
+   "wave": "xwave",
+   "study": "0000",
+   "description": "Area lookup, no person identifier",
+   "hasId": false
+  }
+ ],
+ "counts": {
+  "variables": 16,
+  "files": 4
+ },
+ "topics": {
+  "name": "Mini topics",
+  "version": 1,
+  "hash": "000000000000",
+  "domains": [
+   {
+    "id": "health",
+    "label": "Health",
+    "description": "Physical and mental health.",
+    "topics": [
+     {
+      "id": "smoking",
+      "label": "Smoking",
+      "description": "Tobacco use."
+     },
+     {
+      "id": "alcohol",
+      "label": "Alcohol",
+      "description": "Drinking."
+     }
+    ]
+   },
+   {
+    "id": "housing",
+    "label": "Housing",
+    "description": "Where people live.",
+    "topics": [
+     {
+      "id": "tenure",
+      "label": "Tenure",
+      "description": "Owning or renting."
+     }
+    ]
+   }
+  ]
+ }
+}

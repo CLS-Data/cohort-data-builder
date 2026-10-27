@@ -1,0 +1,144 @@
+{
+ "file": "mini_age10",
+ "wave": "10y",
+ "variables": [
+  {
+   "variable": "pid",
+   "label": "Person identifier",
+   "type": "numeric",
+   "measurement": "NOMINAL"
+  },
+  {
+   "variable": "sex",
+   "label": "Sex of cohort member",
+   "type": "numeric",
+   "measurement": "NOMINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Male"
+    },
+    {
+     "value": "2.0",
+     "label": "Female"
+    }
+   ]
+  },
+  {
+   "variable": "alc10",
+   "label": "How often drinks alcohol",
+   "type": "numeric",
+   "measurement": "ORDINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Never"
+    },
+    {
+     "value": "2.0",
+     "label": "Sometimes"
+    },
+    {
+     "value": "-1.0",
+     "label": "Dislike"
+    },
+    {
+     "value": "-9.0",
+     "label": "Refused"
+    }
+   ],
+   "na": {
+    "values": [],
+    "ranges": [
+     [
+      -9,
+      -2
+     ]
+    ],
+    "kept": [
+     [
+      -1,
+      "Dislike"
+     ]
+    ]
+   },
+   "topics": [
+    [
+     "alcohol",
+     0.3
+    ]
+   ]
+  },
+  {
+   "variable": "tenure10",
+   "label": "Housing tenure of the family home",
+   "type": "numeric",
+   "measurement": "NOMINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Owned"
+    },
+    {
+     "value": "2.0",
+     "label": "Rented"
+    },
+    {
+     "value": "-1.0",
+     "label": "Not applicable"
+    }
+   ],
+   "na": {
+    "values": [
+     -1
+    ],
+    "ranges": []
+   },
+   "topics": [
+    [
+     "tenure",
+     0.95
+    ]
+   ]
+  },
+  {
+   "variable": "weight10",
+   "label": "Weight in kilograms",
+   "type": "numeric",
+   "measurement": "SCALE"
+  },
+  {
+   "variable": "mood10",
+   "label": "Mood today",
+   "type": "numeric",
+   "measurement": "ORDINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Good"
+    },
+    {
+     "value": "-8.0",
+     "label": "Don't know"
+    }
+   ],
+   "na": {
+    "values": [
+     -8
+    ],
+    "ranges": [],
+    "lossy": [
+     [
+      -8,
+      "Don't know"
+     ]
+    ]
+   }
+  },
+  {
+   "variable": "misc10",
+   "label": "Interviewer notes code",
+   "type": "numeric"
+  }
+ ]
+}

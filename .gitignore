@@ -12,3 +12,11 @@ PoC/
 
 # R session history
 **/.Rhistory
+
+# Tooling
+.venv/
+node_modules/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+test-results/

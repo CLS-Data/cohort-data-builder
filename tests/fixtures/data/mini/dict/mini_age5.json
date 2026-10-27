@@ -1,0 +1,107 @@
+{
+ "file": "mini_age5",
+ "wave": "5y",
+ "variables": [
+  {
+   "variable": "PID",
+   "label": "Person identifier",
+   "type": "numeric",
+   "measurement": "NOMINAL"
+  },
+  {
+   "variable": "sex",
+   "label": "Sex of cohort member",
+   "type": "numeric",
+   "measurement": "NOMINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Male"
+    },
+    {
+     "value": "2.0",
+     "label": "Female"
+    }
+   ],
+   "na": {
+    "values": [
+     -9
+    ],
+    "ranges": []
+   }
+  },
+  {
+   "variable": "smoke5",
+   "label": "Does the mother smoke",
+   "type": "numeric",
+   "measurement": "NOMINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Yes"
+    },
+    {
+     "value": "2.0",
+     "label": "No"
+    }
+   ],
+   "topics": [
+    [
+     "smoking",
+     0.95
+    ],
+    [
+     "alcohol",
+     0.55
+    ]
+   ]
+  },
+  {
+   "variable": "tenure5",
+   "label": "Housing tenure of the family home",
+   "type": "numeric",
+   "measurement": "NOMINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Owned"
+    },
+    {
+     "value": "2.0",
+     "label": "Rented"
+    },
+    {
+     "value": "-1.0",
+     "label": "Not applicable"
+    }
+   ],
+   "na": {
+    "values": [],
+    "ranges": [
+     [
+      null,
+      -1
+     ]
+    ]
+   },
+   "topics": [
+    [
+     "tenure",
+     0.6
+    ]
+   ]
+  },
+  {
+   "variable": "quote5",
+   "label": "Mother said \"fine\"\\not fine\nsecond line",
+   "type": "numeric",
+   "measurement": "ORDINAL"
+  },
+  {
+   "variable": "nolab5",
+   "label": "",
+   "type": "numeric",
+   "measurement": "NOMINAL"
+  }
+ ]
+}

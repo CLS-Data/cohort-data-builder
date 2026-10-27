@@ -1,0 +1,13 @@
+{
+ "built": "2026-10-26",
+ "datasets": [
+  {
+   "key": "mini",
+   "name": "Mini",
+   "fullName": "Mini Test Cohort",
+   "description": "A tiny fictional cohort for tests.",
+   "variables": 16,
+   "files": 4
+  }
+ ]
+}

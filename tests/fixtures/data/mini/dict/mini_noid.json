@@ -1,0 +1,12 @@
+{
+ "file": "mini_noid",
+ "wave": "xwave",
+ "variables": [
+  {
+   "variable": "areacode",
+   "label": "Area code",
+   "type": "numeric",
+   "measurement": "NOMINAL"
+  }
+ ]
+}
