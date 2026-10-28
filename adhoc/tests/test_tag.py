@@ -26,7 +26,7 @@ def test_gives_up_after_tries_without_progress():
 
 
 def test_progress_resets_the_count():
-    run, tagged = fake([1, 1, 1, 1, 0], [0, 0, 0, 4, 4, 9])
+    run, tagged = fake([1, 1, 1, 0], [0, 0, 4, 4, 9])
     assert tag_cohort(run, tagged, tries=2, wait=0, sleep=lambda s: None) == 0
 
 

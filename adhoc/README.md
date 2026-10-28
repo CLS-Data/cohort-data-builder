@@ -37,16 +37,17 @@ human-assigned research topic and subtopic. What is worked out:
 
 ## 2. Tag (by hand)
 
-For each cohort, from `tools/topic-tagger/`:
-
 ```sh
-uv run topic-tagger init-scheme ../../adhoc/scheme.toml     # once; edit it if you like
-uv run topic-tagger tag ../../adhoc/data/staging/<key>/tagger/variables.jsonl \
-  --out ../../adhoc/data/staging/<key>/tags --scheme ../../adhoc/scheme.toml \
-  --model gpt-oss:20b-cloud
+uv run python adhoc/tag.py                    # every cohort; or name some: ncds mcs
+uv run python adhoc/tag.py --model gpt-oss:20b-cloud --tries 5 --wait 30
 ```
 
-Stop it at any time; the same command carries on. Check each `tags/report.html`.
+Runs the tagger on each cohort's `tagger/variables.jsonl` into its `tags/`, with
+`adhoc/scheme.toml` (make it once with `topic-tagger init-scheme`). A bad reply from the
+model host can end the tagger with a traceback; the script runs it again after `--wait`
+seconds, carrying on where it stopped, and gives up after `--tries` runs in a row that tag
+nothing new. Other options are passed to the tagger. Stop it at any time; the same
+command carries on. Check each `tags/report.html`.
 At about 100–140 variables a minute, all four cohorts take 14–19 hours.
 
 ## 3. Build
