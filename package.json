@@ -8,6 +8,6 @@
     "test": "node --test \"tests/js/**/*.test.mjs\""
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.3"
+    "@biomejs/biome": "2.6.4"
   }
 }
