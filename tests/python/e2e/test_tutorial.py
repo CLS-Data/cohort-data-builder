@@ -24,13 +24,28 @@ def tutorial(page, base):
     return page
 
 
-def test_loads_only_its_own_files_and_the_data(page, base):
+def test_loads_only_its_own_files_the_data_and_the_builders_styles(page, base):
     requested = []
     page.on("request", lambda r: requested.append(r.url))
     page.goto(base + "tutorial/")
     expect(page.locator("#t-total")).to_have_text("16")
-    outside = [u for u in requested if not u.startswith((base + "tutorial/", base + "data/"))]
+    own = (base + "tutorial/", base + "data/", base + "styles.css")
+    outside = [u for u in requested if not u.startswith(own)]
     assert outside == []
+    assert base + "styles.css" in requested
+
+
+def test_shares_the_builders_theme_setting(page, base):
+    page.emulate_media(color_scheme="light")
+    page.goto(base)
+    expect(page.locator("#result-count")).to_have_text("16 variables")
+    page.locator("#theme").click()
+    page.goto(base + "tutorial/")
+    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+    page.locator("#theme").click()
+    expect(page.locator("html")).to_have_attribute("data-theme", "light")
+    page.goto(base)
+    expect(page.locator("html")).to_have_attribute("data-theme", "light")
 
 
 def test_title_and_counts_come_from_the_data(tutorial):
@@ -74,6 +89,25 @@ def test_selection_demo_click_shift_click_and_clear(tutorial):
     expect(page.locator("#select-count")).to_have_text("0 selected")
 
 
+def test_clicking_a_topic_shows_it_alone_in_the_sweep_bars(tutorial):
+    page = tutorial
+    expect(page.locator("#spine-name")).to_have_text("All six topics")
+    page.locator("#heat").get_by_role("button", name="Smoking").click()
+    expect(page.locator("#spine-name")).to_have_text("Smoking")
+    expect(page.locator("#spine-total")).to_have_text("322")
+    page.locator("#heat").get_by_role("button", name="Smoking").click()
+    expect(page.locator("#spine-name")).to_have_text("All six topics")
+
+
+def test_selection_groups_by_sweep_or_file(tutorial):
+    page = tutorial
+    demo = page.locator("#select-demo")
+    demo.get_by_role("button", name="Select cgprega4").click()
+    expect(page.locator("#select-panel")).to_contain_text("Age 29/30")
+    demo.get_by_role("button", name="File").click()
+    expect(page.locator("#select-panel")).to_contain_text("bcs2000")
+
+
 def test_download_options_update_the_summary(tutorial):
     page = tutorial
     demo = page.locator("#download-demo")
@@ -110,9 +144,9 @@ def test_shade_switch_rescales_the_topic_map(tutorial):
 def test_confidence_filter_hides_less_certain_topics(tutorial):
     page = tutorial
     off = page.locator("#confidence-demo .chip.is-off")
-    page.get_by_role("button", name="0.3").click()
+    page.get_by_role("button", name="30%").click()
     expect(off).to_have_count(0)
-    page.get_by_role("button", name="0.9").click()
+    page.get_by_role("button", name="90%").click()
     assert off.count() > 0
 
 
