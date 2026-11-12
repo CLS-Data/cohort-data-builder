@@ -199,6 +199,13 @@ code, kbd { font-family: var(--mono); font-size: .92em; }
 }
 .theme::after { content: "◑"; color: var(--ink-2); font-size: 15px; }
 
+.guide-link {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .05em; text-transform: uppercase;
+  padding: 7px 13px; border: 1px solid var(--rule); border-radius: 2px;
+  color: var(--ink); text-decoration: none; background: var(--paper);
+}
+.guide-link:hover { border-color: var(--ink-3); }
+
 /* ── The overview ─────────────────────────────────────────────────────
 
    One chart: its first row is every matching variable by sweep, and the rows
