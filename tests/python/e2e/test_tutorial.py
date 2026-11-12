@@ -147,3 +147,12 @@ def test_fits_a_phone(page, base):
     expect(page.locator("#t-total")).to_have_text("16")
     width = page.evaluate("document.documentElement.scrollWidth")
     assert width <= 390
+
+
+def test_the_builder_links_to_it(page, base):
+    page.goto(base)
+    expect(page.locator("#result-count")).to_have_text("16 variables")
+    link = page.locator("header").get_by_role("link", name="Tutorial")
+    expect(link).to_have_attribute("href", "tutorial/")
+    link.click()
+    expect(page.locator("#t-total")).to_have_text("16")
