@@ -122,7 +122,7 @@ def test_topics_section_names_closer_and_points_to_the_tagger(tutorial):
     expect(section).to_contain_text("CLOSER")
     expect(section.get_by_role("link", name=re.compile("CLOSER Discovery"))).to_be_visible()
     expect(section.get_by_role("link", name=re.compile("Topic Tagger")).first).to_have_attribute(
-        "href", re.compile(r"tools/topic-tagger")
+        "href", re.compile(r"#topic-tagging$")
     )
 
 
