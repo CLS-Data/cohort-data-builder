@@ -154,6 +154,8 @@ def test_topics_section_names_closer_and_points_to_the_tagger(tutorial):
     page = tutorial
     section = page.locator("#topics")
     expect(section).to_contain_text("CLOSER")
+    expect(section).to_contain_text("large language model")
+    expect(section).not_to_contain_text("O'Neill")
     expect(section.get_by_role("link", name=re.compile("CLOSER Discovery"))).to_be_visible()
     expect(section.get_by_role("link", name=re.compile("Topic Tagger")).first).to_have_attribute(
         "href", re.compile(r"#topic-tagging$")
