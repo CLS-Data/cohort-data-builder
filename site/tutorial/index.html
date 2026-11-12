@@ -245,10 +245,10 @@
         <h2 id="h-topics">Where the topics come from</h2>
         <p>Topics use the <strong>CLOSER</strong> taxonomy: the domains and topics of
           <a href="https://discovery.closer.ac.uk/">CLOSER Discovery</a>, the search platform for
-          UK longitudinal studies (<a href="https://doi.org/10.1093/ije/dyz004">O'Neill et al., 2019</a>),
-          with a few added for themes it lacks, such as Covid-19. Using one vocabulary means a
+          UK longitudinal studies, with a few added for themes it lacks, such as Covid-19. Using one vocabulary means a
           topic means the same thing in every cohort.</p>
-        <p>Each variable can carry several topics, each with a confidence. In the builder,
+        <p>The tags are classified by a large language model (LLM): it reads each variable and
+          gives it one or more topics, each with a confidence. In the builder,
           <strong>Topic tags ≥</strong> sets how sure a tag must be before it is shown, counted
           and used in the filter. Try it on the right.</p>
         <ul class="t-domains" id="t-domain-list" aria-label="Topic domains"></ul>
@@ -271,8 +271,9 @@
         <div class="t-card">
           <h3>Tagged with the Topic Tagger</h3>
           <p>Every variable was tagged by our Topic Tagger, an open-source tool in this
-            repository. It reads each variable's name, label and values and assigns CLOSER topics
-            with a confidence. You can run it on any study.</p>
+            repository. It sends each variable's name, label and values to a large language model,
+            which classifies it into CLOSER topics and says how confident it is. You can run it
+            on any study.</p>
           <a class="btn" href="https://github.com/CLS-Data/cohort-data-builder#topic-tagging">Topic Tagger on GitHub →</a>
         </div>
       </div>
