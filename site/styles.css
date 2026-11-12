@@ -201,10 +201,10 @@ code, kbd { font-family: var(--mono); font-size: .92em; }
 
 .guide-link {
   font-family: var(--mono); font-size: 12px; letter-spacing: .05em; text-transform: uppercase;
-  padding: 7px 13px; border: 1px solid var(--rule); border-radius: 2px;
-  color: var(--ink); text-decoration: none; background: var(--paper);
+  padding: 7px 13px; border: 1px solid transparent; border-radius: 2px;
+  color: var(--ink-2); text-decoration: none;
 }
-.guide-link:hover { border-color: var(--ink-3); }
+.guide-link:hover { color: var(--ink); background: var(--paper-3); }
 
 /* ── The overview ─────────────────────────────────────────────────────
 

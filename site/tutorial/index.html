@@ -1,249 +1,299 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tutorial · Cohort Data Builder</title>
-  <meta name="description" content="How to search, select and download cohort variables with Cohort Data Builder, and where its topics come from.">
-  <link rel="stylesheet" href="tutorial.css">
-  <script src="tutorial.js" defer></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutorial · Cohort Data Builder</title>
+<meta name="description" content="How to find variables in longitudinal cohort studies, select them and download a ready-to-run R or Python project that merges them.">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="tutorial.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🧵</text></svg>">
+<script src="tutorial.js" defer></script>
 </head>
 <body>
+
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="top">
-  <div class="wrap top-row">
-    <a class="brand" href="../">
-      <span class="brand-mark" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h6"/></svg>
-      </span>
-      Cohort Data Builder
-    </a>
-    <nav aria-label="Tutorial sections" class="nav">
-      <a href="#search">Search</a>
-      <a href="#explore">Explore</a>
-      <a href="#select">Select</a>
-      <a href="#download">Download</a>
-      <a href="#run">Run</a>
-      <a href="#topics">Topics</a>
-    </nav>
-    <a class="btn btn-primary" href="../">Open the builder</a>
+<p class="beta-bar" role="note">
+  <strong>Beta.</strong> This tool is still being developed: check anything you rely on
+  against the UK Data Service documentation, and
+  <a href="https://github.com/CLS-Data/cohort-data-builder/issues">tell us what's wrong or missing</a>.
+</p>
+
+<header class="masthead">
+  <div class="mark">
+    <span class="mark-name"><a href="../">Cohort Data Builder</a></span>
+    <span class="beta-pill" title="Still being developed">Beta</span>
+    <span class="mark-sub">Tutorial</span>
   </div>
+  <nav class="views" aria-label="Pages">
+    <a class="view-tab" href="../">Open the builder</a>
+    <a class="view-tab is-current" href="./" aria-current="page">Tutorial</a>
+  </nav>
+  <button class="theme" id="theme" type="button" aria-label="Switch colour theme" title="Switch colour theme"></button>
 </header>
 
 <main id="main">
 
-<!-- Hero -->
-<section class="hero wrap">
-  <p class="eyebrow">Tutorial · five steps</p>
-  <h1>From thousands of variables to one tidy file, without writing the merge yourself.</h1>
-  <p class="lede">Search the variables of UK cohort studies, pick the ones you need, and download a ready-to-run R or Python project that merges them from your own copy of the data, one row per participant. Everything below works: try it as you read.</p>
-
-  <dl class="stats">
-    <div class="stat"><dt>Cohort studies</dt><dd id="t-cohorts">…</dd></div>
-    <div class="stat"><dt>Variables, all searchable</dt><dd id="t-total">…</dd></div>
-    <div class="stat"><dt>Topics</dt><dd id="t-topics">…</dd></div>
-    <div class="stat"><dt>Topic domains</dt><dd id="t-domains">…</dd></div>
-  </dl>
-  <ul class="cohorts" id="t-cohort-list" aria-label="Cohorts on the site"></ul>
-  <p class="note-plain">The site and the download contain no study data, only the published data dictionaries. You get the data itself from the UK Data Service.</p>
-</section>
-
-<!-- Step 1 -->
-<section class="step" id="search" aria-labelledby="h-search">
-  <div class="wrap split">
-    <div class="copy">
-      <p class="step-no">Step 1</p>
-      <h2 id="h-search">Choose a cohort and search</h2>
-      <p>Pick a study from the <strong>Cohort</strong> menu, then type any part of a variable’s name or label. Results update as you type.</p>
-      <ul class="points">
-        <li><strong>Narrow it down</strong> by sweep, file, measurement level or topic.</li>
-        <li><strong>Open a variable</strong> with <span class="kbd">▸</span> to see its value labels, missing codes and topics.</li>
-        <li><strong>Page through</strong> long results 200 at a time.</li>
+  <section class="overview">
+    <div class="t-wrap t-intro">
+      <p class="t-kicker">Tutorial · six steps, about five minutes</p>
+      <h1>From a question to a merged dataset, without opening a codebook</h1>
+      <p class="t-lede">Search every variable in the studies, see where a topic was measured,
+        pick what you need and download a small R or Python project that builds your dataset
+        from your own copy of the data. Every panel below is a working copy of the builder:
+        try it as you read.</p>
+      <ul class="t-stats" aria-label="What the builder holds">
+        <li><b id="t-total">–</b><span>variables</span></li>
+        <li><b id="t-cohorts">–</b><span>cohorts</span></li>
+        <li><b id="t-domains">–</b><span>topic domains</span></li>
+        <li><b id="t-topics">–</b><span>topics</span></li>
       </ul>
-    </div>
-    <div class="demo" id="search-demo">
-      <p class="demo-tag">Try it · real BCS70 variables</p>
-      <label class="search" for="search-input">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        <span class="sr">Try a search</span>
-        <input id="search-input" type="search" placeholder="Try “pregnancy” or “cigarettes”" autocomplete="off">
-      </label>
-      <p class="demo-count" id="search-count" aria-live="polite"></p>
-      <ul class="rows" id="search-rows"></ul>
-    </div>
-  </div>
-</section>
+      <ul class="t-cohorts" id="t-cohort-list" aria-label="Cohorts"></ul>
 
-<!-- Step 2 -->
-<section class="step alt" id="explore" aria-labelledby="h-explore">
-  <div class="wrap">
-    <div class="copy narrow">
-      <p class="step-no">Step 2</p>
-      <h2 id="h-explore">See what each sweep covers</h2>
-      <p>Above the results, the topic map shows how many variables each sweep has on each topic. Click a cell to filter by that topic and sweep. Here is the real map for six BCS70 topics.</p>
+      <nav class="t-steps" aria-label="Steps">
+        <ol class="spine-track">
+          <li><a class="node" href="#search"><span class="node-bar"><span class="node-fill"></span></span><span class="node-age">01</span><span class="node-n">Search</span></a></li>
+          <li><a class="node" href="#explore"><span class="node-bar"><span class="node-fill"></span></span><span class="node-age">02</span><span class="node-n">Explore</span></a></li>
+          <li><a class="node" href="#select"><span class="node-bar"><span class="node-fill"></span></span><span class="node-age">03</span><span class="node-n">Select</span></a></li>
+          <li><a class="node" href="#download"><span class="node-bar"><span class="node-fill"></span></span><span class="node-age">04</span><span class="node-n">Download</span></a></li>
+          <li><a class="node" href="#run"><span class="node-bar"><span class="node-fill"></span></span><span class="node-age">05</span><span class="node-n">Run</span></a></li>
+          <li><a class="node" href="#topics"><span class="node-bar"><span class="node-fill"></span></span><span class="node-age">06</span><span class="node-n">Topics</span></a></li>
+        </ol>
+      </nav>
     </div>
+  </section>
 
-    <div class="demo demo-wide">
-      <div class="heat-head">
-        <fieldset class="seg" id="shade">
-          <legend>Shade</legend>
-          <label><input type="radio" name="shade" value="within" checked> Within each topic</label>
-          <label><input type="radio" name="shade" value="across"> Across topics</label>
-        </fieldset>
-        <p class="shade-explain" id="shade-explain" aria-live="polite"></p>
+  <div class="t-wrap">
+
+    <!-- 1 · Search -->
+    <section class="t-step" id="search" aria-labelledby="h-search">
+      <div>
+        <span class="field-label">Step 01 · Search</span>
+        <h2 id="h-search">Search names and labels</h2>
+        <p>Pick a cohort at the top of the builder, then type in the search bar. It matches
+          variable names and labels as you type, across every sweep and file.</p>
+        <ul class="t-do">
+          <li><span>Type <kbd>pregnancy</kbd>, then <kbd>habits</kbd>, in the panel.</span></li>
+          <li><span>Press <strong>▸</strong> on a row to open it: its value labels, which codes
+            count as <strong>missing</strong>, and its topics.</span></li>
+          <li><span>The coloured stripe on each name is its topic domain. The
+            <strong>Measurement level</strong> menu narrows to nominal, ordinal or scale.</span></li>
+        </ul>
       </div>
-      <div class="heat-scroll">
-        <table class="heat" id="heat" data-shade="within">
-          <caption class="sr">BCS70: number of variables per topic and sweep</caption>
-          <thead><tr id="heat-sweeps"><th scope="col">Topic</th></tr></thead>
-          <tbody id="heat-body"></tbody>
-        </table>
+      <div class="t-demo" id="search-demo">
+        <div class="t-demo-head">
+          <label class="fb-search">
+            <span class="visually-hidden">Try a search</span>
+            <input type="search" id="search-input" placeholder="Search names and labels…" autocomplete="off" spellcheck="false">
+          </label>
+          <span class="fb-count" id="search-count" role="status">–</span>
+        </div>
+        <ol class="t-rows" id="search-rows"></ol>
       </div>
-      <p class="demo-foot">Columns are sweeps, labelled by the cohort members’ age. Hover a cell for its count.</p>
-    </div>
+    </section>
 
-    <ul class="tips">
-      <li><span class="tip-k">▸ Details</span> Value labels, which codes count as missing, and every topic with its confidence.</li>
-      <li><span class="tip-k">Same label</span> Other variables in the cohort with exactly the same label: usually the same question at another sweep.</li>
-      <li><span class="tip-k">Topic tags ≥</span> Hides topics the tagger was less sure of. See it working in the Topics section below.</li>
-    </ul>
-  </div>
-</section>
-
-<!-- Step 3 -->
-<section class="step" id="select" aria-labelledby="h-select">
-  <div class="wrap split">
-    <div class="copy">
-      <p class="step-no">Step 3</p>
-      <h2 id="h-select">Click to select, Shift-click for a range</h2>
-      <p>Your selection is kept in this browser for each cohort, so you can close the tab and come back to it.</p>
-      <ul class="points">
-        <li><strong>Select all</strong> appears once a search or filter leaves a manageable number.</li>
-        <li>The <strong>Selection</strong> view groups your picks by sweep or file.</li>
-        <li><strong>Clear</strong> empties it in one go.</li>
-      </ul>
-    </div>
-    <div class="demo" id="select-demo">
-      <p class="demo-tag">Try it · click one, then Shift-click another</p>
-      <ul class="rows" id="select-rows"></ul>
-      <div class="select-bar">
-        <span id="select-count" aria-live="polite">0 selected</span>
-        <button type="button" class="btn btn-ghost" id="select-clear">Clear</button>
+    <!-- 2 · Explore -->
+    <section class="t-step" id="explore" aria-labelledby="h-explore">
+      <div>
+        <span class="field-label">Step 02 · Explore</span>
+        <h2 id="h-explore">See what was measured, and when</h2>
+        <p>Above the list, the builder charts the study. The first row counts the matching
+          variables in each sweep; under <strong>Topics</strong>, each topic gets a row, one
+          cell per sweep. Click a sweep bar or a topic to filter the list to it.</p>
+        <ul class="t-do">
+          <li><span>Click a topic name in the panel: the bars above it show that topic alone.</span></li>
+          <li><span><strong>Within each topic</strong> shades every row against its own busiest
+            sweep, so you can see <em>when</em> a topic was asked, even a rare one.</span></li>
+          <li><span><strong>Across topics</strong> puts every cell on one scale, so you can see
+            <em>which</em> topics the study asks most about.</span></li>
+        </ul>
       </div>
-    </div>
-  </div>
-</section>
-
-<!-- Step 4 -->
-<section class="step alt" id="download" aria-labelledby="h-download">
-  <div class="wrap split">
-    <div class="copy">
-      <p class="step-no">Step 4</p>
-      <h2 id="h-download">Review, choose a format, download</h2>
-      <p>Open <strong>Selection</strong>. Check or rename the output columns, choose the language and the kind of file you want out, and decide what happens to missing codes. The download is a small zip.</p>
-    </div>
-    <form class="demo" id="download-demo" aria-label="Download options">
-      <p class="demo-tag">Try it · the same choices as the builder</p>
-      <div class="field">
-        <span class="field-k">Output columns</span>
-        <label class="rename"><span class="mono">bd7smoke</span><span class="sr">Output name for bd7smoke</span><input class="mono" value="smoking_34"></label>
-        <label class="rename"><span class="mono">b11nfcigs</span><span class="sr">Output name for b11nfcigs</span><input class="mono" value="cigs_per_day_51"></label>
-      </div>
-      <div class="field-row">
-        <fieldset class="field">
-          <legend class="field-k">Language</legend>
-          <label class="opt"><input type="checkbox" name="lang" value="R" checked> R</label>
-          <label class="opt"><input type="checkbox" name="lang" value="Python"> Python</label>
-        </fieldset>
-        <fieldset class="field">
-          <legend class="field-k">Output file</legend>
-          <label class="opt"><input type="radio" name="fmt" value="CSV" checked> CSV</label>
-          <label class="opt"><input type="radio" name="fmt" value="Stata"> Stata</label>
-          <label class="opt"><input type="radio" name="fmt" value="SPSS"> SPSS</label>
-        </fieldset>
-      </div>
-      <label class="opt"><input type="checkbox" id="dl-na" checked> Turn missing codes into NA</label>
-      <p class="summary" id="dl-summary" aria-live="polite"></p>
-      <a class="btn btn-primary btn-block" href="../">Open the builder</a>
-    </form>
-  </div>
-</section>
-
-<!-- Step 5 -->
-<section class="step dark" id="run" aria-labelledby="h-run">
-  <div class="wrap split">
-    <div class="copy">
-      <p class="step-no">Step 5</p>
-      <h2 id="h-run">Add your data and run it</h2>
-      <p>Get the data files from the UK Data Service. Unzip the project, put the files its README lists into <code>data/</code> (<code>.tab</code>, <code>.csv</code>, <code>.dta</code> or <code>.sav</code>, in any subfolder) and run the script.</p>
-      <div class="seg seg-dark" role="group" aria-label="Language">
-        <button type="button" data-lang="r" aria-pressed="true">R</button>
-        <button type="button" data-lang="py" aria-pressed="false">Python</button>
-      </div>
-    </div>
-    <div class="term">
-<pre class="mono">my-project/
-├── README.md        <span class="dim">lists the files you need</span>
-├── data/            <span class="dim">put them here</span>
-├── R/merge.R
-└── python/merge.py</pre>
-      <p class="term-cmd mono"><span aria-hidden="true">$ </span><span id="run-cmd">Rscript R/merge.R</span></p>
-      <p class="term-out mono">→ one file, one row per participant</p>
-    </div>
-  </div>
-</section>
-
-<!-- Topics -->
-<section class="step topics" id="topics" aria-labelledby="h-topics">
-  <div class="wrap">
-    <p class="eyebrow">Topics</p>
-    <h2 id="h-topics" class="h-big">One shared vocabulary across every cohort</h2>
-    <p class="lede">Every variable is tagged with topics from the <strong>CLOSER Discovery</strong> topic vocabulary: the two-level scheme CLOSER uses to index the questions and variables of UK longitudinal studies, built from MeSH and ELSST terms. Broad <em>domains</em> hold specific <em>topics</em>, so the same subject is found the same way in every study. We added a handful of topics where the vocabulary had no fit, such as Covid-19, bullying and survey weights.</p>
-    <p class="links">
-      <a href="https://discovery.closer.ac.uk/">CLOSER Discovery</a>
-      <a href="https://doi.org/10.1093/ije/dyz004">The CLOSER resource profile (IJE)</a>
-    </p>
-
-    <ul class="domains" id="t-domain-list" aria-label="Topic domains"></ul>
-
-    <div class="split split-top">
-      <div class="demo" id="confidence-demo">
-        <div class="conf-head">
-          <div>
-            <h3>Try the confidence filter</h3>
-            <p>Each topic comes with a confidence from 0 to 1. Raise the bar to keep only the surest.</p>
-          </div>
-          <div class="seg" role="group" aria-label="Minimum topic confidence" id="conf-buttons">
-            <button type="button" data-min="0.3" aria-pressed="false"><span aria-hidden="true">≥ </span>0.3</button>
-            <button type="button" data-min="0.5" aria-pressed="true"><span aria-hidden="true">≥ </span>0.5</button>
-            <button type="button" data-min="0.7" aria-pressed="false"><span aria-hidden="true">≥ </span>0.7</button>
-            <button type="button" data-min="0.9" aria-pressed="false"><span aria-hidden="true">≥ </span>0.9</button>
+      <div class="t-demo" id="heat">
+        <div class="t-demo-head">
+          <fieldset class="t-switch">
+            <legend>Shade</legend>
+            <span class="t-seg">
+              <label><input type="radio" name="shade" value="within" checked>Within each topic</label>
+              <label><input type="radio" name="shade" value="across">Across topics</label>
+            </span>
+          </fieldset>
+          <span class="t-demo-tag">BCS70 · tags ≥ 50%</span>
+        </div>
+        <div class="t-map">
+          <div class="t-map-inner">
+            <div class="ov-row ov-total">
+              <div class="ov-label">
+                <span class="ov-total-name" id="spine-name">All six topics</span>
+                <span class="ov-count" id="spine-total"></span>
+              </div>
+              <ol class="spine-track" id="spine" aria-label="Variables by sweep"></ol>
+            </div>
+            <div class="ov-row">
+              <div class="ov-label"></div>
+              <div class="t-sweeps" id="heat-sweeps" aria-hidden="true"></div>
+            </div>
+            <div id="heat-body"></div>
           </div>
         </div>
-        <ul class="conf-list" id="conf-list"></ul>
-        <p class="demo-foot">Real BCS70 tags. Struck-through topics fall below the bar and are hidden in the builder.</p>
+        <p class="t-demo-foot" id="shade-explain" aria-live="polite"></p>
       </div>
+    </section>
 
-      <aside class="tagger">
-        <p class="tagger-k">Tagged with our own tool</p>
-        <h3>Topic Tagger</h3>
-        <p>All the topics on this site were assigned by Topic Tagger, a standalone Python tool in this project. It reads a cohort’s data dictionary, tags each variable against a topic scheme like this one, saves as it goes and writes a report to review. It works for any cohort, not only these.</p>
-        <a class="btn btn-light" href="https://github.com/CLS-Data/cohort-data-builder#topic-tagging">Topic Tagger on GitHub</a>
-      </aside>
+    <!-- 3 · Select -->
+    <section class="t-step" id="select" aria-labelledby="h-select">
+      <div>
+        <span class="field-label">Step 03 · Select</span>
+        <h2 id="h-select">Build your selection</h2>
+        <p>Click a row to add it; click again to take it out. Selected rows turn green and
+          gather in the panel beside the list, grouped by sweep or by file. The selection is
+          kept in your browser, per cohort, so it is still there next time.</p>
+        <ul class="t-do">
+          <li><span>Click one row, then hold <kbd>Shift</kbd> and click another to select
+            everything between them.</span></li>
+          <li><span><strong>Select all</strong> takes every row the search matches.</span></li>
+          <li><span>The person identifier is always included, so the files can be merged.</span></li>
+        </ul>
+      </div>
+      <div class="t-demo" id="select-demo">
+        <div class="t-pick">
+          <ol class="t-rows" id="select-rows"></ol>
+          <div class="t-panel">
+            <div class="sp-head">
+              <p class="sp-count" id="select-count" role="status" aria-live="polite">0 selected</p>
+              <button class="link-btn" id="select-clear" type="button">Clear</button>
+            </div>
+            <div class="t-seg" role="group" aria-label="Group by">
+              <button type="button" data-group="sweep" aria-pressed="true">Sweep</button>
+              <button type="button" data-group="file" aria-pressed="false">File</button>
+            </div>
+            <ol id="select-panel"></ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 · Download -->
+    <section class="t-step" id="download" aria-labelledby="h-download">
+      <div>
+        <span class="field-label">Step 04 · Download</span>
+        <h2 id="h-download">Download a project, not the data</h2>
+        <p><strong>Review &amp; download</strong> shows what you picked and asks how you want
+          it. You get a zip of code: it reads only the files your variables are in, keeps only
+          those columns, and joins the sweeps on the person identifier.</p>
+        <ul class="t-do">
+          <li><span>Choose R, Python or both, and the format to write.</span></li>
+          <li><span>Missing codes such as <code>-9 Refused</code> can become <code>NA</code>, or
+            be kept as they are.</span></li>
+          <li><span>The site never holds study data: you bring your own copy, from the
+            UK Data Service.</span></li>
+        </ul>
+      </div>
+      <div class="t-demo">
+        <form class="t-form" id="download-demo">
+          <fieldset>
+            <legend>Language</legend>
+            <label><input type="checkbox" name="lang" value="R" checked>R</label>
+            <label><input type="checkbox" name="lang" value="Python">Python</label>
+          </fieldset>
+          <fieldset>
+            <legend>Write</legend>
+            <label><input type="radio" name="fmt" value="CSV" checked>CSV</label>
+            <label><input type="radio" name="fmt" value="Stata">Stata</label>
+            <label><input type="radio" name="fmt" value="SPSS">SPSS</label>
+          </fieldset>
+          <fieldset>
+            <legend>Missing values</legend>
+            <label><input type="checkbox" id="dl-na" checked>Turn missing codes into NA</label>
+          </fieldset>
+          <p class="t-summary" id="dl-summary" aria-live="polite"></p>
+        </form>
+        <pre class="t-tree" id="dl-tree" aria-label="What the zip holds"></pre>
+      </div>
+    </section>
+
+    <!-- 5 · Run -->
+    <section class="t-step" id="run" aria-labelledby="h-run">
+      <div>
+        <span class="field-label">Step 05 · Run</span>
+        <h2 id="h-run">Point it at your data and run</h2>
+        <p>Unzip the project, put the study's files in its <code>data/</code> folder (or set the
+          path in the config file), and run one command. It writes your merged dataset to
+          <code>output/</code>, with a README listing every variable and where it came from.</p>
+        <ul class="t-do">
+          <li><span>The R project needs only <code>haven</code> and <code>dplyr</code>; the
+            Python one needs <code>pandas</code> and <code>pyreadstat</code>.</span></li>
+          <li><span>It stops with a clear message if a file or variable is missing from your copy.</span></li>
+        </ul>
+      </div>
+      <div class="t-demo">
+        <div class="t-demo-head">
+          <div class="t-seg" role="group" aria-label="Language">
+            <button type="button" data-lang="r" aria-pressed="true">R</button>
+            <button type="button" data-lang="py" aria-pressed="false">Python</button>
+          </div>
+          <span class="t-demo-tag">in the unzipped folder</span>
+        </div>
+        <p class="t-cmd"><code id="run-cmd">Rscript R/merge.R</code></p>
+      </div>
+    </section>
+
+    <!-- 6 · Topics -->
+    <section class="t-step" id="topics" aria-labelledby="h-topics">
+      <div>
+        <span class="field-label">Step 06 · Topics</span>
+        <h2 id="h-topics">Where the topics come from</h2>
+        <p>Topics use the <strong>CLOSER</strong> taxonomy: the domains and topics of
+          <a href="https://discovery.closer.ac.uk/">CLOSER Discovery</a>, the search platform for
+          UK longitudinal studies (<a href="https://doi.org/10.1093/ije/dyz004">O'Neill et al., 2019</a>),
+          with a few added for themes it lacks, such as Covid-19. Using one vocabulary means a
+          topic means the same thing in every cohort.</p>
+        <p>Each variable can carry several topics, each with a confidence. In the builder,
+          <strong>Topic tags ≥</strong> sets how sure a tag must be before it is shown, counted
+          and used in the filter. Try it on the right.</p>
+        <ul class="t-domains" id="t-domain-list" aria-label="Topic domains"></ul>
+      </div>
+      <div>
+        <div class="t-demo" id="confidence-demo">
+          <div class="t-demo-head">
+            <span class="t-switch">
+              <span class="t-demo-tag" style="margin:0">Topic tags ≥</span>
+              <span class="t-seg" role="group" aria-label="Minimum topic confidence" id="conf-buttons">
+                <button type="button" data-min="0.3" aria-pressed="false">30%</button>
+                <button type="button" data-min="0.5" aria-pressed="true">50%</button>
+                <button type="button" data-min="0.7" aria-pressed="false">70%</button>
+                <button type="button" data-min="0.9" aria-pressed="false">90%</button>
+              </span>
+            </span>
+          </div>
+          <ul class="t-conf" id="conf-list"></ul>
+        </div>
+        <div class="t-card">
+          <h3>Tagged with the Topic Tagger</h3>
+          <p>Every variable was tagged by our Topic Tagger, an open-source tool in this
+            repository. It reads each variable's name, label and values and assigns CLOSER topics
+            with a confidence. You can run it on any study.</p>
+          <a class="btn" href="https://github.com/CLS-Data/cohort-data-builder#topic-tagging">Topic Tagger on GitHub →</a>
+        </div>
+      </div>
+    </section>
+
+    <p class="t-note"><strong>Check before you rely on it.</strong> Labels and topics are
+      only as good as the metadata and the tagger. Confirm anything important against the
+      study's own documentation.</p>
+    <div class="t-end">
+      <a class="btn btn-primary" href="../">Open the builder →</a>
+      <a class="btn btn-quiet" href="#main">Back to the top</a>
     </div>
-
-    <p class="caution">Topics are a way in, not a verdict. They are machine-made, so a variable can be missed or tagged loosely: search by name and label too, and check anything you rely on against the study’s documentation.</p>
   </div>
-</section>
 
 </main>
 
 <footer class="foot">
-  <div class="wrap foot-row">
-    <span>Cohort Data Builder · beta · runs entirely in your browser</span>
-    <a href="../">Open the builder</a>
-  </div>
+  <span>Cohort Data Builder · Tutorial</span>
+  <span class="foot-sep">·</span>
+  <a href="https://github.com/CLS-Data/cohort-data-builder">Repository</a>
 </footer>
+
 </body>
 </html>
