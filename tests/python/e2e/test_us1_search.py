@@ -134,13 +134,13 @@ def test_no_match_message_and_clear(mini):
 
 def test_real_bcs70_search_paging_and_details(page, serve):
     page.goto(serve(SITE) + "#bcs70")
-    expect(page.locator("#result-count")).to_have_text("32,452 variables")
+    expect(page.locator("#result-count")).to_have_text("37,562 variables")
     expect(page.locator("#results .vrow")).to_have_count(200)
     page.get_by_role("button", name="Show 200 more").click()
     expect(page.locator("#results .vrow")).to_have_count(400)
 
     page.get_by_label("Search variables").fill("smoke")
-    expect(page.locator("#result-count")).not_to_have_text("32,452 variables")
+    expect(page.locator("#result-count")).not_to_have_text("37,562 variables")
     page.locator("#spine-track [data-wave]:not(.is-empty)").nth(2).click()
     page.locator("#results .v-expand").first.click()
     more = page.locator("#results .vrow-more").first
