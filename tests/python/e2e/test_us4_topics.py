@@ -1,6 +1,7 @@
 import json
 import shutil
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from playwright.sync_api import expect
@@ -127,6 +128,57 @@ def test_details_list_every_topic_dim_those_below_and_filter_on_click(mini):
     tags.nth(0).click()
     count(mini, "1 variable")
     expect(mini.locator("#active-filters .chip-topic")).to_have_text("Smoking ✕")
+
+
+def test_suggesting_tags_picks_from_the_topic_list(mini):
+    mini.get_by_label("Search variables").fill("mother")
+    count(mini, "2 variables")
+    row(mini, "smoke5").get_by_role("button", name="Show details for smoke5").click()
+    tally = mini.locator("#basket-tally").inner_text()
+    row(mini, "smoke5").get_by_role("button", name="Suggest a tag change").click()
+
+    dialog = mini.get_by_role("dialog", name="Suggest tags for smoke5")
+    expect(dialog).to_be_visible()
+    expect(dialog.get_by_label("Smoking")).to_be_checked()
+    expect(dialog.get_by_label("Alcohol")).to_be_checked()
+    expect(dialog.get_by_label("Tenure")).not_to_be_checked()
+    send = dialog.get_by_role("button", name="Open on GitHub")
+    expect(send).to_be_disabled()
+
+    dialog.get_by_label("Filter topics").fill("ten")
+    expect(dialog.get_by_label("Smoking")).to_be_hidden()
+    dialog.get_by_label("Tenure").check()
+    dialog.get_by_label("Filter topics").fill("")
+    dialog.get_by_label("Alcohol").uncheck()
+    expect(dialog.locator("#tag-changes")).to_have_text("Adds Tenure · removes Alcohol")
+    dialog.get_by_label("Why (optional)").fill("It asks who smokes.")
+
+    mini.context.route("https://github.com/**", lambda route: route.fulfill(body="issue form"))
+    with mini.expect_popup() as popup:
+        send.click()
+    popup.value.wait_for_load_state()
+    query = parse_qs(urlparse(popup.value.url).query)
+    popup.value.close()
+    assert query["template"] == ["tag-suggestion.yml"]
+    assert query["variable"] == ["smoke5"] and query["cohort"] == ["Mini"]
+    assert query["current"] == ["Smoking (95%); Alcohol (55%)"]
+    assert query["suggested"] == ["Add: Housing › Tenure\nRemove: Health › Alcohol"]
+    assert query["why"] == ["It asks who smokes."]
+
+    expect(dialog).to_be_hidden()
+    expect(mini.get_by_label("Search variables")).to_have_value("mother")
+    count(mini, "2 variables")
+    expect(mini.locator("#basket-tally")).to_have_text(tally)
+
+
+def test_a_variable_without_tags_can_be_given_one_and_escape_cancels(mini):
+    row(mini, "nolab5").get_by_role("button", name="Show details for nolab5").click()
+    row(mini, "nolab5").get_by_role("button", name="Suggest a tag", exact=True).click()
+    dialog = mini.get_by_role("dialog", name="Suggest tags for nolab5")
+    expect(dialog.get_by_role("checkbox", checked=True)).to_have_count(0)
+    expect(dialog.get_by_label("Filter topics")).to_be_focused()
+    mini.keyboard.press("Escape")
+    expect(dialog).to_be_hidden()
 
 
 @pytest.fixture

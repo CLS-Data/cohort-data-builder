@@ -11,6 +11,7 @@ import { refreshSelection, resetForCohort, runSearch, wireResults } from "./resu
 import { wireReview } from "./review.js";
 import { onSelectionChange, restoreOptions, restoreSelection, storage } from "./selected.js";
 import { state } from "./state.js";
+import { wireSuggest } from "./suggest.js";
 import { switchView } from "./views.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -74,8 +75,33 @@ function wireTheme() {
   });
 }
 
+const TEXT_SIZES = ["", "large", "larger"];
+
+/* Show the text size and mark its button. "" is the browser's own size. */
+function setTextSize(size) {
+  const root = document.documentElement;
+  if (size) root.dataset.text = size;
+  else delete root.dataset.text;
+  for (const b of document.querySelectorAll("[data-text-size]")) {
+    b.setAttribute("aria-pressed", String(b.dataset.textSize === size));
+  }
+}
+
+/** Restore the stored text size and make the Text size buttons set it. */
+function wireTextSize() {
+  const stored = read(storage, storeKey("text-size"), "");
+  setTextSize(TEXT_SIZES.includes(stored) ? stored : "");
+  for (const b of document.querySelectorAll("[data-text-size]")) {
+    b.addEventListener("click", () => {
+      setTextSize(b.dataset.textSize);
+      write(storage, storeKey("text-size"), b.dataset.textSize);
+    });
+  }
+}
+
 async function boot() {
   wireTheme();
+  wireTextSize();
   try {
     state.catalogue = await loadCatalogue(fetch);
   } catch (err) {
@@ -97,6 +123,7 @@ async function boot() {
   wireResults();
   wirePanel();
   wireReview();
+  wireSuggest();
   onSelectionChange(() => {
     renderPanel();
     refreshSelection();

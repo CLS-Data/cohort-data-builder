@@ -30,12 +30,19 @@ const TEMPLATE_FILES = [
   "python/load_data.py",
   "python/merge.py",
   "python/requirements.txt",
+  "stata/load_data.do",
+  "stata/merge.do",
 ];
 let templates = null; // fetched on the first download: most visitors never download
 
 const waveOrder = () => state.manifest.wave.list.map((w) => w.key);
 const currentProblems = () =>
-  problems(state.bundle, state.manifest.identifier, state.options.outputFormat);
+  problems(
+    state.bundle,
+    state.manifest.identifier,
+    state.options.outputFormat,
+    state.options.languages,
+  );
 
 /* ── Drawing ─────────────────────────────────────────────────────────── */
 
@@ -87,6 +94,7 @@ function optionsHtml(languages, format, missingToNa) {
       <span class="option-name">Language</span>
       <label><input type="checkbox" data-lang="r" ${languages.includes("r") ? "checked" : ""}> R</label>
       <label><input type="checkbox" data-lang="python" ${languages.includes("python") ? "checked" : ""}> Python</label>
+      <label><input type="checkbox" data-lang="stata" ${languages.includes("stata") ? "checked" : ""}> Stata (do-file)</label>
     </div>
     <div class="option-row">
       <span class="option-name">Output file</span>
@@ -96,10 +104,11 @@ function optionsHtml(languages, format, missingToNa) {
     <div class="option-row">
       <span class="option-name">Missing codes</span>
       <label><input type="checkbox" id="opt-na" ${missingToNa ? "checked" : ""}> Convert to NA</label>
-      <p class="option-help">Replaces each variable's missing-value codes from the data
-        dictionary with NA. Negative codes that are real answers are kept. Off keeps every code
-        as deposited. Either way it is one setting at the top of the script, and
-        <code>codebook.csv</code> lists the codes.</p>
+      <p class="option-help">Replaces the depositor's declared missing codes, and negative codes
+        whose label reads like "no answer", with NA; other negative codes (e.g. -1 Dislike) are
+        kept. <code>codebook.csv</code> lists them.
+        <a href="https://github.com/CLS-Data/cohort-data-builder/blob/main/docs/data-format.md#how-missing-and-not-missing-were-decided"
+          target="_blank" rel="noopener">How this was decided</a></p>
     </div>
   </div>`;
 }
@@ -122,9 +131,19 @@ function renderDetail() {
   );
   const { languages, missingToNa, outputFormat: format } = state.options;
   const ext = FORMATS[format]?.ext || "csv";
-  const dotted = format === "dta" && state.bundle.some((b) => /[^A-Za-z0-9_]/.test(b.column));
+  const stataNames = format === "dta" || languages.includes("stata");
+  const dotted = stataNames && state.bundle.some((b) => /[^A-Za-z0-9_]/.test(b.column));
+
+  // The list is redrawn in place, so it keeps its scroll position.
+  const top = $("#basket-scroll")?.scrollTop || 0;
+  const why = !languages.length
+    ? "Choose at least one language."
+    : bad.size
+      ? `${plural(bad.size, "column name")} ${bad.size === 1 ? "needs" : "need"} changing.`
+      : "";
 
   el.innerHTML = `
+    <div class="basket-scroll" id="basket-scroll" tabindex="0" role="region" aria-label="Selected variables">
     <div class="detail-head">
       <div class="detail-eyebrow">${esc(m.name)} · ${plural(count, "variable")} from ${plural(files.length, "file")}
         · <button class="link-btn" id="basket-clear">Clear</button></div>
@@ -138,8 +157,18 @@ function renderDetail() {
         before downloading; each says why below.${dotted ? ` <button class="link-btn" id="fix-dots">Replace every . with _</button>` : ""}</div></div>`
         : ""
     }
+    <h2 class="section-title">Data files it needs</h2>
+    <ul class="linklist" id="basket-files">${files
+      .map(
+        (f) => `<li><button data-file="${esc(f)}" title="Show every variable in ${esc(f)}">
+        <span class="ll-name">${esc(f)}</span>
+        <span class="ll-desc">${esc(fileInfo.get(f).description || "")}</span>
+        <span class="ll-meta">${esc(fileInfo.get(f).wave)}</span></button></li>`,
+      )
+      .join("")}</ul>
+    <p class="note">Put them all in the project's <code>data/</code> folder, in any format (<code>.tab</code>, <code>.csv</code>, <code>.dta</code>, <code>.sav</code>): the scripts pick the read call from the extension.${m.ukdsUrl ? ` Download them from the <a href="${esc(m.ukdsUrl)}" target="_blank" rel="noopener">UK Data Service</a>.` : ""}</p>
     <h2 class="section-title">Columns</h2>
-    <p class="note">In the order they are written. Rename any of them here.</p>
+    <p class="note">In the order they are written. Rename or remove any of them here.</p>
     <ol class="cols" id="basket-cols">
       <li class="col-row is-fixed">
         <span class="basket-x" aria-hidden="true"></span>
@@ -152,24 +181,34 @@ function renderDetail() {
         .map((b) => colRow(b, bad))
         .join("")}
     </ol>
-    <h2 class="section-title">Data files it needs</h2>
-    <ul class="linklist">${files
-      .map(
-        (f) => `<li><button data-file="${esc(f)}" title="Show every variable in ${esc(f)}">
-        <span class="ll-name">${esc(f)}</span>
-        <span class="ll-desc">${esc(fileInfo.get(f).description || "")}</span>
-        <span class="ll-meta">${esc(fileInfo.get(f).wave)}</span></button></li>`,
-      )
-      .join("")}</ul>
-    <p class="note">Put them all in the project's <code>data/</code> folder, in any format (<code>.tab</code>, <code>.csv</code>, <code>.dta</code>, <code>.sav</code>): the scripts pick the read call from the extension.${m.ukdsUrl ? ` Download them from the <a href="${esc(m.ukdsUrl)}" target="_blank" rel="noopener">UK Data Service</a>.` : ""}</p>
-    <h2 class="section-title">Download</h2>
-    ${optionsHtml(languages, format, missingToNa)}
-    <div class="detail-actions"><button class="btn btn-primary" id="basket-download">Download</button></div>
-    <p class="draft-status" id="basket-status" role="status"></p>`;
+    </div>
+    <div class="basket-download-area${optionsOpen ? "" : " is-folded"}" id="basket-download-area" role="region" aria-label="Download">
+      <h2 class="section-title dl-title">Download</h2>
+      <button class="link-btn dl-toggle" id="dl-toggle" aria-expanded="${optionsOpen}" aria-controls="dl-options">Download options</button>
+      <div class="dl-options" id="dl-options">${optionsHtml(languages, format, missingToNa)}</div>
+      <div class="dl-actions">
+        <button class="btn btn-primary" id="basket-download">Download</button>
+        ${why ? `<span class="dl-why">${why}${bad.size && languages.length ? ` <button class="link-btn" id="dl-show">Show</button>` : ""}</span>` : ""}
+        <p class="draft-status" id="basket-status" role="status"></p>
+      </div>
+    </div>`;
+  $("#basket-scroll").scrollTop = top;
 
   const button = $("#basket-download");
   button.disabled = bad.size > 0 || !languages.length;
-  button.textContent = `Download ${languages.map((l) => (l === "r" ? "R" : "Python")).join(" + ") || "…"} code`;
+  const names = { r: "R", python: "Python", stata: "Stata do-file" };
+  button.textContent = `Download ${languages.map((l) => names[l]).join(" + ") || "…"} code`;
+}
+
+/* On a small screen the options fold away under a toggle, so the download bar stays short. */
+let optionsOpen = false;
+
+/* Bring the first column that blocks the download into view, ready to retype. */
+function showFirstProblem() {
+  const input = $("#basket-cols .col-input[aria-invalid='true']");
+  if (!input) return;
+  input.scrollIntoView({ block: "center" });
+  input.focus();
 }
 
 /* ── Changing things ─────────────────────────────────────────────────── */
@@ -270,6 +309,13 @@ export function wireReview() {
     if (gone) return setSelection(remove(state.bundle, gone.dataset.remove).selection);
     if (e.target.closest("#basket-clear")) return setSelection([]);
     if (e.target.closest("#basket-download")) return download();
+    if (e.target.closest("#dl-show")) return showFirstProblem();
+    if (e.target.closest("#dl-toggle")) {
+      optionsOpen = !optionsOpen;
+      $("#dl-toggle").setAttribute("aria-expanded", String(optionsOpen));
+      $("#basket-download-area").classList.toggle("is-folded", !optionsOpen);
+      return;
+    }
     if (e.target.closest("#fix-dots")) {
       return setSelection(fixDots(state.bundle, state.manifest.identifier));
     }

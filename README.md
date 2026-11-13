@@ -1,7 +1,7 @@
 # Cohort Data Builder
 
 Search the variables of UK longitudinal cohort studies, pick the ones you need, and download
-a small R and/or Python project that merges them from your own copy of the data into one
+a small R, Python and/or Stata project that merges them from your own copy of the data into one
 file, one row per participant.
 
 It starts with the 1970 British Cohort Study (BCS70, 32,452 variables) and Next Steps
@@ -23,10 +23,18 @@ project.
    codes, topics and the same question at other sweeps.
 2. Click variables to select them (Shift-click for a range). The selection is kept in your
    browser, per cohort.
-3. Open **Selection**: check or rename the output columns, choose R and/or Python, CSV, Stata
-   or SPSS output, and whether missing codes become NA. Then download.
+3. Open **Selection**: check, rename or remove the output columns, choose R, Python and/or
+   Stata code, CSV, Stata or SPSS output, and whether missing codes become NA. Then download.
+   [How missing codes were decided](docs/data-format.md#how-missing-and-not-missing-were-decided):
+   the depositor's declared codes, plus negative codes whose label reads like "no answer".
 4. Unzip, put the data files listed in its README into `data/` (any of `.tab`, `.csv`,
-   `.dta`, `.sav`, in any subfolder), and run `R/merge.R` or `python/merge.py`.
+   `.dta`, `.sav`, in any subfolder), and run `R/merge.R`, `python/merge.py` or, in Stata 16
+   or later, `do stata/merge.do` from the project folder (Stata writes `.dta` or `.csv`, not
+   `.sav`).
+
+**Larger text.** Every font size follows the browser's own text-size setting and zoom
+(Ctrl/Cmd +). The three **A** buttons in the header set normal, 125% or 150% text; the
+choice is remembered and shared with the tutorial.
 
 ## Topic tagging
 
@@ -36,6 +44,13 @@ Ollama, with live progress and an HTML report. It is a self-contained tool, usab
 this project. `scripts/topics.py` exports a cohort from `site/data` for it and merges the
 tags back; [docs/data-format.md](docs/data-format.md#adding-topics) has the three commands.
 
+**Suggesting a tag change.** A variable's details end the Topics line with "Suggest a tag
+change" ("Suggest a tag" when it has none). It opens a list of the cohort's topics, with
+the current tags ticked first: tick and untick, then "Open on GitHub" opens an issue form,
+labelled `tag-suggestion`, with the variable's details and the topics to add and remove
+filled in. Submitting it needs a GitHub account. Maintainers list them with the `tag-suggestion` label and review
+them by hand.
+
 ## Repository layout
 
 ```text
@@ -43,12 +58,12 @@ site/                 the published site (static files only)
   index.html, styles.css
   js/core/            logic with no DOM: search, selection, topics, code generation, zip
   js/ui/              the views
-  templates/          the R and Python project templates for the download
+  templates/          the R, Python and Stata project templates for the download
   data/               supplied cohort data (see docs/data-format.md)
 tests/
   js/                 Node tests for site/js/core
   python/data/        supplied-data checks (rules D1–D8)
-  python/generated/   runs the generated R and Python on fabricated data
+  python/generated/   runs the generated R, Python and Stata on fabricated data
   python/e2e/         browser tests (Playwright), accessibility, phone width, speed
   fixtures/data/      a tiny fictional cohort used by the tests
 tools/topic-tagger/   the Topic Tagger, a standalone Python tool
@@ -89,7 +104,9 @@ uv run pytest                                         # all Python, generated-sc
 ```
 
 Without R, the generated-R tests are skipped locally. CI sets `CDB_REQUIRE_R=1`, which makes
-a missing R a failure. See `specs/001-cohort-data-builder/quickstart.md` for a full
+a missing R a failure. The Stata tests (`uv run pytest tests/python/generated -k stata`) run
+only where Stata is installed, never in CI: Stata is licensed. They find it on `PATH`, in
+`/Applications/Stata*`, or at `CDB_STATA`. See `specs/001-cohort-data-builder/quickstart.md` for a full
 walkthrough.
 
 ## Adding or updating cohort data

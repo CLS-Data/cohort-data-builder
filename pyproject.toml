@@ -31,6 +31,7 @@ pythonpath = ["scripts"]
 markers = [
   "e2e: browser tests against the served site",
   "needs_r: needs Rscript with the haven package",
+  "needs_stata: needs a local Stata (16 or later); skipped when absent, including in CI",
 ]
 
 [dependency-groups]
