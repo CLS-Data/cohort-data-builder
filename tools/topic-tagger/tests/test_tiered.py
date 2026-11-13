@@ -6,7 +6,14 @@ import pytest
 
 from conftest import StubProvider
 from topic_tagger.providers import ProviderError
-from topic_tagger.tiered import ChatDecider, Node, build_tree, walk
+from topic_tagger.tiered import (
+    ChatDecider,
+    DecisionDecider,
+    Node,
+    build_tree,
+    flat_tree,
+    walk,
+)
 from topic_tagger.variables import Variable
 
 
@@ -189,3 +196,110 @@ def test_requests_are_one_plus_distinct_areas(small_scheme, descend_at):
     areas = {a for p in result.paths.values() for a, _ in p}
     # plus one for each variable a reply left out, asked again alone
     assert len(stub.calls) == 1 + len(areas) + result.singles
+
+
+# --- The decision decider: Clef (US4) -----------------------------------------------
+
+
+class StubDecision:
+    """A stand-in decision host: ``probability(variable name, question id)``."""
+
+    def __init__(self, probability, fail_for=()):
+        self.probability = probability
+        self.fail_for = set(fail_for)
+        self.calls: list[tuple[dict, dict]] = []
+
+    def requests_for(self, questions):
+        return -(-questions // 64)
+
+    def decide(self, state, questions):
+        self.calls.append((state, questions))
+        if state["name"] in self.fail_for:
+            raise ProviderError("down")
+        return {q: self.probability(state["name"], q) for q in questions}
+
+
+PROBS = {
+    "smk": {
+        "health": 0.9,
+        "demographics": 0.1,
+        "survey": 0.05,
+        "smoking": 0.95,
+        "alcohol": 0.4,
+        "physical_health": 0.1,
+    },
+    "age": {"health": 0.2, "demographics": 0.97, "survey": 0.1, "age": 0.9, "gender": 0.05},
+}
+
+
+def clef_walk(scheme, names, keep_at=0.3, tree=None, fail_for=(), **kw):
+    stub = StubDecision(lambda n, q: PROBS[n].get(q, 0.0), fail_for)
+    decider = DecisionDecider(stub, keep_at=keep_at)
+    result = walk(
+        tree or build_tree(scheme),
+        [var(n) for n in names],
+        decider,
+        descend_at=kw.get("descend_at", 0.5),
+        max_areas=kw.get("max_areas", 3),
+        retries=kw.get("retries", 1),
+    )
+    return result, stub
+
+
+def test_clef_is_asked_one_variable_at_a_time_with_a_noul_question_per_option(small_scheme):
+    v = Variable("f", "smk", "Smokes now", tuple((str(i), f"L{i}") for i in range(40)))
+    stub = StubDecision(lambda n, q: PROBS["smk"].get(q, 0.0))
+    got, sent = DecisionDecider(stub).decide(build_tree(small_scheme), [v])
+    state, questions = stub.calls[0]
+    assert state["name"] == "smk" and state["label"] == "Smokes now"
+    assert len(state["values"]) == 31 and state["values"][0] == "0: L0"
+    assert state["values"][-1] == "… and 10 more"
+    assert list(questions) == ["demographics", "health", "survey"]
+    assert questions["health"].startswith("Is this survey variable about Health? ")
+    assert "It includes: Smoking, Alcohol, Physical health." in questions["health"]
+    assert sent == 1
+    # areas come back with every probability; the walk applies --descend-at
+    assert got[0] == [("health", 0.9), ("demographics", 0.1), ("survey", 0.05)]
+
+
+def test_clef_tiered_tags_follow_both_thresholds(small_scheme):
+    result, stub = clef_walk(small_scheme, ["smk", "age"])
+    assert result.tags[0] == [("smoking", 0.95), ("alcohol", 0.4)]
+    assert result.paths[0] == [("health", 0.9)]
+    assert result.tags[1] == [("age", 0.9)]
+    assert len(stub.calls) == 4  # each variable: tier 1, then one area
+    assert result.requests_by_tier == [2, 2]
+
+
+def test_keep_at_drops_weak_topics_but_never_all(small_scheme):
+    result, _ = clef_walk(small_scheme, ["smk"], keep_at=0.5)
+    assert result.tags[0] == [("smoking", 0.95)]
+    result, _ = clef_walk(small_scheme, ["age"], keep_at=0.95)
+    assert result.tags[0] == [("age", 0.9)]  # the strongest is kept when none pass
+
+
+def test_keep_at_zero_keeps_every_topic(small_scheme):
+    result, _ = clef_walk(small_scheme, ["smk"], keep_at=0)
+    assert [t for t, _ in result.tags[0]] == ["smoking", "alcohol", "physical_health"]
+
+
+def test_flat_with_clef_asks_every_topic_at_once(small_scheme):
+    result, stub = clef_walk(small_scheme, ["smk"], tree=flat_tree(small_scheme))
+    assert list(stub.calls[0][1]) == small_scheme.topic_ids
+    assert result.tags[0] == [("smoking", 0.95), ("alcohol", 0.4)]
+    assert result.requests_by_tier == [1] and result.paths == {}
+
+
+def test_flat_with_clef_on_the_bundled_scheme_takes_two_requests(bundled_scheme_path):
+    from topic_tagger.scheme import load_scheme
+
+    scheme = load_scheme(bundled_scheme_path)
+    stub = StubDecision(lambda n, q: 0.5)
+    _, sent = DecisionDecider(stub).decide(flat_tree(scheme), [var("x")])
+    assert len(scheme.topic_ids) > 64 and sent == 2
+
+
+def test_a_clef_failure_for_one_variable_leaves_the_others(small_scheme):
+    result, stub = clef_walk(small_scheme, ["smk", "age"], fail_for={"age"})
+    assert result.tags[0] == [("smoking", 0.95), ("alcohol", 0.4)]
+    assert 1 in result.failed and result.singles == 1
