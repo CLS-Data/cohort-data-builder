@@ -24,6 +24,7 @@ import { ensure, flatten, rowTopics, toggle as toggleTopic } from "../core/topic
 import { renderSpine, renderTopicGrid, wireOverview } from "./overview.js";
 import { saveOptions, setSelection } from "./selected.js";
 import { DRAG_MIME, state } from "./state.js";
+import { openSuggest } from "./suggest.js";
 import { switchView } from "./views.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -281,8 +282,10 @@ function sameLabelHtml(row) {
 }
 
 /* Every topic in the dictionary entry, with its confidence; those under the threshold are
-   dimmed rather than hidden. Clicking one filters by it. */
-function topicsHtml(entry) {
+   dimmed rather than hidden. Clicking one filters by it. The tags come from a language
+   model, so the line ends with a button to suggest better ones (see suggest.js). */
+function topicsHtml(entry, row) {
+  if (!state.topics.length) return "";
   const byId = new Map(state.topics.map((t, i) => [t.id, i]));
   const tags = (entry.topics || [])
     .filter(([id]) => byId.has(id))
@@ -294,7 +297,8 @@ function topicsHtml(entry) {
         data-domain="${esc(domain.id)}" title="${esc(domain.label)} › ${esc(state.topics[i].label)} · filter by this topic">${esc(state.topics[i].label)} <span class="vm-pct">${pct}%</span></button>`;
     })
     .join("");
-  return tags ? `<div class="vm-topics"><span class="vm-key">Topics</span>${tags}</div>` : "";
+  const suggest = `<button class="link-btn vm-suggest" data-suggest="${esc(keyOf(row))}">${tags ? "Suggest a tag change" : "Suggest a tag"}</button>`;
+  return `<div class="vm-topics">${tags ? `<span class="vm-key">Topics</span>${tags}` : ""}${suggest}</div>`;
 }
 
 function moreHtml(row) {
@@ -316,7 +320,7 @@ function moreHtml(row) {
         )
         .join(" · ");
   return `${valuesHtml(row, d)}
-    ${topicsHtml(entry)}
+    ${topicsHtml(entry, row)}
     ${sameLabelHtml(row)}
     ${file.hasId ? "" : `<p class="vm-note vm-warn">This file has no ${esc(state.manifest.identifier)} column, so it cannot be merged.</p>`}
     <div class="vm-meta"><span>${facts}</span>
@@ -521,6 +525,12 @@ export function wireResults() {
     if (jump) return jumpTo(jump.dataset.jump);
     const file = e.target.closest("[data-file-open]");
     if (file) return filterToFile(Number(file.dataset.fileOpen));
+    const suggest = e.target.closest("[data-suggest]");
+    if (suggest) {
+      const row = state.matches.find((r) => keyOf(r) === suggest.dataset.suggest);
+      if (row && dictEntry(row)) openSuggest(dictEntry(row), fileOf(row).name, suggest);
+      return;
+    }
     if (e.target.closest("[data-clear-all]")) return clearAll();
     const btn = e.target.closest(".vrow-btn");
     if (btn) selectRow(btn, e);

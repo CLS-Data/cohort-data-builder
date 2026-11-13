@@ -104,8 +104,11 @@ function optionsHtml(languages, format, missingToNa) {
     <div class="option-row">
       <span class="option-name">Missing codes</span>
       <label><input type="checkbox" id="opt-na" ${missingToNa ? "checked" : ""}> Convert to NA</label>
-      <p class="option-help">Replaces each variable's missing-value codes with NA; negative
-        codes that are real answers are kept. <code>codebook.csv</code> lists the codes.</p>
+      <p class="option-help">Replaces the depositor's declared missing codes, and negative codes
+        whose label reads like "no answer", with NA; other negative codes (e.g. -1 Dislike) are
+        kept. <code>codebook.csv</code> lists them.
+        <a href="https://github.com/CLS-Data/cohort-data-builder/blob/main/docs/data-format.md#how-missing-and-not-missing-were-decided"
+          target="_blank" rel="noopener">How this was decided</a></p>
     </div>
   </div>`;
 }

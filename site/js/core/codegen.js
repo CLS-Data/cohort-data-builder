@@ -338,10 +338,14 @@ function contents(languages, project) {
 }
 
 const MISSING_ON =
-  "**Missing-value codes are converted to NA.** Each variable's missing-value codes, as " +
-  "listed in the data dictionary (`codebook.csv`, column `missing_codes`), are replaced " +
-  "with NA. Negative codes that are real answers (column `negative_kept`) are kept. Set " +
-  "`MISSING_TO_NA` to false (0 in Stata) at the top of the merge script to keep every code.";
+  "**Missing-value codes are converted to NA.** Each variable's missing-value codes " +
+  "(`codebook.csv`, column `missing_codes`) are replaced with NA: the codes the depositor " +
+  'declared missing, plus negative codes whose label reads like no answer ("Not known", ' +
+  '"Refused"). Other negative codes are taken to be answers and kept (column ' +
+  "`negative_kept`, e.g. -1 Dislike). This is a reading of labels, so check the variables " +
+  "you rely on: " +
+  "https://github.com/CLS-Data/cohort-data-builder/blob/main/docs/data-format.md#how-missing-and-not-missing-were-decided. " +
+  "Set `MISSING_TO_NA` to false (0 in Stata) at the top of the merge script to keep every code.";
 const MISSING_OFF =
   "**Missing-value codes are kept as deposited.** Set `MISSING_TO_NA` to true (1 in Stata) at the top " +
   "of the merge script to replace them with NA: `codebook.csv` lists which codes that " +

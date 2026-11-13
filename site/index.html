@@ -136,6 +136,23 @@
 
 </main>
 
+<!-- Suggesting better topic tags for one variable: see js/ui/suggest.js. -->
+<dialog class="tag-dialog" id="tag-dialog" aria-labelledby="tag-dialog-title">
+  <h2 class="tag-title" id="tag-dialog-title">Suggest tags</h2>
+  <p class="tag-help">Tick the topics this variable should have; its current tags are ticked,
+    with the model's confidence. This opens a pre-filled issue on GitHub, where you need an
+    account to submit it.</p>
+  <input type="search" id="tag-filter" aria-label="Filter topics" placeholder="Filter topics">
+  <div class="tag-list" id="tag-list"></div>
+  <p class="tag-changes" id="tag-changes" aria-live="polite"></p>
+  <label class="field-label" for="tag-why">Why (optional)</label>
+  <textarea id="tag-why" rows="2"></textarea>
+  <div class="tag-actions">
+    <button type="button" class="btn" id="tag-cancel">Cancel</button>
+    <button type="button" class="btn btn-primary" id="tag-send" disabled>Open on GitHub</button>
+  </div>
+</dialog>
+
 <footer class="foot">
   <span id="foot-counts">—</span>
   <span class="foot-sep">·</span>

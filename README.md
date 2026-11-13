@@ -25,6 +25,8 @@ project.
    browser, per cohort.
 3. Open **Selection**: check, rename or remove the output columns, choose R, Python and/or
    Stata code, CSV, Stata or SPSS output, and whether missing codes become NA. Then download.
+   [How missing codes were decided](docs/data-format.md#how-missing-and-not-missing-were-decided):
+   the depositor's declared codes, plus negative codes whose label reads like "no answer".
 4. Unzip, put the data files listed in its README into `data/` (any of `.tab`, `.csv`,
    `.dta`, `.sav`, in any subfolder), and run `R/merge.R`, `python/merge.py` or, in Stata 16
    or later, `do stata/merge.do` from the project folder (Stata writes `.dta` or `.csv`, not
@@ -37,6 +39,13 @@ Cohorts often arrive without topics. The [Topic Tagger](tools/topic-tagger/READM
 Ollama, with live progress and an HTML report. It is a self-contained tool, usable outside
 this project. `scripts/topics.py` exports a cohort from `site/data` for it and merges the
 tags back; [docs/data-format.md](docs/data-format.md#adding-topics) has the three commands.
+
+**Suggesting a tag change.** A variable's details end the Topics line with "Suggest a tag
+change" ("Suggest a tag" when it has none). It opens a list of the cohort's topics, with
+the current tags ticked first: tick and untick, then "Open on GitHub" opens an issue form,
+labelled `tag-suggestion`, with the variable's details and the topics to add and remove
+filled in. Submitting it needs a GitHub account. Maintainers list them with the `tag-suggestion` label and review
+them by hand.
 
 ## Repository layout
 
