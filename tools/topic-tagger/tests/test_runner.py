@@ -202,3 +202,46 @@ def test_the_stop_handler_stops_then_exits(small_scheme):
     finally:
         restore()
     assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
+
+
+def tiered_answer(messages, schema):
+    """Picks "health" at tier 1 and the first listed option at tier 2, for every variable."""
+    head = messages[0]["content"].split("Rules:")[0]
+    opts = [line[2:].split(":")[0] for line in head.splitlines() if line.startswith("- ")]
+    pick = "health" if "health" in opts else opts[0]
+    rows = [json.loads(x) for x in messages[1]["content"].split("\n") if x.startswith("{")]
+    return json.dumps(
+        {
+            "variables": [
+                {"id": r["id"], "topics": [{"topic": pick, "confidence": 0.8}]} for r in rows
+            ]
+        }
+    )
+
+
+def test_a_tiered_run_walks_each_batch(tmp_path, small_scheme, variables_path, clock):
+    variables = read_variables(variables_path)
+    settings = Settings(batch_size=20, workers=2, retries=1, model="stub:test", method="tiered")
+    runner = Runner(small_scheme, StubProvider(tiered_answer), TagStore(tmp_path), settings, clock)
+    result = runner.run(variables)
+    batches = -(-len(variables) // 20)
+    assert result.tagged == len(variables) and result.failed == []
+    assert result.requests_by_tier == [batches, batches]
+    assert result.requests == 2 * batches
+    records = [json.loads(x) for x in (tmp_path / "tags.jsonl").read_text().splitlines()]
+    assert {r["topics"][0][0] for r in records} == {"smoking"}
+
+
+def test_a_tiered_run_stops_gently(tmp_path, small_scheme, variables_path, clock):
+    settings = Settings(batch_size=20, workers=1, retries=1, model="stub:test", method="tiered")
+    runner = Runner(small_scheme, StubProvider(tiered_answer), TagStore(tmp_path), settings, clock)
+    runner.request_stop()
+    result = runner.run(read_variables(variables_path))
+    assert result.stopped and result.tagged == 0 and result.failed == []
+
+
+def test_a_flat_run_counts_its_requests_as_one_tier(tmp_path, small_scheme, variables_path, clock):
+    result, _, _ = run(
+        tmp_path, small_scheme, StubProvider(answer()), read_variables(variables_path), clock
+    )
+    assert result.requests_by_tier == [result.requests]
