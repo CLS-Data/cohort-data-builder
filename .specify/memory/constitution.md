@@ -1,20 +1,20 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.0.0 → 1.1.0 (MINOR: new workflow rule)
-Modified principles: none
-Modified sections:
-  - Development Workflow & Quality Gates: added the "How to review" requirement for every
-    pull request
+Version change: 1.1.0 → 1.2.0 (MINOR: materially expanded guidance)
+Modified principles:
+  - I. Test-Driven Development: added a narrow exception for tests that need licensed
+    software which cannot be installed on CI runners (prompted by feature 003's Stata code)
+Modified sections: none
 Added sections: none
 Removed sections: none
-Templates reviewed (not modified by this command; they read the constitution at runtime):
-  - .specify/templates/plan-template.md ✅ compatible
+Templates reviewed (not modified by this change; they read the constitution at runtime):
+  - .specify/templates/plan-template.md ✅ compatible (Complexity Tracking records the skip)
   - .specify/templates/spec-template.md ✅ compatible
   - .specify/templates/tasks-template.md ⚠ "Tests are OPTIONAL" still conflicts with
     Principle I; generated task lists MUST include test tasks first
-Follow-up: .github/pull_request_template.md, CLAUDE.md and the pull-request description
-check are created by feature 001 tasks T003, T007, T016–T017
+  - .github/pull_request_template.md ✅ compatible ("How to review" carries the local run)
+Follow-up: none
 -->
 
 # Cohort Data Builder Constitution
@@ -32,6 +32,11 @@ All production code MUST be written using the Red-Green-Refactor cycle:
 - Every bug fix MUST begin with a test that reproduces the bug.
 - Tests MUST run automatically in CI on every push and pull request; a failing test
   suite blocks merge and deployment.
+- Exception, licensed tools: a test that needs software which cannot lawfully be installed
+  on CI runners (e.g. Stata) MAY skip in CI when it is absent, provided (1) CI runs
+  automated tests of the generated code's text for the same behaviour, (2) the skip is
+  recorded in the feature plan's Complexity Tracking, and (3) the pull request's "How to
+  review" requires a reviewer to run the test locally and report the result.
 - Tests MUST be deterministic: no reliance on network access, wall-clock time, or random
   values without injection or seeding.
 
@@ -122,4 +127,4 @@ as a static site.
   design; any violation MUST be recorded and justified in Complexity Tracking.
 - Compliance is reviewed on every pull request against the principles above.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-26 | **Last Amended**: 2026-10-26
+**Version**: 1.2.0 | **Ratified**: 2026-10-26 | **Last Amended**: 2026-11-13
