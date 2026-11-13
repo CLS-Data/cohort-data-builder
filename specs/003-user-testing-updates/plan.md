@@ -53,7 +53,7 @@ checks pass light and dark; no horizontal scroll at 390px
 
 | Principle | Before design | After design |
 |---|---|---|
-| I. Test-driven | Each story starts with failing tests (Node, e2e, generated) | Pass, with one recorded exception: the Stata run cannot be required in CI (Complexity Tracking) |
+| I. Test-driven | Each story starts with failing tests (Node, e2e, generated) | Pass: the Stata run uses the licensed-tools exception (v1.2.0): do-file text tested in CI, skip recorded in Complexity Tracking, local run required in "How to review" |
 | II. Documented code | New `feedback.js` export and changed `codegen.js` get JSDoc; README and download contract updated | Pass: contracts written; README "Stata" section and `docs/` update listed for tasks |
 | III. Static Pages | No server; the tag link is a plain GitHub URL | Pass |
 | IV. Simplicity | No new dependency or build step | Pass: Stata mirrors existing R/Python structure; layout reuses the Variables view's technique |
@@ -110,4 +110,4 @@ Each story maps to its own short branch off `003-user-testing-updates`:
 
 | Violation | Why needed | Simpler alternative rejected because |
 |---|---|---|
-| The Stata output test runs only where Stata is installed, not in CI (Principle I: tests run in CI) | Stata is licensed and cannot be installed on GitHub runners | Text-only tests of the do-file cannot show it produces the same data as R/Python; dropping the run entirely would leave FR-008 unchecked. CI still runs the do-file text tests, and the PR's "How to review" requires a local Stata run. |
+| Stata output test skips in CI (Principle I, licensed-tools exception, constitution v1.2.0) | Stata is licensed and cannot be installed on GitHub runners | Text-only tests of the do-file cannot show it produces the same data as R/Python; dropping the run entirely would leave FR-008 unchecked. CI still runs the do-file text tests, and the PR's "How to review" requires a local Stata run. |

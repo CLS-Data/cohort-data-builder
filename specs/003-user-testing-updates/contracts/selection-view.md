@@ -10,7 +10,7 @@ What a browser test can rely on in the Selection tab after this feature.
   <name>"`), its label, sweep and file, a problem message when there is one, and a
   remove button (`aria-label="Remove <name>"`).
 - `#basket-files`: the data files needed (unchanged content).
-- `#basket-download-area`: the language checkboxes (R, Python, Stata), the format radios,
+- `#basket-download-area`: the language checkboxes (R, Python, Stata (do-file)), the format radios,
   the missing-values checkbox, the download button `#basket-download` and its status line.
 - Dropping a dragged variable anywhere on the Selection view adds it.
 

@@ -158,6 +158,8 @@ already filled in, leaving only the suggestion to write.
   through the whole list, and the page MUST not scroll sideways.
 - **FR-006**: The download options MUST offer Stata alongside R and Python as a code
   language; any combination of the three may be chosen, and at least one is required.
+  The language option is labelled so it cannot be mistaken for the Stata (.dta) output
+  format.
 - **FR-007**: When Stata is chosen, the downloaded project MUST include a do-file that
   reads the needed data files, keeps the selected variables, applies the output column
   names, applies the missing-value choice, merges the sweeps on the person identifier,
