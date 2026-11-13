@@ -24,7 +24,7 @@ A model ending `:cloud` or `-cloud` asks before sending (unless `--yes`), for ev
 {"model": "clef:cloud",
  "state": {"name": "smoke5", "label": "Does the mother smoke", "values": ["1: Yes", "2: No"]},
  "questions": {"option": {"type": "choice",
-   "instructions": "Which area of a survey is this variable about?",
+   "instructions": "Which areas of a survey is this variable about? If more than one applies, share the probability between them.",
    "criteria": {"health": "Health: … It includes: Smoking, …", "housing": "Housing: …"}}}}
 ```
 

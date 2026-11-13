@@ -248,15 +248,16 @@ uv run topic-tagger tag variables.jsonl --out tags/ --scheme my-scheme.toml \
   --provider ollama-decision --model clef:cloud
 ```
 
-For each variable and tier, Clef is asked one choice question: "Which area of a survey is
-this variable about?", then "Which topic…" within each area followed. Each option is
+For each variable and tier, Clef is asked one choice question: "Which areas of a survey
+is this variable about? If more than one applies, share the probability between them.",
+then "Which topics…" within each area followed. Each option is
 described by its label and description, and an area also by its topics. Clef gives every
 option a probability, and these sum to about 1. The probability is the confidence.
 
 Areas are followed as above. Topics are kept at `--keep-at` (0.3) or above, and the
 strongest is always kept. Because the probabilities are shared out between the options,
 a variable rarely has two areas or topics above 0.5. Lower `--descend-at` and `--keep-at`
-to keep more than one.
+(0.3 lets up to three through) so a variable can be tagged from several areas.
 
 Clef tags tiered only: a choice question takes at most 26 options, too few for every
 topic at once, so `--method flat` is refused. For the same reason the tool refuses a scheme

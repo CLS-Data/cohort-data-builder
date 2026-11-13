@@ -193,10 +193,14 @@ def decision_request(model: str, node: Node, variable: Variable) -> dict:
 
 def _choice(node: Node) -> tuple[str, dict[str, str]]:
     """The question and described options for ``node``'s children."""
-    kind = "topic" if all(c.is_leaf for c in node.children) else "area"
-    return f"Which {kind} of a survey is this variable about?", {
-        c.id: _criterion(c) for c in node.children
-    }
+    kind = "topics" if all(c.is_leaf for c in node.children) else "areas"
+    # A choice question gives one answer; asking it to share the probability lets a variable
+    # with two true areas or topics reach the thresholds with both.
+    question = (
+        f"Which {kind} of a survey is this variable about? If more than one applies, share "
+        "the probability between them."
+    )
+    return question, {c.id: _criterion(c) for c in node.children}
 
 
 def _state(v: Variable) -> dict:
