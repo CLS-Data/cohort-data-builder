@@ -1059,9 +1059,9 @@ body.is-dragging-var .view-tab[data-view="basket"] {
 /* ── The download area ────────────────────────────────────────────────
    Always in reach, however long the selection (user testing: people with long
    selections could not find the button). On a big screen the view is one
-   screen tall: the list scrolls on its own and the download sits under it. On a
-   small one the page scrolls and the download bar sticks to the bottom, its
-   options folded behind a toggle so it stays short. */
+   screen tall: the list scrolls on its own and the download panel sits beside
+   it on the right. On a small one the page scrolls and the download bar sticks
+   to the bottom, its options folded behind a toggle so it stays short. */
 
 .basket-scroll:focus-visible { outline: 2px solid var(--contour); outline-offset: -2px; }
 .basket-download-area {
@@ -1069,7 +1069,9 @@ body.is-dragging-var .view-tab[data-view="basket"] {
   background: var(--paper-2);
   box-shadow: 0 -6px 12px -10px rgba(19, 26, 34, .35);
 }
-.dl-options .options { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px 24px; margin: 4px 0 10px; }
+.dl-options .options { grid-template-columns: 1fr; gap: 14px; margin: 4px 0 16px; }
+.dl-options .option-name { min-width: 0; flex-basis: 100%; }
+.dl-title { display: none; margin-top: 0; }
 .dl-options .option-help { font-size: 11.5px; }
 .dl-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
 .dl-actions .draft-status { margin: 0; }
@@ -1083,9 +1085,17 @@ body.is-dragging-var .view-tab[data-view="basket"] {
   }
   body:has(.view[data-view="basket"].is-current) main { flex: 1 1 auto; min-height: 0; }
   .view[data-view="basket"].is-current { height: 100%; }
-  #basket-detail { height: 100%; display: flex; flex-direction: column; padding: 0; }
-  .basket-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 24px 28px 16px; }
-  .basket-download-area { flex: none; padding: 12px 28px 14px; }
+  #basket-detail {
+    height: 100%; max-width: 1360px; padding: 0;
+    display: grid; grid-template-columns: minmax(0, 1fr) 340px;
+  }
+  .basket-scroll { min-height: 0; overflow-y: auto; padding: 24px 28px 16px; }
+  .basket-download-area {
+    min-height: 0; overflow-y: auto; padding: 24px 24px 20px;
+    border-top: 0; border-left: 1px solid var(--rule); box-shadow: none;
+  }
+  .dl-title { display: block; }
+  .dl-actions .btn { width: 100%; }
   .dl-toggle { display: none; }
 }
 

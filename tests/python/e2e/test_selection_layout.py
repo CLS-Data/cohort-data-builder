@@ -54,6 +54,12 @@ def test_download_stays_in_view_while_the_list_scrolls(bcs70):
     assert page.evaluate("document.documentElement.scrollHeight <= innerHeight + 1")
     expect(page.get_by_role("button", name="Download options")).to_be_hidden()
     expect(page.get_by_label("R", exact=True)).to_be_visible()
+    # The download panel is beside the list, on the right, from the top of the view.
+    listing = page.locator("#basket-scroll").bounding_box()
+    panel = page.locator("#basket-download-area").bounding_box()
+    assert panel["x"] >= listing["x"] + listing["width"] - 1
+    assert abs(panel["y"] - listing["y"]) <= 1
+    assert in_viewport(page, "#basket-download-area")
     before = page.locator("#basket-download").bounding_box()["y"]
     page.locator("#basket-scroll").evaluate("el => el.scrollBy(0, 2000)")
     assert page.locator("#basket-scroll").evaluate("el => el.scrollTop") > 0
