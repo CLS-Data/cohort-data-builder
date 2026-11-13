@@ -88,10 +88,8 @@
     consent to send them to a cloud model. Left as an option in the quickstart.
   - The 60-variable test fixture: it uses the small 3-area scheme and has no expected
     topics.
-- **Models**: three runs:
-  - flat with `gpt-oss:20b-cloud`;
-  - tiered with `gpt-oss:20b-cloud`;
-  - tiered with `clef:cloud` (`--provider ollama-decision`).
+- **Models**: four runs, flat and tiered × `gpt-oss:20b-cloud` and `clef:cloud`
+  (`--provider ollama-decision`). Tiered runs use a low threshold for the sweep (R13).
 
 ## R9. Clef: how to ask
 
@@ -144,3 +142,33 @@
 - **Rationale**: `clef:cloud` uses the `:cloud` form, which today's `-cloud` check misses,
   so the tool would not ask before sending metadata off the machine. This is a fix that
   applies to chat models too (FR-014).
+
+## R13. Choosing the descend threshold
+
+- **Decision**: Treat the threshold as something to measure, not fix.
+  - **One run:** tag once at a low threshold (`--descend-at 0.1 --max-areas 0`, and
+    `--keep-at 0` for Clef). `path` then holds every area that passed 0.1 with its
+    probability. Each topic's area is known from the scheme.
+  - **Scoring at higher thresholds:** for a threshold t, keep a variable's topics whose area
+    had confidence ≥ t (plus its strongest area). The requests a run at t would have made
+    are 1 + the areas ≥ t (for Clef, per variable).
+  - **What is reported**, per t: area recall (tier 1 routed to the area of each expected
+    topic), topic recall, precision and requests per variable. The same is done for
+    `--keep-at`.
+- **Rationale**: One model run gives the whole curve. A run per threshold would cost five
+  times as much and add model randomness between rows. Area recall separates the two ways
+  tiered can fail: routing to the wrong area, or picking the wrong topic in the right one.
+- **Caveat**: For a chat model the tier-2 prompt for an area holds the variables routed to
+  it, so a lower threshold changes which variables share a request. The offline numbers are
+  close to, not identical to, a real run at t. For Clef, one variable per request, they are
+  exact.
+
+## R14. Flat with Clef
+
+- **Decision**: Flat with the decision provider walks a one-tier tree: the root's children
+  are every final topic. It asks one `noul` question per topic, about 100 for CLOSER, split
+  into requests of at most 64, so 2 requests per variable.
+- **Rationale**: It is the same decider and the same keep rule as tiered, so the comparison
+  isolates "narrow first or not". The chat flat path stays exactly as it is (FR-009).
+- **Alternatives**: One `choice` question over all topics (the cloud allows 255 options): 1
+  request, but single-label. It is kept as a possible variant in the ad hoc script.

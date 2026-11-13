@@ -7,7 +7,11 @@
 within the taxonomy, so first classify layer 1 and then within layer 2 and so on. We will use
 Ollama's clef model to test. I want to test the outputs during this development, we can do
 this ad hoc testing in the adhoc dir." Then: "I want to use this decision model:
-https://ollama.com/library/clef. We may need to add that to Ollama."
+https://ollama.com/library/clef. We may need to add that to Ollama." Then: "Say we have a
+variable … I want to predict demographics to narrow it down and then predict the final
+label. But actually, let's try both: predicting across all final categories, or first
+narrowing down and then predicting the final category. Also we will need to consider at
+what threshold we choose to make a prediction on the next level."
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -61,9 +65,13 @@ the run record and report say which method was used and how many requests each t
 
 ### User Story 3 - Compare the methods ad hoc (Priority: P2)
 
-During development the maintainer runs both methods on a hand-labelled set of fictional
-variables, with Ollama's cloud model, and gets a comparison: how often each method finds
-the expected topics, the extra topics it adds, and how many requests and seconds each took.
+During development the maintainer runs both methods, **flat** (predict across all final
+topics at once) and **tiered** (predict the area, e.g. Demographics, then the final topic
+within it), with each model (Clef and a chat model), on a hand-labelled set of fictional
+variables. They get a comparison: how often each finds the expected topics, the extra
+topics it adds, and how many requests and seconds each took. For tiered runs, the
+comparison is repeated at several descend thresholds, so the maintainer can see how the
+threshold for moving to the next level trades accuracy against requests.
 
 **Independent Test**: The comparison script runs on two finished output folders and a
 labelled set and prints a table, with no model needed.
@@ -71,9 +79,15 @@ labelled set and prints a table, with no model needed.
 **Acceptance Scenarios**:
 
 1. **Given** the labelled set, **When** the maintainer runs the ad hoc comparison, **Then**
-   it tags the set both ways with the cloud model and prints, per method: top-1 hits, recall
-   and precision against the expected topics, requests and time; plus the variables where
-   the methods disagree.
+   it tags the set four ways (flat and tiered × Clef and gpt-oss). It prints, per run:
+   top-1 hits, recall and precision against the expected topics, requests and time; plus
+   the variables where runs disagree.
+2. **Given** a tiered run, **When** it is scored, **Then** it is scored at each descend
+   threshold in a sweep (default 0.1, 0.2, 0.3, 0.5, 0.7). Each row shows:
+   - **area recall**: how often tier 1 followed the area of an expected topic;
+   - the topic scores and the requests a run at that threshold would have needed.
+
+   All of this comes from one run made at the lowest threshold, with no extra model calls.
 
 ### User Story 4 - Use the Clef decision model (Priority: P1)
 
@@ -101,8 +115,9 @@ threshold.
    split across requests and the answers combined.
 3. **Given** Clef is not pulled, **When** the run starts, **Then** it stops before tagging
    and says to run `ollama pull clef:cloud` (or the model given).
-4. **Given** the decision provider with `--method flat`, **When** the run starts, **Then** it
-   stops with an error: a decision model is used one tier at a time.
+4. **Given** the decision provider with `--method flat`, **When** tagging, **Then** each
+   variable is asked one `noul` question per final topic, across all areas (about 100,
+   split into requests of at most 64). The tags are the topics at or above `--keep-at`.
 5. **Given** a model ending `:cloud` or `-cloud`, **When** the run starts, **Then** it asks
    before sending metadata off the machine (unless `--yes`).
 
@@ -111,8 +126,8 @@ threshold.
 - A tier-1 reply names an area that does not exist → the reply fails the check and is retried.
 - A tier-2 reply names a topic outside the area it was asked about → fails the check.
 - An area chosen at tier 1 gets no topics at tier 2 → the variable keeps the topics from its
-  other areas; if none, it is retried alone, then gets the fallback topic only if the model
-  says nothing fits, otherwise it is recorded as failed.
+  other areas. It is recorded as failed only if it ends with no topics at all. (With the
+  decision model this cannot happen: the strongest topic is always kept, FR-013.)
 - A scheme with one area → tier 1 is skipped (there is nothing to choose).
 - Stopping mid-run (Ctrl-C) → variables whose tiers have all finished are stored; the rest
   are done by the next run.
@@ -122,9 +137,10 @@ threshold.
 ### Functional Requirements
 
 - **FR-001**: The `tag` command MUST accept `--method flat|tiered`, default `flat`.
-- **FR-002**: Tiered tagging MUST ask one request per tier per group of variables: tier 1 for
-  the batch over the scheme's areas, then for each chosen area one request over that area's
-  children, recursing while children have children.
+- **FR-002**: Tiered tagging MUST decide one tier at a time: first the variable's areas
+  (e.g. Demographics), then, within each followed area, its final topics (e.g. Age),
+  recursing while children have children. Chat models decide a group of variables per
+  request. The decision model decides one variable per request (FR-012).
 - **FR-003**: Each request MUST list only the options for its tier, and the reply MUST be
   checked against exactly those options.
 - **FR-004**: An area is followed when its tier-1 confidence is at least the descend threshold
@@ -149,7 +165,14 @@ threshold.
   variable has a topic.
 - **FR-014**: A model name ending `:cloud` or `-cloud` MUST count as remote for every
   Ollama provider.
-- **FR-015**: The decision provider MUST be refused with `--method flat`.
+- **FR-015**: The decision provider MUST work with both methods. Flat asks every final
+  topic at once; tiered asks area by area.
+- **FR-016**: Tiered runs MUST make the descend threshold a setting (`--descend-at`), and
+  `--max-areas 0` MUST mean "no cap". For threshold studies, `path` MUST record every area
+  at or above the threshold with its confidence, so scores at higher thresholds can be
+  worked out from one run.
+- **FR-017**: The decision provider MUST accept `--keep-at 0` (keep every topic's
+  probability), so the keep threshold can be studied offline the same way.
 - **FR-011**: The ad hoc comparison MUST live in `adhoc/` (never committed: it may hold
   real data) and use only fictional variables unless the maintainer chooses otherwise.
 
@@ -161,15 +184,17 @@ threshold.
 
 ## Success Criteria *(mandatory)*
 
-- **SC-001**: On the labelled set, the tiered method's recall of expected topics is at least
-  the flat method's, measured with the same cloud model (decides whether it becomes default;
-  either result is a valid outcome of this feature).
-- **SC-002**: A tiered run needs at most (1 + max areas) requests per batch on average when
-  no request fails.
+- **SC-001**: The comparison answers, for each model, whether tiered beats flat on recall at
+  equal or better precision, and at which descend threshold. Either answer is a valid
+  outcome; it decides the defaults in a follow-up.
+- **SC-002**: For the decision model, a variable takes 1 tier-1 request plus 1 request per
+  followed area (each under 64 questions). For a chat model, a batch takes 1 tier-1 request
+  plus 1 per distinct followed area. The comparison reports requests per variable at each
+  threshold.
 - **SC-003**: All existing tagger tests pass unchanged except for the added `method` field.
 - **SC-005**: Clef tiered tagging stores a tag for every fixture variable with no failures.
-- **SC-004**: The comparison of both methods on the labelled set runs with one command and
-  finishes in under 10 minutes with the cloud model.
+- **SC-004**: The four-run comparison on the labelled set runs with one command and
+  finishes in under 20 minutes.
 
 ## Assumptions
 

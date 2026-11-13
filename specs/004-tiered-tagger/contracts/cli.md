@@ -4,17 +4,15 @@
 |---|---|---|
 | `--method flat\|tiered` | `flat` | `flat`: one request per batch listing every topic (as now). `tiered`: one request per tier (see spec FR-002). |
 | `--descend-at X` | `0.5` | Tiered only. Follow an area when its confidence is at least X (0–1). |
-| `--max-areas N` | `3` | Tiered only. Follow at most N areas per variable (N ≥ 1). |
-| `--keep-at X` | `0.3` | Decision provider only. Keep a topic when its probability is at least X (0–1). |
-| `--provider ollama-decision` | | Ollama's decision API (`/v1/systemone`), e.g. `--model clef:cloud`. Needs `--method tiered`. |
+| `--max-areas N` | `3` | Tiered only. Follow at most N areas per variable; `0` means no cap. |
+| `--keep-at X` | `0.3` | Decision provider only. Keep a topic when its probability is at least X (0–1); `0` keeps every topic. |
+| `--provider ollama-decision` | | Ollama's decision API (`/v1/systemone`), e.g. `--model clef:cloud`. Works with both methods. |
 
 Errors (exit 2, bad input):
 - `--descend-at` outside 0–1;
-- `--max-areas` below 1;
+- `--max-areas` below 0;
 - `--descend-at` or `--max-areas` given without `--method tiered`;
-- `--keep-at` given without `--provider ollama-decision`;
-- `--provider ollama-decision` with `--method flat` (message: "a decision model answers one tier
-  at a time: use --method tiered").
+- `--keep-at` given without `--provider ollama-decision`.
 
 Exit 3 (no host) when Clef is not pulled: `model clef:cloud is not installed; run: ollama pull clef:cloud`.
 

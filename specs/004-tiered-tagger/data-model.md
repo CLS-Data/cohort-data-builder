@@ -47,7 +47,8 @@ A record with no `method` counts as `"flat"`.
 ## Run record (`run.json`), added
 
 - `method`
-- `descend_at` and `max_areas` (tiered only)
+- `descend_at` and `max_areas` (tiered only; `max_areas` 0 means no cap)
+- `keep_at` (decision provider only)
 - `requests_by_tier`: a list, index 0 being tier 1
 
 The existing `requests` field stays the total.

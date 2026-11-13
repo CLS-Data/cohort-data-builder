@@ -28,8 +28,10 @@ Tiered record:
 Added:
 
 ```json
-{"method": "tiered", "descend_at": 0.5, "max_areas": 3, "requests_by_tier": [12, 41]}
+{"method": "tiered", "descend_at": 0.5, "max_areas": 3, "keep_at": 0.3, "requests_by_tier": [12, 41]}
 ```
+
+`keep_at` appears only for the decision provider.
 
 A flat run has `"method": "flat"` and `"requests_by_tier": [<requests>]`.
 

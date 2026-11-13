@@ -63,11 +63,12 @@ From the repository root, with Ollama running and signed in for cloud models:
 uv run --project tools/topic-tagger python adhoc/tiered/compare.py
 ```
 
-Expected: a table, one row per run (flat/gpt-oss, tiered/gpt-oss, tiered/clef), with:
-- top-1 hits, recall, precision, requests and seconds;
+Expected: a table with flat and tiered × gpt-oss and Clef. Tiered rows are repeated at each
+descend threshold (0.1–0.7), from one low-threshold run (research R13). Each row shows:
+- top-1 hits, recall, precision, area recall, requests per variable and seconds;
 - then the variables where the two methods disagree, with the expected topics.
 
-It finishes in under 10 minutes. Results are kept in `adhoc/tiered/runs/`.
+It finishes in under 20 minutes. Results are kept in `adhoc/tiered/runs/`.
 
 To try real variables instead, a choice for the maintainer since it sends study metadata to
 a cloud model: export a cohort with `scripts/topics.py export` and pass `--variables` with
@@ -75,5 +76,6 @@ a sample. That run has no expected topics, so the script reports only the disagr
 
 ## 7. Decide
 
-If tiered recall ≥ flat recall (SC-001), consider making it the default in a follow-up.
-Otherwise keep flat, and note the result in `research.md`.
+For each model, pick the method and the descend and keep thresholds with the best recall
+at acceptable precision and request count (SC-001). Record them in `research.md`
+§ "Results", and set them as defaults in a follow-up.

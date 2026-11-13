@@ -24,7 +24,12 @@ The tiered walk asks a **decider** at each tier, and there are two:
   provider. That provider posts one variable at a time to Ollama's `/v1/systemone`, with
   one yes/no (`noul`) question per option, and uses the probabilities as confidences.
 
-The comparison covers flat/gpt-oss, tiered/gpt-oss and tiered/Clef.
+Clef works with both methods:
+- **Flat** asks every final topic at once (R14).
+- **Tiered** asks the area first, then the topics in it.
+
+The comparison covers flat and tiered × Clef and gpt-oss. The descend threshold is studied
+from one low-threshold run, scored offline at several thresholds (R13).
 
 ## Technical Context
 
@@ -46,8 +51,10 @@ Cloud models are reached through it. Clef needs Ollama 0.40.6 or later for `clef
 
 **Project Type**: CLI tool (standalone Python project)
 
-**Performance Goals**: at most 1 + `--max-areas` requests per batch when nothing fails
-(SC-002). The ad hoc comparison runs in under 10 minutes with the cloud model (SC-004).
+**Performance Goals**:
+- **Clef:** 1 + (areas followed) requests per variable, tiered; 2 per variable, flat.
+- **Chat models:** 1 + (distinct areas followed) requests per batch (SC-002).
+- **Ad hoc comparison:** the four runs take under 20 minutes (SC-004).
 
 **Constraints**: the flat method's prompts and output are unchanged apart from the
 `method` field (FR-009). The tagger imports nothing outside its folder. `adhoc/` is never
