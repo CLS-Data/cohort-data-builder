@@ -518,15 +518,10 @@ code, kbd { font-family: var(--mono); font-size: .92em; }
 main { display: block; }
 
 .view { display: none; }
-.view.is-current {
-  display: grid; grid-template-columns: var(--rail) 1fr;
-  position: relative;   /* the grip below is positioned against this */
-}
+.view.is-current { display: block; }
 
 .pane { min-width: 0; }
-.view[data-view="search"].is-current { display: block; }
-.pane-list { border-right: 1px solid var(--rule); background: var(--paper-2); }
-.pane-detail { padding: 24px 28px 60px; }
+.pane-detail { max-width: 1040px; margin: 0 auto; padding: 24px 28px 60px; }
 
 /* Variables, on a wide screen: the page is one screen tall and the list
    takes what is left under the filter bar, scrolling on its own. When the
@@ -668,37 +663,6 @@ main { display: block; }
 .sp-foot { padding: 10px 14px; border-top: 1px solid var(--rule); }
 .sp-foot .btn { width: 100%; }
 
-/* ── The pane divider ─────────────────────────────────────────────────
-
-   Absolutely positioned over the border rather than made a third grid track:
-   the two-column layout stays exactly as it was, and the hit area can be
-   wider than the 1px rule it sits on without pushing anything around.
-
-   `--rail` lives on :root, so all three views share one width. That is
-   deliberate — the list column means the same thing in each, and a width you
-   set while searching should still be there when you switch to the bundle. */
-.grip {
-  position: absolute; top: 0; bottom: 0;
-  left: calc(var(--rail) - 3px); width: 7px;
-  z-index: 5;
-  cursor: col-resize;
-  background: none; border: 0;
-}
-.grip:hover, .grip:focus-visible { background: var(--contour); opacity: .35; }
-.grip:focus-visible { outline: none; }
-/* While dragging, the whole page keeps the resize cursor and stops selecting
-   text under the pointer — otherwise a drag across the list highlights it. */
-body.is-resizing { cursor: col-resize; user-select: none; }
-body.is-resizing .grip { background: var(--contour); opacity: .5; }
-
-/* ── Finder ───────────────────────────────────────────────────────── */
-
-.finder {
-  padding: 16px 16px 12px;
-  background: var(--paper-2);
-  border-bottom: 1px solid var(--rule);
-}
-
 .field { display: block; margin-bottom: 14px; }
 .field:last-child { margin-bottom: 0; }
 
@@ -722,12 +686,6 @@ input[type="search"], input[type="text"], input:not([type]), select, textarea {
 textarea { font-family: var(--sans); font-size: 14px; resize: vertical; }
 input::placeholder, textarea::placeholder { color: var(--ink-3); }
 
-.finder-meta {
-  display: flex; justify-content: space-between; align-items: baseline;
-  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
-}
-.finder-help { margin: 4px 0 0; font-size: 12px; color: var(--ink-3); }
-
 .link-btn {
   border: 0; background: none; padding: 0;
   color: var(--contour); cursor: pointer;
@@ -745,26 +703,6 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
   cursor: pointer;
 }
 
-/* ── Selecting variables to download ──────────────────────────────────
-   The count line under the bundle's heading. */
-
-.picked {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center; gap: 6px 10px;
-  margin-top: 12px; padding-top: 10px;
-  border-top: 1px solid var(--rule);
-}
-.picked-count {
-  margin: 0;
-  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
-}
-.picked-count strong { color: var(--ink); }
-.picked-warn { color: var(--ochre); }
-/* The count line doubling as a status line — see say() in atlas/basket.js. */
-.picked-count.is-saying { color: var(--ochre); }
-.picked-actions { display: flex; gap: 10px; grid-row: 1; grid-column: 2; justify-self: end; }
-.picked .btn { grid-column: 1 / -1; width: 100%; }
 /* The affirmative twin of .warn — for telling someone the thing they were
    about to look for is already handled. */
 .note-box {
@@ -963,7 +901,7 @@ pre.code {
 
 /* ── The bundle ─────────────────────────────────────────────────────
 
-   The view's own list pane is a drop target while you are in it; the TAB is a
+   The Selection view itself is a drop target while you are in it; the TAB is a
    drop target from anywhere else, which is the only way a drag from the
    metadata list can reach a view you are not currently on. Both advertise
    themselves only while something is in flight, so neither sits there as
@@ -973,7 +911,7 @@ pre.code {
 body.is-dragging-var .view-tab[data-view="basket"] {
   border-color: var(--contour); color: var(--contour);
 }
-.view-tab.is-dropping, .pane.is-dropping {
+.view-tab.is-dropping, .view.is-dropping {
   background: color-mix(in srgb, var(--contour) 10%, transparent);
   box-shadow: inset 0 0 0 2px var(--contour);
 }
@@ -981,8 +919,8 @@ body.is-dragging-var .view-tab[data-view="basket"] {
 /* The remove control on a collected row. Mirrors the ＋ that put it there:
    same size, same column, so adding and removing land in the same place. */
 .basket-x {
-  flex: 0 0 auto; align-self: center;
-  margin-left: 10px; width: 22px; height: 22px;
+  flex: 0 0 auto; align-self: start;
+  width: 28px; height: 28px; margin-top: -4px;
 }
 
 /* ── The output columns ───────────────────────────────────────────────
@@ -1000,7 +938,7 @@ body.is-dragging-var .view-tab[data-view="basket"] {
    now, so no name can collide with anything at any length. */
 .col-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 28px auto minmax(0, 1fr);
   align-items: start; gap: 10px;
   padding: 8px 0;
   border-bottom: 1px solid var(--rule);
@@ -1163,9 +1101,6 @@ body.is-dragging-var .view-tab[data-view="basket"] {
   .v-expand { align-self: flex-start; height: 36px; }
   .vrow-more { padding-left: 16px; }
 
-  .view.is-current { grid-template-columns: 1fr; }
-  .grip { display: none; }
-  .pane-list { border-right: 0; border-bottom: 1px solid var(--rule); }
   .detail-name { font-size: 20px; }
 }
 

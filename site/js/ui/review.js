@@ -1,18 +1,18 @@
-/* The Selection view: what was picked, the output columns (the one place a column can be
-   renamed), the data files needed, the download options, and the download itself.
+/* The Selection view: what was picked, as one list of output columns (where a variable is
+   renamed or removed), the data files needed, the download options, and the download.
 
-   The two panes are not the same list twice. The columns list is where a name clash
-   between two files becomes visible (two files both calling something `sex` is normal). */
+   One list, not two: user testing found a second list of the same variables confusing.
+   The columns list is also where a name clash between two files becomes visible (two files
+   both calling something `sex` is normal). */
 
 import { buildProject, FORMATS } from "../core/codegen.js";
 import { fixDots, problems } from "../core/columns.js";
 import { loadDict } from "../core/data.js";
 import { addMany, keyOf, remove } from "../core/selection.js";
-import { read, storeKey, write } from "../core/storage.js";
 import { esc } from "../core/text.js";
 import { zip } from "../core/zip.js";
 import { filterToFile } from "./results.js";
-import { onSelectionChange, saveOptions, setSelection, storage } from "./selected.js";
+import { onSelectionChange, saveOptions, setSelection } from "./selected.js";
 import { DRAG_MIME, state } from "./state.js";
 import { onShow } from "./views.js";
 
@@ -43,37 +43,14 @@ const currentProblems = () =>
    slowest thing on the page, and every click in the list would otherwise redraw them. */
 function render() {
   if (state.view !== "basket" || !state.manifest) return;
-  renderList();
   renderDetail();
-}
-
-function renderList() {
-  const count = state.bundle.length;
-  $("#basket-clear").hidden = !count;
-  $("#basket-count").innerHTML = count
-    ? `<strong>${plural(count, "variable")}</strong>`
-    : "Nothing selected yet";
-  const order = waveOrder();
-  const sorted = [...state.bundle].sort(
-    (a, b) => order.indexOf(a.wave) - order.indexOf(b.wave) || a.file.localeCompare(b.file),
-  );
-  $("#basket-list").innerHTML = sorted
-    .map(
-      (b) => `<li class="pickable">
-      <button class="add is-in basket-x" data-remove="${esc(keyOf(b))}"
-          aria-label="Remove ${esc(b.name)}" title="Remove"><span class="add-yes">✓</span><span class="add-no">✕</span></button>
-      <span class="row" style="cursor:default">
-        <span class="row-top"><span class="row-name">${esc(b.name)}</span><span class="row-wave">${esc(b.wave)}</span></span>
-        <span class="row-label">${esc(b.label || "no label")}</span>
-        <span class="row-file">${esc(b.file)}</span>
-      </span></li>`,
-    )
-    .join("");
 }
 
 function colRow(b, bad) {
   const problem = bad.get(keyOf(b));
   return `<li class="col-row${problem ? " is-bad" : ""}">
+    <button class="add is-in basket-x" data-remove="${esc(keyOf(b))}"
+        aria-label="Remove ${esc(b.name)}" title="Remove"><span class="add-yes">✓</span><span class="add-no">✕</span></button>
     <span class="col-kind col-kind-raw" title="${esc(b.wave)}">${esc(b.wave)}</span>
     <span class="col-body">
       <input class="col-input" type="text" value="${esc(b.column)}" data-rename="${esc(keyOf(b))}"
@@ -149,7 +126,8 @@ function renderDetail() {
 
   el.innerHTML = `
     <div class="detail-head">
-      <div class="detail-eyebrow">${esc(m.name)} · ${plural(count, "variable")} from ${plural(files.length, "file")}</div>
+      <div class="detail-eyebrow">${esc(m.name)} · ${plural(count, "variable")} from ${plural(files.length, "file")}
+        · <button class="link-btn" id="basket-clear">Clear</button></div>
       <h1 class="detail-name">output/merged.${ext}</h1>
       <p class="detail-label">One row per person, joined on <code>${esc(m.identifier)}</code>.
         A file with several rows per person is written to its own file instead.</p>
@@ -162,8 +140,9 @@ function renderDetail() {
     }
     <h2 class="section-title">Columns</h2>
     <p class="note">In the order they are written. Rename any of them here.</p>
-    <ol class="cols">
+    <ol class="cols" id="basket-cols">
       <li class="col-row is-fixed">
+        <span class="basket-x" aria-hidden="true"></span>
         <span class="col-kind col-kind-id" title="The identifier">·</span>
         <span class="col-body"><span class="col-name">${esc(m.identifier)}</span>
           <span class="col-note">always included: the key the files are merged on</span></span>
@@ -280,69 +259,16 @@ async function download() {
   }
 }
 
-/* ── The divider between the panes ───────────────────────────────────
-   One width, stored once for the site. Pointer events so a trackpad, touch and pen all
-   work; arrow keys too. */
-const RAIL_MIN = 260;
-const RAIL_DEFAULT = 400; // must match --rail in styles.css
-const railMax = () => Math.max(RAIL_MIN, Math.round(window.innerWidth * 0.7));
-const currentRail = () =>
-  Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue("--rail"), 10);
-
-function setRail(px, remember = true) {
-  const w = Math.min(railMax(), Math.max(RAIL_MIN, Math.round(px)));
-  document.documentElement.style.setProperty("--rail", `${w}px`);
-  for (const g of $$(".grip")) g.setAttribute("aria-valuenow", String(w));
-  if (remember) write(storage, storeKey("rail"), w);
-}
-
-function wireGrip() {
-  setRail(read(storage, storeKey("rail"), currentRail() || RAIL_DEFAULT), false);
-  for (const grip of $$(".grip")) {
-    grip.setAttribute("aria-valuemin", String(RAIL_MIN));
-    grip.addEventListener("pointerdown", (e) => {
-      grip.setPointerCapture(e.pointerId);
-      document.body.classList.add("is-resizing");
-      e.preventDefault();
-    });
-    grip.addEventListener("pointermove", (e) => {
-      if (!grip.hasPointerCapture(e.pointerId)) return;
-      setRail(e.clientX - grip.parentElement.getBoundingClientRect().left, false);
-    });
-    const end = (e) => {
-      if (!grip.hasPointerCapture(e.pointerId)) return;
-      grip.releasePointerCapture(e.pointerId);
-      document.body.classList.remove("is-resizing");
-      setRail(currentRail());
-    };
-    grip.addEventListener("pointerup", end);
-    grip.addEventListener("pointercancel", end);
-    grip.addEventListener("dblclick", () => setRail(RAIL_DEFAULT));
-    grip.addEventListener("keydown", (e) => {
-      const step = e.shiftKey ? 64 : 16;
-      if (e.key === "ArrowLeft") setRail(currentRail() - step);
-      else if (e.key === "ArrowRight") setRail(currentRail() + step);
-      else if (e.key === "Home") setRail(RAIL_DEFAULT);
-      else return;
-      e.preventDefault();
-    });
-  }
-}
-
 /** Attach the Selection view's event handlers. Call once. */
 export function wireReview() {
   onShow("basket", render);
   onSelectionChange(render);
-  wireGrip();
-
-  $("#basket-clear").addEventListener("click", () => setSelection([]));
-  $("#basket-list").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-remove]");
-    if (btn) setSelection(remove(state.bundle, btn.dataset.remove).selection);
-  });
 
   const detail = $("#basket-detail");
   detail.addEventListener("click", (e) => {
+    const gone = e.target.closest("[data-remove]");
+    if (gone) return setSelection(remove(state.bundle, gone.dataset.remove).selection);
+    if (e.target.closest("#basket-clear")) return setSelection([]);
     if (e.target.closest("#basket-download")) return download();
     if (e.target.closest("#fix-dots")) {
       return setSelection(fixDots(state.bundle, state.manifest.identifier));
@@ -378,8 +304,8 @@ export function wireReview() {
     }
   });
 
-  // The list pane takes a variable dragged from the Variables view.
-  const drop = $("#basket-drop");
+  // The whole view takes a variable dragged from the Variables view.
+  const drop = $('section.view[data-view="basket"]');
   drop.addEventListener("dragover", (e) => {
     if (e.dataTransfer.types.includes(DRAG_MIME)) e.preventDefault();
   });
