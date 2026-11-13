@@ -10,7 +10,7 @@ PAGES = [SITE / "index.html", SITE / "tutorial" / "index.html"]
 
 def test_font_sizes_are_relative_so_browser_text_size_applies():
     for path in STYLES:
-        found = re.findall(r"font-size:\s*[\d.]+px", path.read_text())
+        found = re.findall(r"(?:font-size|line-height):\s*[\d.]+px", path.read_text())
         assert found == [], f"{path.name}: {found[:5]}"
 
 

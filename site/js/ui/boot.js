@@ -75,8 +75,33 @@ function wireTheme() {
   });
 }
 
+const TEXT_SIZES = ["", "large", "larger"];
+
+/* Show the text size and mark its button. "" is the browser's own size. */
+function setTextSize(size) {
+  const root = document.documentElement;
+  if (size) root.dataset.text = size;
+  else delete root.dataset.text;
+  for (const b of document.querySelectorAll("[data-text-size]")) {
+    b.setAttribute("aria-pressed", String(b.dataset.textSize === size));
+  }
+}
+
+/** Restore the stored text size and make the Text size buttons set it. */
+function wireTextSize() {
+  const stored = read(storage, storeKey("text-size"), "");
+  setTextSize(TEXT_SIZES.includes(stored) ? stored : "");
+  for (const b of document.querySelectorAll("[data-text-size]")) {
+    b.addEventListener("click", () => {
+      setTextSize(b.dataset.textSize);
+      write(storage, storeKey("text-size"), b.dataset.textSize);
+    });
+  }
+}
+
 async function boot() {
   wireTheme();
+  wireTextSize();
   try {
     state.catalogue = await loadCatalogue(fetch);
   } catch (err) {

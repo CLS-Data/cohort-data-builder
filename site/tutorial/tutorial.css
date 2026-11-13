@@ -16,7 +16,7 @@ a.view-tab { display: inline-block; text-decoration: none; }
 .t-intro { padding: 28px 0 24px; }
 .t-kicker {
   margin: 0 0 6px;
-  font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+  font-family: var(--mono); font-size: 0.6875rem; text-transform: uppercase;
   letter-spacing: .14em; color: var(--contour);
 }
 .t-intro h1 {
@@ -24,7 +24,7 @@ a.view-tab { display: inline-block; text-decoration: none; }
   font-family: var(--mono); font-size: clamp(24px, 4vw, 34px); font-weight: 700;
   letter-spacing: -.04em; line-height: 1.15;
 }
-.t-lede { margin: 12px 0 0; max-width: 68ch; font-size: 15px; color: var(--ink-2); }
+.t-lede { margin: 12px 0 0; max-width: 68ch; font-size: 0.9375rem; color: var(--ink-2); }
 
 .t-stats {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px;
@@ -34,15 +34,15 @@ a.view-tab { display: inline-block; text-decoration: none; }
   padding: 10px 12px; border: 1px solid var(--rule); border-radius: 2px; background: var(--paper);
 }
 .t-stats b {
-  display: block; font-family: var(--mono); font-size: 22px; font-weight: 700;
+  display: block; font-family: var(--mono); font-size: 1.375rem; font-weight: 700;
   letter-spacing: -.03em; color: var(--contour);
 }
 .t-stats span {
-  font-family: var(--mono); font-size: 10.5px; text-transform: uppercase;
+  font-family: var(--mono); font-size: 0.6562rem; text-transform: uppercase;
   letter-spacing: .1em; color: var(--ink-3);
 }
 .t-cohorts { display: flex; flex-wrap: wrap; gap: 5px; margin: 12px 0 0; padding: 0; list-style: none; }
-.t-cohorts li { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+.t-cohorts li { font-family: var(--mono); font-size: 0.7188rem; color: var(--ink); }
 .t-cohorts li span { color: var(--ink-3); }
 .t-cohorts li + li::before { content: "·"; margin-right: 5px; color: var(--ink-3); }
 
@@ -51,7 +51,7 @@ a.view-tab { display: inline-block; text-decoration: none; }
 .t-steps .node { text-decoration: none; color: inherit; min-height: 44px; }
 .t-steps .node-fill { height: 100%; opacity: .25; }
 .t-steps .node:hover .node-fill { opacity: 1; }
-.t-steps .node-n { font-family: var(--mono); font-size: 10.5px; color: var(--ink-2); }
+.t-steps .node-n { font-family: var(--mono); font-size: 0.6562rem; color: var(--ink-2); }
 
 /* ── A step: what to do on the left, a working copy on the right ─── */
 
@@ -62,20 +62,20 @@ a.view-tab { display: inline-block; text-decoration: none; }
 }
 .t-step h2 {
   margin: 4px 0 10px;
-  font-family: var(--mono); font-size: 21px; font-weight: 700; letter-spacing: -.03em;
+  font-family: var(--mono); font-size: 1.3125rem; font-weight: 700; letter-spacing: -.03em;
 }
 .t-step p { margin: 0 0 10px; max-width: 60ch; }
 .t-step .field-label { display: block; }
 .t-do { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 7px; }
 .t-do li {
   display: grid; grid-template-columns: 18px 1fr; gap: 6px;
-  font-size: 13.5px; color: var(--ink-2);
+  font-size: 0.8438rem; color: var(--ink-2);
 }
 .t-do li::before { content: "→"; font-family: var(--mono); font-weight: 700; color: var(--contour); }
 .t-do strong { color: var(--ink); font-weight: 600; }
 kbd {
   padding: 0 5px; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 2px;
-  background: var(--paper-2); font-size: 11px;
+  background: var(--paper-2); font-size: 0.6875rem;
 }
 
 .t-demo {
@@ -90,12 +90,12 @@ kbd {
 .t-demo-head .fb-search { flex: 1 1 200px; }
 .t-demo-tag {
   margin-left: auto;
-  font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+  font-family: var(--mono); font-size: 0.625rem; text-transform: uppercase;
   letter-spacing: .1em; color: var(--ink-3);
 }
 .t-demo-foot {
   margin: 0; padding: 8px 14px; border-top: 1px solid var(--rule);
-  font-size: 12.5px; color: var(--ink-2);
+  font-size: 0.7812rem; color: var(--ink-2);
 }
 
 /* Rows: the builder's columns, cut down to fit a demo. */
@@ -107,7 +107,7 @@ kbd {
 .t-row-main .v-name { padding-left: 7px; }
 .t-row .vrow-more { padding: 2px 16px 12px 40px; }
 .t-row .v-expand { width: 28px; min-height: 32px; }
-.t-empty { padding: 18px 14px; font-size: 13px; color: var(--ink-3); }
+.t-empty { padding: 18px 14px; font-size: 0.8125rem; color: var(--ink-3); }
 button.t-row-main {
   width: 100%; border: 0; background: none; cursor: pointer; text-align: left; font: inherit;
 }
@@ -123,25 +123,25 @@ button.t-row-main:hover .v-check { opacity: 1; color: var(--contour); }
 .t-map .tg-cell { height: 15px; cursor: default; }
 .t-map .tg-cell:hover { outline: 0; }
 .t-sweeps { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; }
-.t-sweeps span { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-align: center; }
+.t-sweeps span { font-family: var(--mono); font-size: 0.625rem; color: var(--ink-3); text-align: center; }
 .t-map .spine-track { margin-bottom: 4px; }
 .t-map .node { cursor: default; padding: 3px 2px; }
 .t-map .node:hover { background: none; }
 .t-map .node-bar { height: 22px; }
-.t-say { font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
+.t-say { font-family: var(--mono); font-size: 0.6875rem; color: var(--ink-2); }
 .t-say b { color: var(--contour); }
 
 /* A pair of buttons or radios, as the builder's Sweep / File switch. */
 .t-switch { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 0; border: 0; }
 .t-switch legend {
   float: left; margin-right: 8px; padding: 0;
-  font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
+  font-family: var(--mono); font-size: 0.6562rem; color: var(--ink-3);
 }
 .t-seg { display: inline-flex; }
 .t-seg label, .t-seg button {
   position: relative; display: inline-flex; align-items: center;
   padding: 5px 9px; border: 1px solid var(--rule); background: var(--paper);
-  cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--ink-2);
+  cursor: pointer; font-family: var(--mono); font-size: 0.6875rem; color: var(--ink-2);
 }
 .t-seg > * + * { margin-left: -1px; }
 .t-seg input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
@@ -158,31 +158,31 @@ button.t-row-main:hover .v-check { opacity: 1; color: var(--contour); }
 .t-panel .sp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .t-panel ol { margin: 6px 0 0; padding: 0; list-style: none; }
 .t-panel li.t-group {
-  margin-top: 8px; font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+  margin-top: 8px; font-family: var(--mono); font-size: 0.625rem; text-transform: uppercase;
   letter-spacing: .1em; color: var(--ink-3);
 }
-.t-panel li.t-item { font-family: var(--mono); font-size: 12px; font-weight: 700; padding: 1px 0; }
-.t-panel .t-none { font-size: 12px; color: var(--ink-3); }
+.t-panel li.t-item { font-family: var(--mono); font-size: 0.75rem; font-weight: 700; padding: 1px 0; }
+.t-panel .t-none { font-size: 0.75rem; color: var(--ink-3); }
 
 /* Download */
 .t-form { display: grid; gap: 14px; padding: 14px; }
 .t-form fieldset { margin: 0; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .t-form legend {
   margin-bottom: 4px; padding: 0;
-  font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+  font-family: var(--mono); font-size: 0.625rem; text-transform: uppercase;
   letter-spacing: .1em; color: var(--ink-3);
 }
-.t-form label { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; font-size: 13.5px; }
+.t-form label { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; font-size: 0.8438rem; }
 .t-form input[type="checkbox"], .t-form input[type="radio"] { accent-color: var(--contour); margin: 0; }
 .t-summary {
   margin: 0; padding: 10px 12px;
   box-shadow: inset 3px 0 0 var(--moss);
-  background: color-mix(in srgb, var(--moss) 8%, transparent); font-size: 13.5px;
+  background: color-mix(in srgb, var(--moss) 8%, transparent); font-size: 0.8438rem;
 }
 .t-form .btn { justify-self: start; }
 .t-tree {
   margin: 0; padding: 12px 14px; border-top: 1px solid var(--rule);
-  font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--ink-2);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.7; color: var(--ink-2);
   white-space: pre; overflow-x: auto;
 }
 .t-tree b { color: var(--ink); }
@@ -190,10 +190,10 @@ button.t-row-main:hover .v-check { opacity: 1; color: var(--contour); }
 /* Run */
 .t-cmd {
   display: flex; align-items: center; gap: 10px; margin: 0; padding: 16px 14px;
-  font-family: var(--mono); font-size: 14px; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.875rem; overflow-x: auto;
 }
 .t-cmd::before { content: "$"; color: var(--ink-3); }
-.t-cmd code { font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.t-cmd code { font-size: 0.875rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
 
 /* ── Topics ──────────────────────────────────────────────────────── */
 
@@ -203,10 +203,10 @@ button.t-row-main:hover .v-check { opacity: 1; color: var(--contour); }
 }
 .t-domains li {
   display: flex; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--rule);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .t-domains li span:last-child {
-  margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
+  margin-left: auto; font-family: var(--mono); font-size: 0.6562rem; color: var(--ink-3);
 }
 .t-conf { list-style: none; margin: 0; padding: 0; }
 .t-conf li { padding: 10px 14px; border-bottom: 1px solid var(--rule); }
@@ -215,7 +215,7 @@ button.t-row-main:hover .v-check { opacity: 1; color: var(--contour); }
 .t-conf .chips { margin: 0; }
 .t-conf .chip {
   border-color: var(--rule); color: var(--ink); cursor: default;
-  font-family: var(--sans); font-size: 12px;
+  font-family: var(--sans); font-size: 0.75rem;
   box-shadow: inset 3px 0 0 var(--dom, transparent);
 }
 .t-conf .chip.is-off { opacity: .45; text-decoration: line-through; }
@@ -225,16 +225,16 @@ button.t-row-main:hover .v-check { opacity: 1; color: var(--contour); }
   border: 1px solid var(--rule); border-radius: 2px; background: var(--paper-2);
 }
 .t-card h3 {
-  margin: 0; font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: -.02em;
+  margin: 0; font-family: var(--mono); font-size: 0.875rem; font-weight: 700; letter-spacing: -.02em;
 }
-.t-card p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.t-card p { margin: 0; font-size: 0.8438rem; color: var(--ink-2); }
 .t-card .btn { justify-self: start; margin-top: 6px; }
 
 .t-note {
   margin: 0 0 18px; padding: 10px 14px;
   border: 1px solid color-mix(in srgb, var(--ochre) 35%, var(--rule)); border-radius: 2px;
   background: color-mix(in srgb, var(--ochre) 10%, var(--paper));
-  font-size: 13.5px;
+  font-size: 0.8438rem;
 }
 .t-note strong { color: var(--ochre); }
 .t-end { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 0 0 40px; }

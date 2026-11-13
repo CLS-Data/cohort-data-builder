@@ -18,7 +18,7 @@ def size(page, selector):
     return page.locator(selector).first.evaluate("e => parseFloat(getComputedStyle(e).fontSize)")
 
 
-def test_text_size_buttons_enlarge_every_text_and_are_remembered(mini, serve, mini_site):
+def test_text_size_buttons_enlarge_every_text_and_are_remembered(mini):
     group = mini.get_by_role("group", name="Text size")
     normal = group.get_by_role("button", name="Normal text")
     expect(normal).to_have_attribute("aria-pressed", "true")
@@ -34,7 +34,7 @@ def test_text_size_buttons_enlarge_every_text_and_are_remembered(mini, serve, mi
     mini.reload()
     expect(mini.locator("#result-count")).to_have_text("16 variables")
     assert size(mini, "body") == pytest.approx(body * 1.5)
-    mini.goto(serve(mini_site) + "tutorial/")
+    mini.goto(mini.url.split("#")[0] + "tutorial/")  # same origin, same storage
     assert size(mini, "body") == pytest.approx(body * 1.5)
 
 
@@ -43,7 +43,7 @@ def test_largest_text_still_fits_without_sideways_scrolling(mini, width):
     mini.set_viewport_size({"width": width, "height": 800})
     mini.get_by_role("group", name="Text size").get_by_role("button", name="Largest text").click()
     assert mini.evaluate("document.documentElement.scrollWidth") <= width
-    mini.locator("#results .vrow-btn").first.click()
+    mini.locator("#results .vrow-btn:not([aria-disabled])").first.click()
     mini.get_by_role("button", name="Selection").first.click()
     expect(mini.locator("#basket-download")).to_be_visible()
     assert mini.evaluate("document.documentElement.scrollWidth") <= width
