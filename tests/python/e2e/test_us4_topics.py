@@ -153,9 +153,10 @@ def test_suggesting_tags_picks_from_the_topic_list(mini):
     expect(dialog.locator("#tag-changes")).to_have_text("Adds Tenure · removes Alcohol")
     dialog.get_by_label("Why (optional)").fill("It asks who smokes.")
 
-    mini.route("https://github.com/**", lambda route: route.fulfill(body="issue form"))
+    mini.context.route("https://github.com/**", lambda route: route.fulfill(body="issue form"))
     with mini.expect_popup() as popup:
         send.click()
+    popup.value.wait_for_load_state()
     query = parse_qs(urlparse(popup.value.url).query)
     popup.value.close()
     assert query["template"] == ["tag-suggestion.yml"]

@@ -39,9 +39,10 @@ this project. `scripts/topics.py` exports a cohort from `site/data` for it and m
 tags back; [docs/data-format.md](docs/data-format.md#adding-topics) has the three commands.
 
 **Suggesting a tag change.** A variable's details end the Topics line with "Suggest a tag
-change" ("Suggest a tag" when it has none). It opens a GitHub issue form, labelled
-`tag-suggestion`, with the cohort, variable, file, label and current tags filled in; raising
-it needs a GitHub account. Maintainers list them with the `tag-suggestion` label and review
+change" ("Suggest a tag" when it has none). It opens a list of the cohort's topics, with
+the current tags ticked first: tick and untick, then "Open on GitHub" opens an issue form,
+labelled `tag-suggestion`, with the variable's details and the topics to add and remove
+filled in. Submitting it needs a GitHub account. Maintainers list them with the `tag-suggestion` label and review
 them by hand.
 
 ## Repository layout

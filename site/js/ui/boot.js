@@ -11,6 +11,7 @@ import { refreshSelection, resetForCohort, runSearch, wireResults } from "./resu
 import { wireReview } from "./review.js";
 import { onSelectionChange, restoreOptions, restoreSelection, storage } from "./selected.js";
 import { state } from "./state.js";
+import { wireSuggest } from "./suggest.js";
 import { switchView } from "./views.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -97,6 +98,7 @@ async function boot() {
   wireResults();
   wirePanel();
   wireReview();
+  wireSuggest();
   onSelectionChange(() => {
     renderPanel();
     refreshSelection();

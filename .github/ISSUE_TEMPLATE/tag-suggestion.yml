@@ -41,7 +41,7 @@ body:
     id: suggested
     attributes:
       label: Suggested tags
-      description: Which topics should it have, or not have?
+      description: Topics to add and remove. Filled in from your choice in the builder; edit freely.
     validations:
       required: true
   - type: textarea
