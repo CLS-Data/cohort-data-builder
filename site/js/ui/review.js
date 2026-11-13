@@ -180,6 +180,7 @@ function renderDetail() {
     </ol>
     </div>
     <div class="basket-download-area${optionsOpen ? "" : " is-folded"}" id="basket-download-area" role="region" aria-label="Download">
+      <h2 class="section-title dl-title">Download</h2>
       <button class="link-btn dl-toggle" id="dl-toggle" aria-expanded="${optionsOpen}" aria-controls="dl-options">Download options</button>
       <div class="dl-options" id="dl-options">${optionsHtml(languages, format, missingToNa)}</div>
       <div class="dl-actions">
