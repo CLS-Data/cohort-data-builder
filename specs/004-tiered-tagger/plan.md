@@ -22,11 +22,10 @@ The tiered walk asks a **decider** at each tier, and there are two:
   existing machinery, for chat models such as `gpt-oss:20b-cloud`.
 - **Decision decider:** uses **Clef** (`clef:cloud`) through a new `ollama-decision`
   provider. That provider posts one variable at a time to Ollama's `/v1/systemone`, with
-  one yes/no (`noul`) question per option, and uses the probabilities as confidences.
+  one `choice` question per tier, and uses its probabilities as confidences.
 
-Clef works with both methods:
-- **Flat** asks every final topic at once (R14).
-- **Tiered** asks the area first, then the topics in it.
+Clef tags tiered only (R14): a `choice` question takes at most 26 options, so it asks the
+area first, then the topics in it. Flat tagging stays for chat models.
 
 The comparison covers flat and tiered × Clef and gpt-oss. The descend threshold is studied
 from one low-threshold run, scored offline at several thresholds (R13).
@@ -109,7 +108,7 @@ tools/topic-tagger/
 │   └── cli.py           # --method, --descend-at, --max-areas; dry-run; summary per tier
 ├── tests/
 │   ├── test_tiered.py   # NEW: tree, routing, thresholds, fallback, depth, retries per tier
-│   ├── test_decision_provider.py  # NEW: fake /v1/systemone server: request shape, 64-split, errors
+│   ├── test_decision_provider.py  # NEW: fake /v1/systemone server: choice request shape, 2–26 options, errors
 │   ├── test_prompt.py   # + tier prompts list only the node's children
 │   ├── test_reply.py    # + ids outside the node's options rejected
 │   ├── test_runner.py   # + tiered run end to end with the stand-in

@@ -112,6 +112,7 @@ thresholds.
   - Leaves are kept when ≥ `keep_at`, else the single strongest leaf is kept, and `keep_at=0` keeps every leaf (FR-017).
   - **Flat** with the decider (R14) walks `flat_tree(scheme)`, a root whose children are every topic. With the bundled CLOSER scheme it sends 2 requests per variable (split at 64), and returns the same keep rule.
 - [x] T018 [US4] Implement `DecisionDecider` and `flat_tree(scheme)` in `src/topic_tagger/tiered.py`. Commit.
+- [x] T017b [US4] *(After review.)* Ask Clef one `choice` question per tier instead of one `noul` question per option, and use its `probabilities`. A choice takes 2 to 26 options, so remove flat with Clef (`flat_tree`): `--method flat` with `ollama-decision` exits 2, the method defaults to tiered, and a scheme with a tier over 26 options is refused before any request (`choice_problems`). Tests first, then code; README and spec documents updated.
 - [x] T019 [US4] Write the failing tests in `tests/test_cli.py`:
   - `--provider ollama-decision --method flat` tags the fixture against the fake server, asking every topic per variable.
   - With `--provider ollama` (chat), `--method flat` still uses the unchanged flat prompt (FR-009).
@@ -120,7 +121,7 @@ thresholds.
   - `--model clef:cloud` without `--yes` asks before sending.
   - `--dry-run` with the decision provider prints the first variable's tier-1 and tier-2 `/v1/systemone` bodies as JSON.
 - [x] T020 [US4] Implement `--keep-at`, the decider choice (chat or decision, flat or tiered) and the decision dry-run in `src/topic_tagger/cli.py`. In the same commit, document `--provider ollama-decision`, `--keep-at`, `ollama pull clef:cloud` and the request cost (1 + areas per variable tiered, 2 per variable flat) in `README.md`. Commit.
-- [ ] T021 [US4] Maintainer, outside the sandbox: `uv run topic-tagger tag tests/fixtures/variables.jsonl --out "$TMPDIR/clef" --provider ollama-decision --model clef:cloud --method tiered --yes`. All 60 should be tagged with 0 failed (SC-005). If Clef's real responses differ from the documented shape (`answers.<id>.noul`), first add a failing provider test with the real shape, then fix it.
+- [ ] T021 [US4] Maintainer, outside the sandbox: `uv run topic-tagger tag tests/fixtures/variables.jsonl --out "$TMPDIR/clef" --provider ollama-decision --model clef:cloud --method tiered --yes`. All 60 should be tagged with 0 failed (SC-005). If Clef's real responses differ from the documented shape (`answers.option.probabilities`), first add a failing provider test with the real shape, then fix it.
 
 **Checkpoint**: Clef tags the fixture for real.
 
@@ -155,11 +156,10 @@ thresholds.
 - [x] T025 [US3] Write the scoring part of `adhoc/tiered/compare.py` (not committed) first, with a `--self-check` that scores two tiny hand-written folders with known answers and asserts the numbers, so scoring can be trusted without a model. Run the self-check, and see it fail, then pass.
   - **Measures:** top-1 hit rate, recall, precision and mean tags per variable.
   - **Area recall:** the share of expected topics whose area was followed.
-  - **Thresholds (R13):** re-scoring at each descend threshold t in `--sweep` (default `0.1,0.2,0.3,0.5,0.7`) and keep threshold k in `--keep-sweep` (default `0.2,0.3,0.5`). It keeps topics whose area had path confidence ≥ t (always the strongest area) and whose confidence is ≥ k, and estimates the requests per variable a run at t would need.
+  - **Thresholds (R13):** re-scoring at each descend threshold t in `--sweep` (default `0.1,0.2,0.3,0.5,0.7`) and keep threshold k in `--keep-sweep` (default `0.1,0.2,0.3,0.5`, lower since Clef's choice probabilities sum to 1). It keeps topics whose area had path confidence ≥ t (always the strongest area) and whose confidence is ≥ k, and estimates the requests per variable a run at t would need.
 - [x] T026 [US3] Add the runs to `compare.py`. It calls `topic-tagger tag` (via `sys.executable -m topic_tagger`) on `adhoc/tiered/variables.jsonl`, into `adhoc/tiered/runs/<name>-<YYYYMMDD-HHMM>/`:
   - `flat-gptoss`: `--method flat --model gpt-oss:20b-cloud`;
   - `tiered-gptoss`: `--method tiered --model gpt-oss:20b-cloud --descend-at 0.1 --max-areas 0`;
-  - `flat-clef`: `--provider ollama-decision --model clef:cloud --method flat --keep-at 0`;
   - `tiered-clef`: `--provider ollama-decision --model clef:cloud --method tiered --descend-at 0.1 --max-areas 0 --keep-at 0`;
   - all four with `--yes --plain --workers 4`.
 

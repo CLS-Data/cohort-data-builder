@@ -67,7 +67,8 @@ the run record and report say which method was used and how many requests each t
 
 During development the maintainer runs both methods, **flat** (predict across all final
 topics at once) and **tiered** (predict the area, e.g. Demographics, then the final topic
-within it), with each model (Clef and a chat model), on a hand-labelled set of fictional
+within it) with a chat model, and tiered with Clef (which cannot tag flat: FR-015), on a
+hand-labelled set of fictional
 variables. They get a comparison: how often each finds the expected topics, the extra
 topics it adds, and how many requests and seconds each took. For tiered runs, the
 comparison is repeated at several descend thresholds, so the maintainer can see how the
@@ -93,16 +94,16 @@ labelled set and prints a table, with no model needed.
 
 The maintainer tags tiered with Clef, Cloudflare's decision model served by Ollama. It
 does not chat. It takes a state (the variable) and typed questions, and returns a
-probability for each. At each tier the tagger asks Clef one yes/no (`noul`) question per
-option ("does this variable belong to area X?", then "is it about topic Y?"), and uses the
-probabilities as confidences.
+probability for each. At each tier the tagger asks Clef one `choice` question ("which area
+of a survey is this variable about?", then "which topic…" within each area followed). Clef
+gives every option a probability, summing to about 1, and these are the confidences.
 
 **Why this priority**: Clef is the model the maintainer wants to test the tiered method
 with. Its fixed, structured answers suit one decision per tier.
 
 **Independent Test**: Against a local fake `/v1/systemone` server, tag the fixture with
 `--provider ollama-decision --method tiered`. Each request carries one variable as the
-state and one `noul` question per option of that tier. The stored tags are the topics whose
+state and one `choice` question over the options of that tier. The stored tags are the topics whose
 probability passed the keep threshold, inside areas whose probability passed the descend
 threshold.
 
@@ -111,13 +112,14 @@ threshold.
 1. **Given** Clef is pulled in Ollama, **When** tagging with
    `--provider ollama-decision --model clef:cloud --method tiered`, **Then** each variable is
    tagged by asking tier 1, then tier 2 for each followed area.
-2. **Given** a tier with more than 64 options, **When** asking Clef, **Then** the questions are
-   split across requests and the answers combined.
+2. **Given** a scheme with more than 26 areas, or an area with more than 26 topics, **When**
+   tagging with Clef, **Then** it stops before any request and names the tier (a `choice`
+   question takes 2 to 26 options).
 3. **Given** Clef is not pulled, **When** the run starts, **Then** it stops before tagging
    and says to run `ollama pull clef:cloud` (or the model given).
-4. **Given** the decision provider with `--method flat`, **When** tagging, **Then** each
-   variable is asked one `noul` question per final topic, across all areas (about 100,
-   split into requests of at most 64). The tags are the topics at or above `--keep-at`.
+4. **Given** the decision provider with `--method flat`, **When** the run starts, **Then** it
+   stops with exit 2: Clef cannot choose among every topic at once. Without `--method`, the
+   decision provider tags tiered.
 5. **Given** a model ending `:cloud` or `-cloud`, **When** the run starts, **Then** it asks
    before sending metadata off the machine (unless `--yes`).
 
@@ -158,15 +160,17 @@ threshold.
 - **FR-010**: `docs/formats.md` and the tagger README MUST describe the method, the new
   options and the new fields.
 - **FR-012**: A provider `ollama-decision` MUST call Ollama's `POST /v1/systemone` with
-  `state` = one variable (name, label, value labels) and `questions` = one `noul` question per
-  option, keyed by option id, at most 64 per request.
+  `state` = one variable (name, label, value labels) and `questions` = one `choice` question
+  whose `criteria` are the tier's options (id → description), 2 to 26 of them. Confidences
+  are the answer's `probabilities`.
 - **FR-013**: With the decision provider, a leaf is kept when its probability is at least
   `--keep-at` (default 0.3). If no leaf passes, the strongest one is kept, so every tagged
   variable has a topic.
 - **FR-014**: A model name ending `:cloud` or `-cloud` MUST count as remote for every
   Ollama provider.
-- **FR-015**: The decision provider MUST work with both methods. Flat asks every final
-  topic at once; tiered asks area by area.
+- **FR-015**: The decision provider MUST tag tiered only, and refuse `--method flat` and any
+  scheme with a tier of more than 26 options before sending anything. *(Changed after
+  review: Clef is asked `choice` questions, which take at most 26 options.)*
 - **FR-016**: Tiered runs MUST make the descend threshold a setting (`--descend-at`), and
   `--max-areas 0` MUST mean "no cap". For threshold studies, `path` MUST record every area
   at or above the threshold with its confidence, so scores at higher thresholds can be
@@ -188,7 +192,7 @@ threshold.
   equal or better precision, and at which descend threshold. Either answer is a valid
   outcome; it decides the defaults in a follow-up.
 - **SC-002**: For the decision model, a variable takes 1 tier-1 request plus 1 request per
-  followed area (each under 64 questions). For a chat model, a batch takes 1 tier-1 request
+  followed area (one `choice` question each). For a chat model, a batch takes 1 tier-1 request
   plus 1 per distinct followed area. The comparison reports requests per variable at each
   threshold.
 - **SC-003**: All existing tagger tests pass unchanged except for the added `method` field.

@@ -6,7 +6,7 @@
 | `--descend-at X` | `0.5` | Tiered only. Follow an area when its confidence is at least X (0–1). |
 | `--max-areas N` | `3` | Tiered only. Follow at most N areas per variable; `0` means no cap. |
 | `--keep-at X` | `0.3` | Decision provider only. Keep a topic when its probability is at least X (0–1); `0` keeps every topic. |
-| `--provider ollama-decision` | | Ollama's decision API (`/v1/systemone`), e.g. `--model clef:cloud`. Works with both methods. |
+| `--provider ollama-decision` | | Ollama's decision API (`/v1/systemone`), e.g. `--model clef:cloud`. Tiered only: `--method` defaults to `tiered`, and `--method flat` exits 2. |
 
 Errors (exit 2, bad input):
 - `--descend-at` outside 0–1;
@@ -23,11 +23,13 @@ A model ending `:cloud` or `-cloud` asks before sending (unless `--yes`), for ev
 ```json
 {"model": "clef:cloud",
  "state": {"name": "smoke5", "label": "Does the mother smoke", "values": ["1: Yes", "2: No"]},
- "questions": {"health": {"type": "noul", "instructions": "Is this survey variable about Health? …"},
-               "housing": {"type": "noul", "instructions": "…"}}}
+ "questions": {"option": {"type": "choice",
+   "instructions": "Which area of a survey is this variable about?",
+   "criteria": {"health": "Health: … It includes: Smoking, …", "housing": "Housing: …"}}}}
 ```
 
-At most 64 questions per request. Answers are read from `answers.<id>.noul`.
+2 to 26 options per question; a scheme with a bigger tier exits 2 before any request.
+Confidences are read from `answers.option.probabilities.<id>`.
 
 ## `--dry-run --method tiered`
 

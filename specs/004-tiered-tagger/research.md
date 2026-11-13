@@ -96,30 +96,34 @@
 
 ## R9. Clef: how to ask
 
-- **Decision**:
-  - At each tier, one `noul` question per option, keyed by the option id. Its
-    `instructions` are "Is this survey variable about <label>? <description>". For areas,
-    the topic labels are appended, as in R2.
+- **Decision** *(revised after review; it was one `noul` question per option)*:
+  - At each tier, one `choice` question, "Which area (or topic) of a survey is this variable
+    about?". Its `criteria` map each option id to "<label>: <description>", with the topic
+    labels appended for areas, as in R2.
   - The `state` is the variable as a JSON object: `{"name", "label", "values"}`, with values
     capped at 30, as the chat prompt does.
-  - Confidence is the `noul` probability.
+  - Confidence is the option's probability from the answer's `probabilities`.
   - Areas are followed by `--descend-at` and `--max-areas` (R3).
   - Leaves are kept at ≥ `--keep-at` (default 0.3, the threshold the scheme's guidance
     already gives chat models). The strongest leaf is kept if none passes.
-- **Rationale**: Topics are multi-label. A `choice` question returns one winner, and its
-  probabilities sum to 1, so a second true topic would look weak. `noul` gives each option
-  an independent probability, which matches "every topic that applies".
-- **Alternatives**: One `choice` question per tier. It is cheaper, but single-label. The ad
-  hoc script can try it as a variant if `noul` proves slow or costly.
+- **Rationale**: The maintainer chose `choice`: one question per tier, with the options
+  compared against each other, and a probability for every option. The probabilities sum to
+  about 1, so a second true area or topic gets a share rather than its own score. The
+  descend and keep thresholds may need to be lower than for chat models; the threshold
+  sweep in the comparison (R13) decides.
+- **Alternatives**: One `noul` (yes/no) question per option: an independent probability
+  for each, so better suited to multi-label, but the options are not weighed against each
+  other. It was the first version built, and was replaced.
 
 ## R10. Calling `/v1/systemone`
 
 - **Decision**: A small `OllamaDecisionProvider` uses `urllib.request` to send
   `POST {base}/v1/systemone` with
-  `{"model", "state", "questions": {id: {"type": "noul", "instructions": …}}}`, and reads
-  `answers[id].noul`.
+  `{"model", "state", "questions": {"option": {"type": "choice", "instructions": …,
+  "criteria": {id: description}}}}`, and reads `answers.option.probabilities`.
   - **Checking the model:** `check()` reuses `GET /v1/models`, as the chat provider does.
-  - **Splitting:** more than 64 options are split across requests (the cloud limit).
+  - **Option limit:** a `choice` takes 2 to 26 options. The provider refuses others, and
+    the CLI checks the scheme first (R14). A tier with one option needs no request.
   - **Retries and timeouts:** none in the client, since retries are the runner's job. The
     timeout comes from `--timeout`.
 - **Rationale**: The `openai` client has no such endpoint, and the `ollama` Python package
@@ -168,10 +172,13 @@
 
 ## R14. Flat with Clef
 
-- **Decision**: Flat with the decision provider walks a one-tier tree: the root's children
-  are every final topic. It asks one `noul` question per topic, about 100 for CLOSER, split
-  into requests of at most 64, so 2 requests per variable.
-- **Rationale**: It is the same decider and the same keep rule as tiered, so the comparison
-  isolates "narrow first or not". The chat flat path stays exactly as it is (FR-009).
-- **Alternatives**: One `choice` question over all topics (the cloud allows 255 options): 1
-  request, but single-label. It is kept as a possible variant in the ad hoc script.
+- **Decision** *(revised after review)*: Clef tags tiered only. `--method flat` with the
+  decision provider exits 2, and without `--method` it tags tiered. A scheme with more than
+  26 areas, or an area with more than 26 topics, is refused before any request. The bundled
+  scheme has 15 areas and at most 23 topics in one (physical health).
+- **Rationale**: A `choice` question takes at most 26 options, and the bundled scheme has
+  107 topics. Splitting them into groups of 26 would give probabilities that only sum to 1
+  within a group, so they could not be compared.
+- **Alternatives**: Flat with one `noul` question per topic (the first version); flat in
+  groups of 26. Both were dropped. The comparison is flat and tiered with gpt-oss, and
+  tiered with Clef.
