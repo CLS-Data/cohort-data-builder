@@ -253,7 +253,7 @@ def test_clef_is_asked_one_choice_question_per_variable_per_tier(small_scheme):
     assert state["name"] == "smk" and state["label"] == "Smokes now"
     assert len(state["values"]) == 31 and state["values"][0] == "0: L0"
     assert state["values"][-1] == "… and 10 more"
-    assert instructions == "Which area of a survey is this variable about?"
+    assert instructions.startswith("Which areas of a survey is this variable about?")
     assert list(options) == ["demographics", "health", "survey", "other"]
     assert options["health"] == (
         "Health: Health and health behaviour. It includes: Smoking, Alcohol, Physical health."
@@ -263,7 +263,7 @@ def test_clef_is_asked_one_choice_question_per_variable_per_tier(small_scheme):
     stub.calls.clear()
     DecisionDecider(stub).decide(build_tree(small_scheme).find("health"), [v])
     _, instructions, options = stub.calls[0]
-    assert instructions == "Which topic of a survey is this variable about?"
+    assert instructions.startswith("Which topics of a survey is this variable about?")
     assert options["smoking"] == "Smoking: Tobacco use."
 
 
@@ -360,3 +360,28 @@ def test_clef_sees_the_exit_and_its_probability_is_not_cut_by_keep_at(small_sche
     assert list(options) == ["demographics", "health", "survey", "other"]
     assert options["other"].startswith("Other: ")
     assert got[0][0] == ("other", 0.25) and len(got[0]) == 4
+
+
+# --- Every method can tag one variable with topics from several areas ----------------
+
+
+def test_clef_follows_every_area_at_the_threshold_and_tags_from_each(small_scheme):
+    probs = {"health": 0.5, "demographics": 0.4, "survey": 0.06, "other": 0.04,
+             "smoking": 0.8, "alcohol": 0.15, "age": 0.7, "gender": 0.3}  # fmt: skip
+    stub = StubDecision(lambda n, o: probs.get(o, 0.0))
+    result = walk(build_tree(small_scheme), [var("pregsmk")], DecisionDecider(stub, 0.3),
+                  descend_at=0.3, max_areas=3)  # fmt: skip
+    assert result.paths[0] == [("health", 0.5), ("demographics", 0.4)]
+    assert result.tags[0] == [("smoking", 0.8), ("age", 0.7), ("gender", 0.3)]
+
+
+def test_clefs_questions_ask_for_every_option_that_applies(small_scheme):
+    stub = StubDecision(lambda n, o: 0.25)
+    root = build_tree(small_scheme)
+    DecisionDecider(stub).decide(root, [var("x")])
+    DecisionDecider(stub).decide(root.find("health"), [var("x")])
+    tier1, tier2 = stub.calls[0][1], stub.calls[1][1]
+    assert tier1.startswith("Which areas of a survey is this variable about?")
+    assert tier2.startswith("Which topics of a survey is this variable about?")
+    for text in (tier1, tier2):
+        assert "If more than one applies, share the probability between them" in text

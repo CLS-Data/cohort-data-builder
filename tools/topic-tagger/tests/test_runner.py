@@ -245,3 +245,17 @@ def test_a_flat_run_counts_its_requests_as_one_tier(tmp_path, small_scheme, vari
         tmp_path, small_scheme, StubProvider(answer()), read_variables(variables_path), clock
     )
     assert result.requests_by_tier == [result.requests]
+
+
+def test_a_flat_run_keeps_topics_from_several_areas(tmp_path, small_scheme, variables_path, clock):
+    def two_areas(messages, schema):
+        rows = [json.loads(x) for x in messages[1]["content"].split("\n") if x.startswith("{")]
+        both = [{"topic": "smoking", "confidence": 0.9}, {"topic": "age", "confidence": 0.6}]
+        return json.dumps({"variables": [{"id": r["id"], "topics": both} for r in rows]})
+
+    result, _, _ = run(
+        tmp_path, small_scheme, StubProvider(two_areas), read_variables(variables_path), clock
+    )
+    records = [json.loads(x) for x in (tmp_path / "tags.jsonl").read_text().splitlines()]
+    assert result.tagged == 60
+    assert all(r["topics"] == [["smoking", 0.9], ["age", 0.6]] for r in records)
