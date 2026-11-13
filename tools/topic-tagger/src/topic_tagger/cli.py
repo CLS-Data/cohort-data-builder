@@ -14,13 +14,14 @@ from rich.console import Console
 
 from topic_tagger.clock import SystemClock
 from topic_tagger.display import RunView
-from topic_tagger.prompt import build_messages
+from topic_tagger.prompt import build_messages, build_option_messages
 from topic_tagger.providers import Provider, ProviderError, get_provider
 from topic_tagger.report import render_report
 from topic_tagger.runner import Runner, Settings, install_stop_handler
 from topic_tagger.scheme import SchemeError, bundled_scheme_text, load_scheme, scheme_from_json
 from topic_tagger.stats import compute_stats
 from topic_tagger.store import LockedError, StaleLockError, TagStore
+from topic_tagger.tiered import build_tree
 from topic_tagger.variables import InputError, read_variables
 
 OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED, STOPPED = 0, 1, 2, 3, 4, 130
@@ -88,6 +89,22 @@ def _parser() -> argparse.ArgumentParser:
         help="where the host's API is (also TOPIC_TAGGER_BASE_URL)",
     )
     tag.add_argument("--model", default="gpt-oss:20b", help="model name on the host")
+    tag.add_argument(
+        "--method",
+        choices=["flat", "tiered"],
+        default="flat",
+        help="flat: every topic in one request; tiered: areas first, then topics within them",
+    )
+    tag.add_argument(
+        "--descend-at",
+        type=float,
+        help="tiered: follow an area at this confidence or above (default 0.5)",
+    )
+    tag.add_argument(
+        "--max-areas",
+        type=int,
+        help="tiered: follow at most this many areas per variable; 0 for no cap (default 3)",
+    )
     tag.add_argument("--batch-size", type=int, default=20, help="variables per request")
     tag.add_argument("--workers", type=int, default=2, help="requests in flight at once")
     tag.add_argument(
@@ -130,6 +147,10 @@ def _err(message: str) -> None:
 
 
 def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
+    problem = _check_method(args)
+    if problem:
+        _err(problem)
+        return BAD_INPUT
     try:
         variables = read_variables(args.variables)
         scheme = load_scheme(args.scheme)
@@ -140,6 +161,9 @@ def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
 
     if args.dry_run:
         batch = variables[: args.batch_size]
+        if args.method == "tiered":
+            _print_tiered_requests(scheme, batch)
+            return OK
         system, user = build_messages(scheme, batch)
         print(system["content"], user["content"], sep="\n\n---\n\n")
         return OK
@@ -154,6 +178,32 @@ def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
         return _run(args, variables, scheme, provider, store, clock, runner_created)
     finally:
         store.unlock()
+
+
+def _check_method(args: argparse.Namespace) -> str | None:
+    """Fill in the tiered defaults, or say what is wrong with the method's settings."""
+    if args.method != "tiered":
+        if args.descend_at is not None or args.max_areas is not None:
+            return "--descend-at and --max-areas need --method tiered"
+        return None
+    args.descend_at = 0.5 if args.descend_at is None else args.descend_at
+    args.max_areas = 3 if args.max_areas is None else args.max_areas
+    if not 0 <= args.descend_at <= 1:
+        return "--descend-at must be between 0 and 1"
+    if args.max_areas < 0:
+        return "--max-areas must be 0 (no cap) or more"
+    return None
+
+
+def _print_tiered_requests(scheme, batch) -> None:
+    """Print the tier-1 request and, as an example, the first area's tier-2 request."""
+    root = build_tree(scheme)
+    system, user = build_option_messages(scheme.guidance, root, batch)
+    print(system["content"], user["content"], sep="\n\n---\n\n")
+    area = root.children[0]
+    print(f"\n--- tier 2 example ({area.label}) ---\n")
+    system, user = build_option_messages(scheme.guidance, area, batch)
+    print(system["content"], user["content"], sep="\n\n---\n\n")
 
 
 def _run(args, variables, scheme, provider, store, clock, runner_created) -> int:
@@ -184,6 +234,9 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
         workers=args.workers,
         retries=args.retries,
         model=f"{args.provider}:{args.model}",
+        method=args.method,
+        descend_at=args.descend_at if args.descend_at is not None else 0.5,
+        max_areas=args.max_areas if args.max_areas is not None else 3,
     )
     view = RunView(len(variables), len(todo), scheme, clock)
     runner = Runner(scheme, provider, store, settings, clock, on_event=view.on_event)
@@ -240,6 +293,12 @@ def _run_record(args, scheme, started, ended, result, total, todo, skipped) -> d
             "provider": args.provider,
             "base_url": args.base_url,
             "model": args.model,
+            "method": args.method,
+            **(
+                {"descend_at": args.descend_at, "max_areas": args.max_areas}
+                if args.method == "tiered"
+                else {}
+            ),
             "batch_size": args.batch_size,
             "workers": args.workers,
             "timeout": args.timeout,

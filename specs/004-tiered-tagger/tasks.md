@@ -78,11 +78,11 @@ the followed areas.
   Comments say *why*: single-child routing, and always following the strongest area.
 - [x] T010 [US1] Write the failing tests in `tests/test_runner.py`: `Settings(method="tiered", descend_at=0.5, max_areas=3)` makes `Runner.run` use the walk for each batch. Stop (`request_stop`) still finishes and stores the batches in flight. `RunResult.requests_by_tier` is summed across batches. `method="flat"` behaves exactly as before.
 - [x] T011 [US1] Implement in `src/topic_tagger/runner.py`: add the `method`, `descend_at` and `max_areas` settings, add `RunResult.requests_by_tier`, and have `_batch` call `walk` when tiered, reusing the ladder via a shared `_with_ladder(ask, variables)` helper so flat and tiered retry alike. Commit.
-- [ ] T012 [US1] Write the failing tests in `tests/test_cli.py`:
+- [x] T012 [US1] Write the failing tests in `tests/test_cli.py`:
   - `--method tiered` is accepted, and `--method` defaults to `flat`.
   - `--descend-at 1.5` gives exit 2. So do `--max-areas -1` and `--descend-at` without `--method tiered`. `--max-areas 0` is accepted as no cap.
   - `--dry-run --method tiered` prints the tier-1 request, `--- tier 2 example (<area label>) ---` and the tier-2 request (contracts/cli.md), and sends nothing.
-- [ ] T013 [US1] Implement `--method`, `--descend-at` and `--max-areas`, their validation, and the tiered dry-run in `src/topic_tagger/cli.py`. Pass them into `Settings`. In the same commit, document them in `README.md` ("Tiered tagging") and add `method` to the `run.json` section of `docs/formats.md` (constitution II: docs change with code). Commit.
+- [x] T013 [US1] Implement `--method`, `--descend-at` and `--max-areas`, their validation, and the tiered dry-run in `src/topic_tagger/cli.py`. Pass them into `Settings`. In the same commit, document them in `README.md` ("Tiered tagging") and add `method` to the `run.json` section of `docs/formats.md` (constitution II: docs change with code). Commit.
 
 **Checkpoint**: A tiered run with the stand-in tags the fixture end to end, and flat is unchanged.
 
