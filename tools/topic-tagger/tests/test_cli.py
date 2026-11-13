@@ -417,3 +417,60 @@ def test_report_rebuilds_and_can_regroup(tmp_path, variables_path, capsys):
 def test_report_needs_a_finished_folder(tmp_path, capsys):
     assert main(["report", str(tmp_path)]) == 2
     assert "run.json" in capsys.readouterr().err
+
+
+# --- Tiered tagging (feature 004) ---------------------------------------------------
+
+
+def test_method_defaults_to_flat_and_tiered_tags_every_variable(tmp_path, variables_path):
+    from test_runner import tiered_answer
+
+    stub = StubProvider(answer("smoking", 0.7))
+    assert tag(variables_path, tmp_path / "flat", stub) == 0
+    assert len(stub.calls) == 3  # 60 variables, batches of 20, one request each
+    stub = StubProvider(tiered_answer)
+    assert tag(variables_path, tmp_path / "tiered", stub, "--method", "tiered") == 0
+    assert len(records(tmp_path / "tiered")) == 60
+    assert len(stub.calls) == 6  # tier 1 and one area per batch
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ("--method", "tiered", "--descend-at", "1.5"),
+        ("--method", "tiered", "--max-areas", "-1"),
+        ("--descend-at", "0.5"),
+        ("--max-areas", "2"),
+    ],
+)
+def test_tiered_settings_are_checked(tmp_path, variables_path, capsys, extra):
+    stub = StubProvider(answer())
+    assert tag(variables_path, tmp_path / "out", stub, *extra) == 2
+    assert stub.calls == []
+    assert capsys.readouterr().err
+
+
+def test_max_areas_zero_means_no_cap(tmp_path, variables_path):
+    from test_runner import tiered_answer
+
+    stub = StubProvider(tiered_answer)
+    assert tag(variables_path, tmp_path / "o", stub, "--method", "tiered", "--max-areas", "0") == 0
+
+
+def test_tiered_dry_run_prints_tier_1_and_a_tier_2_example(tmp_path, variables_path, capsys):
+    stub = StubProvider(answer(), check_error=ProviderError("not running"))
+    assert tag(variables_path, tmp_path / "out", stub, "--method", "tiered", "--dry-run") == 0
+    out = capsys.readouterr().out
+    tier1, tier2 = out.split("--- tier 2 example (Demographics) ---")
+    assert "- demographics: Demographics" in tier1 and "Includes: Age" in tier1
+    assert "- age: Age" in tier2 and "- smoking:" not in tier2
+    assert '"name": "A01AGE"' in tier1 and '"name": "A01AGE"' in tier2
+    assert stub.calls == [] and stub.checked == 0
+
+
+def test_help_lists_the_tiered_options(capsys):
+    with pytest.raises(SystemExit):
+        main(["tag", "--help"])
+    out = capsys.readouterr().out
+    for opt in ("--method", "--descend-at", "--max-areas"):
+        assert opt in out
