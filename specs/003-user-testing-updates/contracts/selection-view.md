@@ -18,7 +18,7 @@ What a browser test can rely on in the Selection tab after this feature.
 
 | Viewport | Rule |
 |---|---|
-| ≥ 1024 wide and ≥ 700 tall | The page does not scroll. The list area scrolls on its own; `#basket-download-area` is fully visible at all times. |
+| ≥ 1024 wide and ≥ 700 tall | The page does not scroll. The list area scrolls on its own; `#basket-download-area` is a panel on its right, from the top of the view, fully visible at all times. |
 | Narrower or shorter | The page scrolls; `#basket-download-area` stays stuck to the bottom of the viewport, showing the download button and a "Download options" toggle that reveals the options. No horizontal scroll at 390px. |
 
 ## Unchanged

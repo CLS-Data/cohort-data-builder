@@ -1050,6 +1050,59 @@ body.is-dragging-var .view-tab[data-view="basket"] {
 .option-row input { accent-color: var(--contour); }
 .option-help { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--ink-3); }
 
+/* ── The download area ────────────────────────────────────────────────
+   Always in reach, however long the selection (user testing: people with long
+   selections could not find the button). On a big screen the view is one
+   screen tall: the list scrolls on its own and the download panel sits beside
+   it on the right. On a small one the page scrolls and the download bar sticks
+   to the bottom, its options folded behind a toggle so it stays short. */
+
+.basket-scroll:focus-visible { outline: 2px solid var(--contour); outline-offset: -2px; }
+.basket-download-area {
+  border-top: 1px solid var(--rule);
+  background: var(--paper-2);
+  box-shadow: 0 -6px 12px -10px rgba(19, 26, 34, .35);
+}
+.dl-options .options { grid-template-columns: 1fr; gap: 14px; margin: 4px 0 16px; }
+.dl-options .option-name { min-width: 0; flex-basis: 100%; }
+.dl-title { display: none; margin-top: 0; }
+.dl-options .option-help { font-size: 11.5px; }
+.dl-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.dl-actions .draft-status { margin: 0; }
+.dl-why { font-size: 12.5px; color: var(--ochre); }
+.dl-why .link-btn { font-size: 12px; }
+
+@media (min-width: 1024px) and (min-height: 700px) {
+  body:has(.view[data-view="basket"].is-current) {
+    height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column;
+  }
+  body:has(.view[data-view="basket"].is-current) main { flex: 1 1 auto; min-height: 0; }
+  .view[data-view="basket"].is-current { height: 100%; }
+  #basket-detail {
+    height: 100%; max-width: 1360px; padding: 0;
+    display: grid; grid-template-columns: minmax(0, 1fr) 340px;
+  }
+  .basket-scroll { min-height: 0; overflow-y: auto; padding: 24px 28px 16px; }
+  .basket-download-area {
+    min-height: 0; overflow-y: auto; padding: 24px 24px 20px;
+    border-top: 0; border-left: 1px solid var(--rule); box-shadow: none;
+  }
+  .dl-title { display: block; }
+  .dl-actions .btn { width: 100%; }
+  .dl-toggle { display: none; }
+}
+
+@media not ((min-width: 1024px) and (min-height: 700px)) {
+  #basket-detail { padding-bottom: 0; }
+  .basket-download-area {
+    position: sticky; bottom: 0; z-index: 10;
+    margin: 0 -28px; padding: 10px 28px 12px;
+  }
+  .basket-download-area.is-folded .dl-options { display: none; }
+  .dl-toggle { display: block; margin-bottom: 8px; font-size: 12px; min-height: 24px; }
+}
+
 /* ── Footer ───────────────────────────────────────────────────────── */
 
 .foot {
