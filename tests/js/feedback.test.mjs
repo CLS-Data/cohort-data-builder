@@ -135,3 +135,26 @@ test("topicChanges says what a choice adds and removes", () => {
   });
   assert.deepEqual(topicChanges(entry({ topics: undefined }), []), { add: [], remove: [] });
 });
+
+test("the body repeats everything, for when GitHub has no form to fill", () => {
+  const body = params(
+    tagSuggestionUrl(entry(), "mini_age5", withHousing, {
+      topics: ["smoking", "tenure"],
+      why: "Rent.",
+    }),
+  ).get("body");
+  for (const line of [
+    "**Cohort:** Mini",
+    "**Variable:** smoke5",
+    "**File:** mini_age5",
+    "**Label:** Smokes at 5",
+    "**Current tags:** Smoking (90%); Pregnancy (60%)",
+    "**Suggested tags:**\nAdd: Housing › Tenure\nRemove: Health › Pregnancy",
+    "**Why:** Rent.",
+  ]) {
+    assert.ok(body.includes(line), line);
+  }
+  const plain = params(tagSuggestionUrl(entry(), "f", manifest)).get("body");
+  assert.ok(!plain.includes("**Why:**"));
+  assert.ok(plain.includes("**Suggested tags:**\n_Which topics should it have, or not have?_"));
+});
