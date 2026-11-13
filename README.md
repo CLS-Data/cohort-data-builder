@@ -25,6 +25,8 @@ project.
    browser, per cohort.
 3. Open **Selection**: check, rename or remove the output columns, choose R, Python and/or
    Stata code, CSV, Stata or SPSS output, and whether missing codes become NA. Then download.
+   [How missing codes were decided](docs/data-format.md#how-missing-and-not-missing-were-decided):
+   the depositor's declared codes, plus negative codes whose label reads like "no answer".
 4. Unzip, put the data files listed in its README into `data/` (any of `.tab`, `.csv`,
    `.dta`, `.sav`, in any subfolder), and run `R/merge.R`, `python/merge.py` or, in Stata 16
    or later, `do stata/merge.do` from the project folder (Stata writes `.dta` or `.csv`, not

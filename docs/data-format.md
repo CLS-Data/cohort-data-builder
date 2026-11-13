@@ -143,6 +143,62 @@ themselves.
 When a researcher asks for missing codes to become NA, exactly the `values` and `ranges` are
 converted, and nothing else. A variable with no `na` (or `na: null`) has nothing converted.
 
+### How missing and not-missing were decided
+
+The site and the scripts never decide what is missing: they apply the lists in `na`. Those
+lists are built from each variable's data dictionary when the cohort's data is prepared.
+This is how, and where it can be wrong.
+
+**1. Declared codes are missing.** The depositor's own SPSS user-missing values (the
+`missing` text, e.g. `-999 thru -1` or `-9, -8`) become `values` and `ranges`. They are the
+depositor's decision and are always converted.
+
+**2. Other negative codes are judged by their label.** Many variables declare nothing yet
+label negative codes such as `-2 Not known` or `-1 Not applicable`. Each negative code that
+is not declared is looked at once:
+
+- if its label reads like "no answer" (see the list below), it is added to `values` and
+  converted;
+- otherwise it is taken to be a real answer, such as `-1 Dislike` or `-8 Never immunised`,
+  listed under `kept`, and never converted.
+
+Codes of 0 and above that are not declared are never treated as missing.
+
+**3. Declared codes that read like answers are flagged.** A declared code whose label does
+not read like "no answer", such as `-4 No alcohol in past 4 weeks`, is still converted (step
+1), but listed under `lossy`. The site shows a warning against it, because converting it
+loses an answer.
+
+**What "reads like no answer" means.** The label is lower-cased and everything but letters
+removed (so "Don't know", "Dont know" and "DON'T KNOW" match alike), then searched for any of
+these phrases:
+
+> not applicable, does not apply, not stated, not known, unknown, don't know, refused,
+> blank, unanswered, not answered, no answer, no response, no information, incomplete info,
+> vague, not attempted, not scorable, not codeable, out of range, questionnaire, no test
+> booklet, no tests, inappropriate answer, more than one answer, unable to examine, no
+> estimation, no check possible, not given, not asked, illegible, hidden NA, alphas present,
+> unbelievable, not interviewed, script error, problem with script, missed question,
+> insufficient, not enough info, not completed, unable to complete, not received,
+> misidentified, not identified, invalid, multicoded, multiple response, unclear, declined,
+> don't want to answer, inconsistent, unable to classify, can't code, no code available, not
+> computed, irrelevant, using interpreter, problem with sample, unable to code, not
+> calculable, not calculated
+
+It also matches the short forms NA, N/A, NS, NK and "miss" as separate words, and "missing".
+
+**Where this can be wrong.** It is a reading of labels, not a statement from the
+depositor:
+
+- a missing code worded in a way the list does not cover is kept as an answer, so it
+  survives when NA was asked for;
+- a real answer whose label contains one of the phrases (e.g. "Unknown cause") is converted.
+
+Every decision is visible: a variable's details on the site list its converted, kept and
+lossy codes, and `codebook.csv` in each download has them in the columns `missing_codes`
+and `negative_kept`. Check the variables you rely on, and set `MISSING_TO_NA` off to keep
+every code exactly as deposited. Report a wrong decision as an issue.
+
 ## Checking the data
 
 The checks run in CI on every pull request, and publishing waits for them. To run them
