@@ -6,6 +6,7 @@
 
 import { loadDict } from "../core/data.js";
 import { describeVariable } from "../core/details.js";
+import { tagSuggestionUrl } from "../core/feedback.js";
 import { buildLabelIndex, filterVariables, PAGE, page, sameLabel } from "../core/search.js";
 import {
   addMany,
@@ -19,7 +20,6 @@ import {
   toggle,
   toItem,
 } from "../core/selection.js";
-import { tagSuggestionUrl } from "../core/feedback.js";
 import { esc, highlight, levelName } from "../core/text.js";
 import { ensure, flatten, rowTopics, toggle as toggleTopic } from "../core/topics.js";
 import { renderSpine, renderTopicGrid, wireOverview } from "./overview.js";
