@@ -474,3 +474,92 @@ def test_help_lists_the_tiered_options(capsys):
     out = capsys.readouterr().out
     for opt in ("--method", "--descend-at", "--max-areas"):
         assert opt in out
+
+
+class DecisionStub:
+    """A stand-in decision host for CLI runs: every question gets ``probability``."""
+
+    def __init__(self, probability=lambda state, q: 0.6, remote=False):
+        self.probability = probability
+        self.remote = remote
+        self.calls = []
+
+    def check(self):
+        pass
+
+    def is_remote(self):
+        return self.remote
+
+    def requests_for(self, questions):
+        return -(-questions // 64)
+
+    def decide(self, state, questions):
+        self.calls.append((state, questions))
+        return {q: self.probability(state, q) for q in questions}
+
+
+def clef(*extra):
+    return ("--provider", "ollama-decision", "--model", "clef:cloud", *extra)
+
+
+@pytest.mark.parametrize("method", ["flat", "tiered"])
+def test_clef_tags_the_fixture_flat_or_tiered(tmp_path, variables_path, small_scheme, method):
+    stub = DecisionStub()
+    assert tag(variables_path, tmp_path / "o", stub, *clef("--method", method)) == 0
+    recs = records(tmp_path / "o")
+    assert len(recs) == 60 and all(r["topics"] for r in recs)
+    asked = {tuple(q) for _, q in stub.calls}
+    if method == "flat":
+        assert asked == {tuple(small_scheme.topic_ids)}
+        assert len(stub.calls) == 60
+    else:
+        assert ("demographics", "health", "survey") in asked
+        assert ("smoking", "alcohol", "physical_health") in asked
+
+
+def test_a_chat_model_flat_still_uses_the_flat_prompt(tmp_path, variables_path):
+    stub = StubProvider(answer("smoking", 0.7))
+    assert tag(variables_path, tmp_path / "o", stub, "--method", "flat") == 0
+    assert "smoking: Smoking — Tobacco use." in stub.calls[0][0][0]["content"]
+
+
+def test_keep_at_needs_the_decision_provider(tmp_path, variables_path, capsys):
+    stub = StubProvider(answer())
+    assert tag(variables_path, tmp_path / "o", stub, "--keep-at", "0.2") == 2
+    assert "--keep-at" in capsys.readouterr().err and stub.calls == []
+
+
+def test_keep_at_reaches_the_decider(tmp_path, variables_path):
+    probs = {"smoking": 0.9, "alcohol": 0.25}
+    stub = DecisionStub(lambda state, q: probs.get(q, 0.01) if q not in ("health",) else 0.9)
+    tag(variables_path, tmp_path / "a", stub, *clef("--method", "tiered", "--keep-at", "0.2"))
+    assert [t for t, _ in records(tmp_path / "a")[0]["topics"]] == ["smoking", "alcohol"]
+    tag(variables_path, tmp_path / "b", stub, *clef("--method", "tiered"))
+    assert [t for t, _ in records(tmp_path / "b")[0]["topics"]] == ["smoking"]
+
+
+def test_a_cloud_decision_model_asks_before_sending(tmp_path, variables_path, capsys):
+    argv = [
+        "tag",
+        str(variables_path),
+        "--out",
+        str(tmp_path / "o"),
+        "--scheme",
+        SMALL,
+        *clef("--method", "tiered"),
+    ]
+    assert main(argv) == 2  # the real provider: clef:cloud is remote; no --yes, no terminal
+    assert "leave this machine" in capsys.readouterr().err
+
+
+def test_decision_dry_run_prints_the_request_bodies(tmp_path, variables_path, capsys):
+    stub = DecisionStub()
+    assert tag(variables_path, tmp_path / "o", stub, *clef("--method", "tiered", "--dry-run")) == 0
+    out = capsys.readouterr().out
+    first, second = out.split("--- tier 2 example (Demographics) ---")
+    tier1, tier2 = json.loads(first), json.loads(second)
+    assert tier1["model"] == "clef:cloud" and tier1["state"]["name"] == "PID"
+    assert list(tier1["questions"]) == ["demographics", "health", "survey"]
+    assert tier1["questions"]["health"]["type"] == "noul"
+    assert list(tier2["questions"]) == ["age", "gender"]
+    assert stub.calls == []
