@@ -182,9 +182,10 @@ def test_a_variable_left_out_at_tier_1_is_asked_alone(small_scheme):
 
 
 @pytest.mark.parametrize("descend_at", [0.0, 0.5, 1.0])
-def test_requests_never_exceed_one_plus_distinct_areas(small_scheme, descend_at):
+def test_requests_are_one_plus_distinct_areas(small_scheme, descend_at):
     result, stub = do_walk(
         small_scheme, ANSWERS, ["smk", "age", "both", "weak"], descend_at=descend_at
     )
     areas = {a for p in result.paths.values() for a, _ in p}
-    assert len(stub.calls) == 1 + len(areas)
+    # plus one for each variable a reply left out, asked again alone
+    assert len(stub.calls) == 1 + len(areas) + result.singles

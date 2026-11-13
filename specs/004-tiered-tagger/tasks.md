@@ -59,7 +59,7 @@ node's options", add the `Node` tree, and pin the flat behaviour so it cannot ch
 only areas, the tier-2 requests list only one area's topics, and the stored tags come from
 the followed areas.
 
-- [ ] T008 [US1] Write the failing tests in `tests/test_tiered.py`, using a scripted chat stand-in that answers according to the option ids in each request's system message:
+- [x] T008 [US1] Write the failing tests in `tests/test_tiered.py`, using a scripted chat stand-in that answers according to the option ids in each request's system message:
   - (a) A batch of 4 gives 1 tier-1 request and then one request per distinct followed area.
   - (b) An area is followed when its confidence is ≥ `descend_at` (default 0.5), at most `max_areas` (default 3, `0` = no cap), and the strongest is always followed even when below the threshold. `path` holds every followed area with its confidence (FR-016).
   - (b2) A one-domain scheme sends no tier-1 request.
@@ -70,7 +70,7 @@ the followed areas.
   - (g) A reply naming an id outside the options is retried, using the runner's existing ladder (retries, then alone, then failed for that group).
   - (h) A variable with tags from one area but a failed second area is stored with the tags it has, while a variable with no tags at all is failed.
   - (i) The walk returns per-variable `path` `[[area, conf], …]` and `requests_by_tier`.
-- [ ] T009 [US1] Implement in `src/topic_tagger/tiered.py`:
+- [x] T009 [US1] Implement in `src/topic_tagger/tiered.py`:
   - a `Decider` protocol: `decide(node, variables) -> dict[int, list[tuple[str, float]]]`;
   - `ChatDecider(provider, guidance)`, using `build_option_messages` and `parse_options_reply`;
   - `walk(tree, batch, decider, descend_at, max_areas) -> (tags, paths, failed, requests_by_tier)`, a queue of `(node, variables)` groups.
