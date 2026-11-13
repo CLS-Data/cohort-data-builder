@@ -307,3 +307,56 @@ def test_a_tier_with_more_than_26_options_is_named():
     areas = tuple(Node(f"a{i}", f"A{i}", "", (Node(f"x{i}", "X", ""),)) for i in range(30))
     many = Node("", "S", "", areas)
     assert choice_problems(many) == ["the scheme has 30 areas; Clef can choose among at most 26"]
+
+
+# --- The fallback topic is an exit at tier 1 -----------------------------------------
+
+
+def test_the_fallback_topic_is_offered_beside_the_areas(small_scheme):
+    root = build_tree(small_scheme)
+    assert [c.id for c in root.children] == ["demographics", "health", "survey", "other"]
+    assert root.children[-1].is_leaf
+    assert [c.id for c in root.find("survey").children] == ["identifiers", "survey_weights"]
+
+
+def test_a_domain_left_empty_by_the_move_is_dropped(tmp_path):
+    from topic_tagger.scheme import load_scheme
+
+    path = tmp_path / "s.toml"
+    path.write_text(
+        'name = "S"\nversion = 1\nfallback_topic = "other"\nguidance = "G"\n'
+        '[[domains]]\nid = "a"\nlabel = "A"\ndescription = "A."\n'
+        '  [[domains.topics]]\n  id = "x"\n  label = "X"\n  description = "X."\n'
+        '  [[domains.topics]]\n  id = "y"\n  label = "Y"\n  description = "Y."\n'
+        '[[domains]]\nid = "misc"\nlabel = "Misc"\ndescription = "M."\n'
+        '  [[domains.topics]]\n  id = "other"\n  label = "Other"\n  description = "None."\n'
+    )
+    assert [c.id for c in build_tree(load_scheme(path)).children] == ["a", "other"]
+
+
+def test_the_exit_is_taken_when_it_is_the_strongest_option(small_scheme):
+    answers = {"junk": {"other": 0.7, "health": 0.2}}
+    result, calls = do_walk(small_scheme, answers, ["junk"])
+    assert result.tags[0] == [("other", 0.7)]
+    assert result.paths.get(0, []) == [] and result.requests_by_tier == [1, 0]
+
+
+def test_the_exit_needs_the_descend_threshold_like_an_area(small_scheme):
+    answers = {"smk": {"health": 0.9, "other": 0.4, "smoking": 0.9}}
+    result, _ = do_walk(small_scheme, answers, ["smk"])
+    assert result.tags[0] == [("smoking", 0.9)]
+
+
+def test_the_exit_is_dropped_when_a_followed_area_gives_topics(small_scheme):
+    answers = {"smk": {"health": 0.6, "other": 0.55, "smoking": 0.8}}
+    result, _ = do_walk(small_scheme, answers, ["smk"])
+    assert result.tags[0] == [("smoking", 0.8)]
+
+
+def test_clef_sees_the_exit_and_its_probability_is_not_cut_by_keep_at(small_scheme):
+    stub = StubDecision(lambda n, o: {"other": 0.25, "health": 0.2}.get(o, 0.18))
+    got, _ = DecisionDecider(stub, keep_at=0.3).decide(build_tree(small_scheme), [var("q")])
+    _, _, options = stub.calls[0]
+    assert list(options) == ["demographics", "health", "survey", "other"]
+    assert options["other"].startswith("Other: ")
+    assert got[0][0] == ("other", 0.25) and len(got[0]) == 4
