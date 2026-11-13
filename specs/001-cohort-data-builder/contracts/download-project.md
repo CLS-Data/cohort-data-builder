@@ -16,7 +16,12 @@ What the researcher receives (FR-019–FR-028). Behaviour matches `PoC/templates
   python/load_data.py     Python only
   python/merge.py         Python only
   python/requirements.txt Python only
+  stata/load_data.do      Stata only
+  stata/merge.do          Stata only: settings, selection, merge
 ```
+
+The Stata files were added by feature 003: see
+[stata-project.md](../../003-user-testing-updates/contracts/stata-project.md).
 
 Zip name: `<key>-merge-<YYYY-MM-DD>.zip`.
 
@@ -61,7 +66,7 @@ fetched by the browser at download time. A test fails if any listed placeholder 
 
 | Template | Required placeholders |
 |---|---|
-| `r/merge.R`, `python/merge.py` | dataset, created, identifier, missing_to_na, selection, missing_codes, output_format, labels, value_labels |
+| `r/merge.R`, `python/merge.py`, `stata/merge.do` | dataset, created, identifier, missing_to_na, selection, missing_codes, output_format, labels, value_labels |
 | `README.md` | dataset, full_name, created, count, files, languages, contents, ext, format_note, identifier, ukds_url, missing_note, run |
 | `data-README.md` | dataset, files, ukds_url |
 

@@ -30,12 +30,19 @@ const TEMPLATE_FILES = [
   "python/load_data.py",
   "python/merge.py",
   "python/requirements.txt",
+  "stata/load_data.do",
+  "stata/merge.do",
 ];
 let templates = null; // fetched on the first download: most visitors never download
 
 const waveOrder = () => state.manifest.wave.list.map((w) => w.key);
 const currentProblems = () =>
-  problems(state.bundle, state.manifest.identifier, state.options.outputFormat);
+  problems(
+    state.bundle,
+    state.manifest.identifier,
+    state.options.outputFormat,
+    state.options.languages,
+  );
 
 /* ── Drawing ─────────────────────────────────────────────────────────── */
 
@@ -87,6 +94,7 @@ function optionsHtml(languages, format, missingToNa) {
       <span class="option-name">Language</span>
       <label><input type="checkbox" data-lang="r" ${languages.includes("r") ? "checked" : ""}> R</label>
       <label><input type="checkbox" data-lang="python" ${languages.includes("python") ? "checked" : ""}> Python</label>
+      <label><input type="checkbox" data-lang="stata" ${languages.includes("stata") ? "checked" : ""}> Stata (do-file)</label>
     </div>
     <div class="option-row">
       <span class="option-name">Output file</span>
@@ -120,7 +128,8 @@ function renderDetail() {
   );
   const { languages, missingToNa, outputFormat: format } = state.options;
   const ext = FORMATS[format]?.ext || "csv";
-  const dotted = format === "dta" && state.bundle.some((b) => /[^A-Za-z0-9_]/.test(b.column));
+  const stataNames = format === "dta" || languages.includes("stata");
+  const dotted = stataNames && state.bundle.some((b) => /[^A-Za-z0-9_]/.test(b.column));
 
   // The list is redrawn in place, so it keeps its scroll position.
   const top = $("#basket-scroll")?.scrollTop || 0;
@@ -183,7 +192,8 @@ function renderDetail() {
 
   const button = $("#basket-download");
   button.disabled = bad.size > 0 || !languages.length;
-  button.textContent = `Download ${languages.map((l) => (l === "r" ? "R" : "Python")).join(" + ") || "…"} code`;
+  const names = { r: "R", python: "Python", stata: "Stata do-file" };
+  button.textContent = `Download ${languages.map((l) => names[l]).join(" + ") || "…"} code`;
 }
 
 /* On a small screen the options fold away under a toggle, so the download bar stays short. */
