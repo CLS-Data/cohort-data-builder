@@ -563,3 +563,53 @@ def test_decision_dry_run_prints_the_request_bodies(tmp_path, variables_path, ca
     assert tier1["questions"]["health"]["type"] == "noul"
     assert list(tier2["questions"]) == ["age", "gender"]
     assert stub.calls == []
+
+
+def run_json(out):
+    return json.loads((out / "run.json").read_text())
+
+
+def test_a_tiered_run_records_its_method_paths_and_requests_by_tier(
+    tmp_path, variables_path, capsys
+):
+    from test_runner import tiered_answer
+
+    out = tmp_path / "o"
+    assert tag(variables_path, out, StubProvider(tiered_answer), "--method", "tiered") == 0
+    run = run_json(out)
+    assert run["settings"]["method"] == "tiered"
+    assert run["settings"]["descend_at"] == 0.5 and run["settings"]["max_areas"] == 3
+    assert run["counts"]["requests_by_tier"] == [3, 3]
+    for r in records(out):
+        assert r["method"] == "tiered" and r["path"] == [["health", 0.8]]
+    text = capsys.readouterr().out
+    assert "Requests by tier: 1: 3, 2: 3" in text
+    assert "Areas followed per variable: 1.0" in text
+
+
+def test_a_flat_run_records_one_tier(tmp_path, variables_path, capsys):
+    out = tmp_path / "o"
+    assert tag(variables_path, out, StubProvider(answer("smoking", 0.7))) == 0
+    run = run_json(out)
+    assert run["settings"]["method"] == "flat" and "descend_at" not in run["settings"]
+    assert run["counts"]["requests_by_tier"] == [run["counts"]["requests"]]
+    assert all(r["method"] == "flat" and "path" not in r for r in records(out))
+    assert "Requests by tier" not in capsys.readouterr().out
+
+
+def test_a_clef_run_records_keep_at(tmp_path, variables_path):
+    tag(variables_path, tmp_path / "o", DecisionStub(), *clef("--method", "tiered"))
+    assert run_json(tmp_path / "o")["settings"]["keep_at"] == 0.3
+
+
+def test_switching_method_redoes_every_variable(tmp_path, variables_path):
+    from test_runner import tiered_answer
+
+    out = tmp_path / "o"
+    tag(variables_path, out, StubProvider(answer("smoking", 0.7)))
+    stub = StubProvider(tiered_answer)
+    tag(variables_path, out, stub, "--method", "tiered")
+    assert run_json(out)["counts"]["todo"] == 60 and stub.calls
+    stub = StubProvider(tiered_answer)
+    tag(variables_path, out, stub, "--method", "tiered")
+    assert run_json(out)["counts"]["todo"] == 0 and not stub.calls
