@@ -15,6 +15,14 @@ from topic_tagger.providers import ProviderError
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
+def is_cloud_model(model: str) -> bool:
+    """True for a model Ollama runs in its cloud: a name ending ``-cloud`` or ``:cloud``.
+
+    Both forms exist (``gpt-oss:20b-cloud``, ``clef:cloud``); either sends data off the machine.
+    """
+    return model.endswith(("-cloud", ":cloud"))
+
+
 class OpenAICompatProvider:
     """Calls ``/chat/completions`` with a JSON schema for the reply.
 
@@ -74,7 +82,7 @@ class OpenAICompatProvider:
         """True for a host other than this machine, or a model the host runs remotely."""
         if urlparse(self.base_url).hostname not in LOCAL_HOSTS:
             return True
-        return bool(self.remote_suffix) and self.model.endswith(self.remote_suffix)
+        return bool(self.remote_suffix) and is_cloud_model(self.model)
 
     def complete(self, messages: list[dict], schema: dict) -> str:
         """Send the messages and return the reply's text."""

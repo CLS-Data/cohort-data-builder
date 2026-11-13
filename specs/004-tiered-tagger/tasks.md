@@ -96,14 +96,14 @@ the followed areas.
 as `state` and one `noul` question per option, and the tags follow the descend and keep
 thresholds.
 
-- [ ] T014 [P] [US4] Write the failing tests in the new `tests/test_decision_provider.py`, with a local fake server in the style of `FakeOllama` that serves `GET /v1/models` and `POST /v1/systemone`:
+- [x] T014 [P] [US4] Write the failing tests in the new `tests/test_decision_provider.py`, with a local fake server in the style of `FakeOllama` that serves `GET /v1/models` and `POST /v1/systemone`:
   - `decide(state, questions)` posts `{"model", "state", "questions"}` and returns `{id: noul}` from `answers`.
   - More than 64 questions are split into several requests and their answers combined.
   - `check()` says `model clef:cloud is not installed; run: ollama pull clef:cloud` when the model is not listed, and names the host when it cannot be reached.
   - A timeout, a non-200 response or a missing answer raises `ProviderError`.
   - `is_remote()` is true for `clef:cloud`, `x-cloud`, and any host other than localhost.
-- [ ] T015 [P] [US4] Write a failing test in `tests/test_provider.py`: the chat `ollama` provider's `is_remote()` is true for a model ending `:cloud`, as well as `-cloud` (FR-014, R12).
-- [ ] T016 [US4] Implement `OllamaDecisionProvider` in the new `src/topic_tagger/providers/ollama_decision.py`, using `urllib.request` with no client retries and splitting at 64. Register it as `ollama-decision` in `providers/__init__.py`, and document the second provider kind in that module's docstring. Make `remote_suffix` accept both `-cloud` and `:cloud` for both providers. Commit.
+- [x] T015 [P] [US4] Write a failing test in `tests/test_provider.py`: the chat `ollama` provider's `is_remote()` is true for a model ending `:cloud`, as well as `-cloud` (FR-014, R12).
+- [x] T016 [US4] Implement `OllamaDecisionProvider` in the new `src/topic_tagger/providers/ollama_decision.py`, using `urllib.request` with no client retries and splitting at 64. Register it as `ollama-decision` in `providers/__init__.py`, and document the second provider kind in that module's docstring. Make `remote_suffix` accept both `-cloud` and `:cloud` for both providers. Commit.
 - [ ] T017 [US4] Write the failing tests in `tests/test_tiered.py` for `DecisionDecider(provider, keep_at=0.3)`:
   - It asks one request per variable.
   - The `state` is `{"name", "label", "values"}`, with values capped at 30 (`prompt.MAX_VALUES`).
