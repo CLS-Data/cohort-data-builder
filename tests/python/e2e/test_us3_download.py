@@ -115,8 +115,45 @@ def test_options_persist_and_no_language_disables_download(mini):
     expect(mini.get_by_label("Python", exact=True)).to_be_checked()
     expect(mini.get_by_label("SPSS (.sav)")).to_be_checked()
     expect(mini.get_by_label("Convert to NA")).to_be_checked()
+    expect(mini.get_by_label("Stata (do-file)")).not_to_be_checked()
+    mini.get_by_label("Stata (do-file)").check()
+    mini.reload()
+    expect(mini.locator("#result-count")).to_have_text("16 variables")
+    review(mini)
+    expect(mini.get_by_label("Stata (do-file)")).to_be_checked()
+    expect(download_button(mini)).to_have_text("Download Python + Stata do-file code")
     mini.get_by_label("Python", exact=True).uncheck()
+    mini.get_by_label("Stata (do-file)").uncheck()
     expect(download_button(mini)).to_be_disabled()
+
+
+def test_options_saved_before_stata_still_load(mini):
+    mini.evaluate(
+        """localStorage.setItem("cohort-data-builder:_site:options",
+             JSON.stringify({languages: ["r", "spss"]}))"""
+    )
+    mini.reload()
+    pick(mini, "smoke5")
+    review(mini)
+    expect(mini.get_by_label("R", exact=True)).to_be_checked()
+    expect(mini.get_by_label("Python", exact=True)).not_to_be_checked()
+    expect(mini.get_by_label("Stata (do-file)")).not_to_be_checked()
+
+
+def test_stata_option_adds_do_files_to_the_zip(mini, tmp_path):
+    pick(mini, "smoke5")
+    review(mini)
+    mini.get_by_label("Stata (do-file)").check()
+    mini.get_by_label("R", exact=True).uncheck()
+    mini.get_by_label("Python", exact=True).uncheck()
+    with mini.expect_download() as info:
+        download_button(mini).click()
+    path = tmp_path / "stata.zip"
+    info.value.save_as(path)
+    with zipfile.ZipFile(path) as z:
+        names = [n.split("/", 1)[1] for n in z.namelist()]
+    assert "stata/merge.do" in names and "stata/load_data.do" in names
+    assert not any(n.startswith(("R/", "python/")) for n in names)
 
 
 def test_download_produces_the_project_zip(mini, tmp_path):
@@ -160,19 +197,39 @@ def test_data_file_link_filters_the_variables_view(mini):
     expect(mini.locator("#active-filters .chip")).to_contain_text("mini_grid")
 
 
-def test_selection_list_removes_and_divider_resizes(mini):
+def test_one_list_renames_and_removes(mini):
     pick(mini, "smoke5")
     pick(mini, "alc10")
     review(mini)
-    mini.get_by_role("button", name="Remove smoke5").first.click()
-    expect(mini.locator("#basket-list li")).to_have_count(1)
-    grip = mini.get_by_role("separator", name="Resize the list")
-    before = int(grip.get_attribute("aria-valuenow") or 0)
-    grip.focus()
-    grip.press("ArrowRight")
-    after = int(grip.get_attribute("aria-valuenow"))
-    assert after > before
-    mini.reload()
-    expect(mini.locator("#result-count")).to_have_text("16 variables")
+    expect(mini.locator("#basket-list")).to_have_count(0)
+    expect(mini.get_by_role("separator", name="Resize the list")).to_have_count(0)
+    rows = mini.locator("#basket-cols li")
+    expect(rows).to_have_count(3)
+    expect(column(mini, "alc10")).to_be_visible()
+    mini.get_by_role("button", name="Remove smoke5").click()
+    expect(rows).to_have_count(2)
+    expect(mini.locator("#basket-tally")).to_have_text("1")
+    mini.get_by_role("button", name=re.compile("^Variables")).click()
+    row = mini.locator("#results .vrow").filter(
+        has=mini.locator(".v-name", has_text=re.compile("^smoke5$"))
+    )
+    expect(row).not_to_have_class(re.compile(r"\bis-in\b"))
+
+
+def test_dropping_a_variable_anywhere_on_selection_adds_it(mini):
+    pick(mini, "smoke5")
     review(mini)
-    assert int(mini.get_by_role("separator").get_attribute("aria-valuenow")) == after
+    mini.evaluate(
+        """() => {
+        const data = new DataTransfer();
+        data.setData("application/x-cohort-data-builder-variable", JSON.stringify(
+            {name: "alc10", label: "How often drinks alcohol", file: "mini_age10", wave: "10y"}));
+        const view = document.querySelector('section.view[data-view="basket"]');
+        for (const type of ["dragenter", "dragover", "drop"]) {
+            const init = {bubbles: true, cancelable: true, dataTransfer: data};
+            view.dispatchEvent(new DragEvent(type, init));
+        }
+    }"""
+    )
+    expect(column(mini, "alc10")).to_be_visible()
+    expect(mini.locator("#basket-cols li")).to_have_count(3)

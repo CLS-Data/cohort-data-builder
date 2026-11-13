@@ -13,6 +13,8 @@ const TEMPLATE_FILES = [
   "python/load_data.py",
   "python/merge.py",
   "python/requirements.txt",
+  "stata/load_data.do",
+  "stata/merge.do",
 ];
 const TODAY = "2026-10-26";
 const PROJECT = `mini-merge-${TODAY}`;
@@ -194,5 +196,125 @@ test("every template has the placeholders the contract requires", () => {
     for (const key of keys.split(" ")) {
       assert.ok(templates[name].includes(`{{${key}}}`), `${name} lacks {{${key}}}`);
     }
+  }
+});
+
+/* ── Stata ───────────────────────────────────────────────────────────── */
+
+const stata = [`stata/load_data.do`, "stata/merge.do"];
+
+test("Stata adds its two do-files, alone or with the others", () => {
+  const paths = (p) => p.files.map(([path]) => path.slice(PROJECT.length + 1)).sort();
+  const common = ["README.md", "codebook.csv", "data/README.md"];
+  assert.deepEqual(paths(build({ languages: ["stata"] })), [...common, ...stata].sort());
+  const all = paths(build({ languages: ["r", "python", "stata"] }));
+  for (const f of [...stata, "R/merge.R", "python/merge.py"]) assert.ok(all.includes(f), f);
+});
+
+test("the README says how to run the do-file, for Stata alone and in company", () => {
+  const alone = file(build({ languages: ["stata"] }), "README.md");
+  assert.match(alone, /written in Stata/);
+  assert.ok(alone.includes("do stata/merge.do"));
+  assert.match(alone, /Stata 16/);
+  assert.ok(alone.includes("stata/merge.do       your selection and the merge: run this"));
+  const three = file(build({ languages: ["r", "python", "stata"] }), "README.md");
+  assert.match(three, /included in R, Python and Stata/);
+});
+
+test("merge.do settings follow the options", () => {
+  const on = file(build({ languages: ["stata"], outputFormat: "dta" }), "stata/merge.do");
+  assert.ok(on.includes('local OUTPUT_FORMAT "dta"'));
+  assert.ok(on.includes("local MISSING_TO_NA 1"));
+  assert.ok(on.includes('local IDENTIFIER "PID"'));
+  const off = file(build({ languages: ["stata"], missingToNa: false }), "stata/merge.do");
+  assert.ok(off.includes("local MISSING_TO_NA 0"));
+});
+
+test("merge.do lists each file's variables and output columns in the same order", () => {
+  const d = file(build({ languages: ["stata"] }), "stata/merge.do");
+  assert.ok(d.includes("local n_files 3"));
+  assert.ok(d.includes('local f2_file "mini_age10"'));
+  assert.ok(d.includes('local f2_vars "sex alc10 mood10 weight10"'));
+  assert.ok(d.includes('local f2_cols "sex_10y alc10 mood10 weight10"'));
+});
+
+test("Stata strings are compound-quoted and cannot expand macros", () => {
+  const odd = structuredClone(dicts);
+  odd.mini_age5.variables.find((v) => v.variable === "smoke5").label = 'Cost in $ `x\' "q"\nnext';
+  const p = buildProject(
+    selection,
+    manifest,
+    odd,
+    templates,
+    options({ languages: ["stata"] }),
+    TODAY,
+  );
+  const d = file(p, "stata/merge.do");
+  assert.ok(d.includes('label variable smoke5 `"Cost in \\$ \\`x\' "q" next"\''), d);
+  assert.ok(d.includes('label variable quote5 `"Mother said "fine"\\not fine second line"\''));
+});
+
+test("Stata variable labels are cut to 80 characters", () => {
+  const odd = structuredClone(dicts);
+  odd.mini_age5.variables.find((v) => v.variable === "smoke5").label = "x".repeat(90);
+  const p = buildProject(
+    selection,
+    manifest,
+    odd,
+    templates,
+    options({ languages: ["stata"] }),
+    TODAY,
+  );
+  assert.ok(file(p, "stata/merge.do").includes(`label variable smoke5 \`"${"x".repeat(80)}"'`));
+});
+
+test("Stata missing codes become guarded replace lines", () => {
+  const d = file(build({ languages: ["stata"] }), "stata/merge.do");
+  assert.ok(d.includes("if !_rc quietly replace sex = . if inlist(sex, -9)"));
+  assert.ok(d.includes("if !_rc quietly replace tenure5 = . if tenure5 <= -1"));
+  assert.ok(d.includes("if !_rc quietly replace alc10 = . if inrange(alc10, -9, -2)"));
+  assert.ok(d.includes("if !_rc quietly replace mood10 = . if inlist(mood10, -8)"));
+  const codes = d.slice(
+    d.indexOf("program define cdb_missing_codes"),
+    d.indexOf("program define cdb_labels"),
+  );
+  for (const absent of ["smoke5", "sex_10y", "weight10", "hhrel"]) {
+    assert.ok(!codes.includes(` ${absent} `), absent);
+  }
+});
+
+test("an open high end keeps Stata's missing values out of the range", () => {
+  const odd = structuredClone(dicts);
+  odd.mini_age5.variables.find((v) => v.variable === "smoke5").na = {
+    values: [],
+    ranges: [[90, null]],
+  };
+  const p = buildProject(
+    selection,
+    manifest,
+    odd,
+    templates,
+    options({ languages: ["stata"] }),
+    TODAY,
+  );
+  assert.ok(
+    file(p, "stata/merge.do").includes("replace smoke5 = . if (smoke5 >= 90 & !missing(smoke5))"),
+  );
+});
+
+test("Stata value labels are defined per column", () => {
+  const d = file(build({ languages: ["stata"] }), "stata/merge.do");
+  assert.ok(
+    d.includes('label define tenure5 1 `"Owned"\' 2 `"Rented"\' -1 `"Not applicable"\', replace'),
+  );
+  assert.ok(d.includes("label values tenure5 tenure5"));
+  assert.ok(!d.includes("label define weight10"));
+});
+
+test("the Stata templates have their placeholders", () => {
+  for (const key of "dataset created identifier missing_to_na selection missing_codes output_format labels value_labels".split(
+    " ",
+  )) {
+    assert.ok(templates["stata/merge.do"].includes(`{{${key}}}`), `merge.do lacks {{${key}}}`);
   }
 });

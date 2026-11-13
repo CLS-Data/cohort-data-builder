@@ -3,7 +3,8 @@
    node tests/js/generate_bundle.mjs <data_dir> <cohort> <out_dir> <missingToNa> \
        <csv|dta|sav> <langs> <file:variable[:column]>...
 
-   <missingToNa> is "true" or "false"; <langs> is "r", "python" or "r,python". Columns not
+   <missingToNa> is "true" or "false"; <langs> is a comma-separated list of "r", "python" and
+   "stata". Columns not
    given get the site's defaults. The project's files are written directly into out_dir. */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -21,6 +22,8 @@ const TEMPLATE_FILES = [
   "python/load_data.py",
   "python/merge.py",
   "python/requirements.txt",
+  "stata/load_data.do",
+  "stata/merge.do",
 ];
 
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));

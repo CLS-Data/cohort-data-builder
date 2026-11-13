@@ -1,7 +1,7 @@
 /* Turning a selection into the files of a downloadable project.
 
-   Almost nothing here is R or Python: the loaders and the merge logic are templates in
-   site/templates/, reviewed as R and as Python. This fills in the selection, the
+   Almost nothing here is R, Python or Stata: the loaders and the merge logic are templates
+   in site/templates/, reviewed in their own languages. This fills in the selection, the
    missing-value codes, the labels and the README. Dictionaries and templates are passed
    in, so it runs under Node in tests. */
 
@@ -90,6 +90,74 @@ const pyCodes = (selection, entries) =>
         .join(", ");
       return `    ${quote(b.column)}: {"values": [${values.join(", ")}], "ranges": [${r}]},`;
     })
+    .join("\n");
+
+/* ── Stata ───────────────────────────────────────────────────────────────
+   Stata strings are compound-quoted, `"…"', so double quotes need no escaping. A ` or $
+   would start a macro, so each gets a backslash. A "' would end the string early, so it
+   gets a space. Newlines become spaces. */
+
+const stataQuote = (s, max = Infinity) =>
+  `\`"${String(s ?? "")
+    .replace(/\r?\n/g, " ")
+    .slice(0, max)
+    .replace(/[`$]/g, "\\$&")
+    .replace(/"'/g, "\" '")}"'`;
+
+const stataSelection = (groups) =>
+  [
+    `local n_files ${groups.size}`,
+    ...[...groups].flatMap(([file, items], i) => [
+      `local f${i + 1}_file "${file}"`,
+      `local f${i + 1}_vars "${items.map((b) => b.name).join(" ")}"`,
+      `local f${i + 1}_cols "${items.map((b) => b.column).join(" ")}"`,
+    ]),
+  ].join("\n");
+
+/* A condition true for a column's missing codes: inlist for single values, inrange for
+   ranges, a comparison for an open end. Stata's missing value counts as larger than any
+   number, so an open high end excludes it. */
+function stataCondition(col, { values, ranges }) {
+  const parts = [];
+  if (values.length) parts.push(`inlist(${col}, ${values.join(", ")})`);
+  for (const [lo, hi] of ranges) {
+    if (lo === null) parts.push(`${col} <= ${hi}`);
+    else if (hi === null) parts.push(`(${col} >= ${lo} & !missing(${col}))`);
+    else parts.push(`inrange(${col}, ${lo}, ${hi})`);
+  }
+  return parts.join(" | ");
+}
+
+/* Each line is guarded: a column the file lacked was skipped, and a text column has no codes. */
+const stataCodes = (selection, entries) =>
+  selection
+    .map((b) => [b, codesOf(entries.get(b))])
+    .filter(([, c]) => c)
+    .map(
+      ([b, c]) =>
+        `    capture confirm numeric variable ${b.column}\n` +
+        `    if !_rc quietly replace ${b.column} = . if ${stataCondition(b.column, c)}`,
+    )
+    .join("\n");
+
+/* Stata keeps variable labels to 80 characters. */
+const stataLabels = (selection, entries, identifier) =>
+  [
+    `    capture label variable ${identifier} ${stataQuote(ID_LABEL, 80)}`,
+    ...selection.map(
+      (b) => `    capture label variable ${b.column} ${stataQuote(labelOf(b, entries), 80)}`,
+    ),
+  ].join("\n");
+
+const stataValueLabels = (selection, entries) =>
+  selection
+    .map((b) => [b, codeLabels(entries.get(b))])
+    .filter(([, c]) => c)
+    .map(
+      ([b, c]) =>
+        `    label define ${b.column} ${c.map(([x, l]) => `${x} ${stataQuote(l)}`).join(" ")}, replace\n` +
+        `    capture label values ${b.column} ${b.column}`,
+    )
     .join("\n");
 
 /* ── Labels, for Stata and SPSS output ─────────────────────────────── */
@@ -206,6 +274,19 @@ export function codebook(selection, manifest, dicts) {
 
 /* ── The README ──────────────────────────────────────────────────────── */
 
+const LANGUAGE_NAMES = { r: "R", python: "Python", stata: "Stata" };
+
+/* "R", "R and Python", "R, Python and Stata". */
+const listOf = (names) =>
+  names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+
+function languagesSentence(languages) {
+  const names = languages.map((l) => LANGUAGE_NAMES[l]);
+  return names.length > 1
+    ? `The same merge is included in ${listOf(names)}; use whichever you prefer.`
+    : `The merge is written in ${names[0]}.`;
+}
+
 function runSteps(languages, project) {
   const steps = [];
   if (languages.includes("r")) {
@@ -216,6 +297,12 @@ function runSteps(languages, project) {
   if (languages.includes("python")) {
     steps.push(`**Python.** \`pip install -r python/requirements.txt\`, then
 \`python python/merge.py\`. \`pyreadstat\` is only needed for \`.sav\` files.`);
+  }
+  if (languages.includes("stata")) {
+    steps.push(`**Stata.** In Stata, \`cd\` to this folder (the one holding this README) and type
+\`do stata/merge.do\`, or run \`stata-mp -b do stata/merge.do\` from a terminal. Needs Stata 16
+or later and no extra packages. Stata cannot write \`.sav\` files: asked for one, it writes
+\`.dta\`.`);
   }
   return steps.join("\n\n");
 }
@@ -241,16 +328,26 @@ function contents(languages, project) {
       "    python/requirements.txt",
     );
   }
+  if (languages.includes("stata")) {
+    lines.push(
+      "    stata/load_data.do   finds and reads data files; the read call follows the extension",
+      "    stata/merge.do       your selection and the merge: run this",
+    );
+  }
   return lines.join("\n");
 }
 
 const MISSING_ON =
-  "**Missing-value codes are converted to NA.** Each variable's missing-value codes, as " +
-  "listed in the data dictionary (`codebook.csv`, column `missing_codes`), are replaced " +
-  "with NA. Negative codes that are real answers (column `negative_kept`) are kept. Set " +
-  "`MISSING_TO_NA` to false at the top of the merge script to keep every code.";
+  "**Missing-value codes are converted to NA.** Each variable's missing-value codes " +
+  "(`codebook.csv`, column `missing_codes`) are replaced with NA: the codes the depositor " +
+  'declared missing, plus negative codes whose label reads like no answer ("Not known", ' +
+  '"Refused"). Other negative codes are taken to be answers and kept (column ' +
+  "`negative_kept`, e.g. -1 Dislike). This is a reading of labels, so check the variables " +
+  "you rely on: " +
+  "https://github.com/CLS-Data/cohort-data-builder/blob/main/docs/data-format.md#how-missing-and-not-missing-were-decided. " +
+  "Set `MISSING_TO_NA` to false (0 in Stata) at the top of the merge script to keep every code.";
 const MISSING_OFF =
-  "**Missing-value codes are kept as deposited.** Set `MISSING_TO_NA` to true at the top " +
+  "**Missing-value codes are kept as deposited.** Set `MISSING_TO_NA` to true (1 in Stata) at the top " +
   "of the merge script to replace them with NA: `codebook.csv` lists which codes that " +
   "would replace (column `missing_codes`).";
 
@@ -263,7 +360,7 @@ const MISSING_OFF =
  * @param {Object<string, object>} dicts Each selected file's dictionary, by file name.
  * @param {Object<string, string>} templates The text of each file in site/templates/, by
  *   path relative to that folder (e.g. "r/merge.R").
- * @param {{languages: string[], missingToNa: boolean, outputFormat: string}} options The
+ * @param {{languages: ("r"|"python"|"stata")[], missingToNa: boolean, outputFormat: string}} options The
  *   download options.
  * @param {string} today The date, YYYY-MM-DD, used in the project name.
  * @returns {{name: string, files: Array<[string, string]>}} The project name
@@ -307,10 +404,7 @@ export function buildProject(selection, manifest, dicts, templates, options, tod
           : ` A ${FORMATS[format].name} file, with each column's label and value labels from ` +
             "the data dictionary. To get a different file type, change `OUTPUT_FORMAT` at the " +
             'top of the merge script ("csv", "dta" or "sav").',
-      languages:
-        languages.length === 2
-          ? "The same merge is included in R and in Python; use whichever you prefer."
-          : `The merge is written in ${languages[0] === "r" ? "R" : "Python"}.`,
+      languages: languagesSentence(languages),
       missing_note: missingToNa ? MISSING_ON : MISSING_OFF,
       run: runSteps(languages, project),
       contents: contents(languages, project),
@@ -349,6 +443,19 @@ export function buildProject(selection, manifest, dicts, templates, options, tod
         missing_codes: pyCodes(selection, entries),
         labels: pyLabels(selection, entries, manifest.identifier),
         value_labels: pyValueLabels(selection, entries),
+      }),
+    );
+  }
+  if (languages.includes("stata")) {
+    add("stata/load_data.do", templates["stata/load_data.do"]);
+    add(
+      "stata/merge.do",
+      fill(templates["stata/merge.do"], {
+        ...settings("1", "0"),
+        selection: stataSelection(groups),
+        missing_codes: stataCodes(selection, entries),
+        labels: stataLabels(selection, entries, manifest.identifier),
+        value_labels: stataValueLabels(selection, entries),
       }),
     );
   }

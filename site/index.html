@@ -36,6 +36,11 @@
 
   <a class="guide-link" href="tutorial/">Tutorial</a>
 
+  <div class="text-size" role="group" aria-label="Text size">
+    <button type="button" data-text-size="" aria-label="Normal text" title="Normal text" aria-pressed="true"><span class="ts-a ts-1">A</span></button>
+    <button type="button" data-text-size="large" aria-label="Larger text" title="Larger text" aria-pressed="false"><span class="ts-a ts-2">A</span></button>
+    <button type="button" data-text-size="larger" aria-label="Largest text" title="Largest text" aria-pressed="false"><span class="ts-a ts-3">A</span></button>
+  </div>
   <button class="theme" id="theme" type="button" aria-label="Switch colour theme" title="Switch colour theme"></button>
 </header>
 
@@ -131,26 +136,27 @@
 
   <!-- ── Selection ────────────────────────────────────────────────── -->
   <section class="view" data-view="basket">
-    <div class="pane pane-list" id="basket-drop">
-      <div class="finder">
-        <span class="field-label">Selected</span>
-        <p class="finder-help">Drag variables here from the list, or use the <strong>＋</strong> beside any row.</p>
-        <div class="picked">
-          <p class="picked-count" id="basket-count">Nothing selected yet</p>
-          <div class="picked-actions">
-            <button class="link-btn" id="basket-clear" hidden>Clear</button>
-          </div>
-        </div>
-      </div>
-      <ol class="results" id="basket-list"></ol>
-    </div>
-    <div class="grip" role="separator" aria-orientation="vertical"
-         tabindex="0" aria-label="Resize the list"
-         title="Drag to resize · double-click to reset"></div>
     <div class="pane pane-detail" id="basket-detail" tabindex="-1"></div>
   </section>
 
 </main>
+
+<!-- Suggesting better topic tags for one variable: see js/ui/suggest.js. -->
+<dialog class="tag-dialog" id="tag-dialog" aria-labelledby="tag-dialog-title">
+  <h2 class="tag-title" id="tag-dialog-title">Suggest tags</h2>
+  <p class="tag-help">Tick the topics this variable should have; its current tags are ticked,
+    with the model's confidence. This opens a pre-filled issue on GitHub, where you need an
+    account to submit it.</p>
+  <input type="search" id="tag-filter" aria-label="Filter topics" placeholder="Filter topics">
+  <div class="tag-list" id="tag-list"></div>
+  <p class="tag-changes" id="tag-changes" aria-live="polite"></p>
+  <label class="field-label" for="tag-why">Why (optional)</label>
+  <textarea id="tag-why" rows="2"></textarea>
+  <div class="tag-actions">
+    <button type="button" class="btn" id="tag-cancel">Cancel</button>
+    <button type="button" class="btn btn-primary" id="tag-send" disabled>Open on GitHub</button>
+  </div>
+</dialog>
 
 <footer class="foot">
   <span id="foot-counts">—</span>

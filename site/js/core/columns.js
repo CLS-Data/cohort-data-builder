@@ -26,12 +26,18 @@ const FORMAT_RULES = {
  * @param {object[]} selection The selection ({name, file, column, …}).
  * @param {string} identifier The cohort's identifier, always the first output column.
  * @param {"csv"|"dta"|"sav"} format The chosen output file type.
+ * @param {string[]} [languages] The chosen code languages. Stata code applies Stata's name
+ *   rules whatever the output file type, since the do-file creates the columns.
  * @returns {Map<string, string>} `<file>:<name>` to the problem; empty when all is well.
  */
-export function problems(selection, identifier, format) {
+export function problems(selection, identifier, format, languages = []) {
   const out = new Map();
   const seen = new Map([[String(identifier).toLowerCase(), null]]);
-  const rule = FORMAT_RULES[format] || FORMAT_RULES.csv;
+  const formatRule = FORMAT_RULES[format] || FORMAT_RULES.csv;
+  const rule =
+    languages.includes("stata") && format !== "dta"
+      ? (name) => FORMAT_RULES.dta(name) || formatRule(name)
+      : formatRule;
   for (const b of selection) {
     if (!NAME_OK.test(b.column || "")) {
       out.set(keyOf(b), "Must start with a letter and use only letters, digits, _ or .");
