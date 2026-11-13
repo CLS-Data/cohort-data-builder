@@ -23,9 +23,9 @@ stacked PRs top-down, or retarget each to `004-tiered-tagger` before merging.
 
 ## Phase 1: Setup
 
-- [ ] T001 Add `/adhoc/` to the root `.gitignore`, with the comment "Ad hoc development work and local data: never committed". Check that `git status` no longer lists `adhoc/`.
+- [x] T001 Add `/adhoc/` to the root `.gitignore`, with the comment "Ad hoc development work and local data: never committed". Check that `git status` no longer lists `adhoc/`.
 - [ ] T002 Maintainer (needs the network, so it runs outside Claude's sandbox): run `ollama --version` (needs 0.40.6 or later), `ollama signin`, then `ollama pull clef:cloud`. Check that `curl -s localhost:11434/v1/models` lists `clef:cloud`, and note the Ollama version in `specs/004-tiered-tagger/research.md` § R10.
-- [ ] T003 [P] Write the labelled set:
+- [x] T003 [P] Write the labelled set:
   - `adhoc/tiered/variables.jsonl`: 80 fictional variables, in the tagger input format of `tools/topic-tagger/docs/formats.md` (`file`, `variable`, `label`, `values`). Spread them over every area of `tools/topic-tagger/src/topic_tagger/schemes/closer.toml`, about 5 per area. Include 15 that span two areas (e.g. "Mother smoked during pregnancy") and 3 that fit nothing.
   - `adhoc/tiered/expected.json`: `{"<file>/<variable>": ["topic_id", …]}`, using only topic ids from `closer.toml`.
   - `adhoc/tiered/README.md`: what the set is, and that it is fictional.
@@ -37,15 +37,15 @@ stacked PRs top-down, or retarget each to `004-tiered-tagger` before merging.
 **Purpose**: Generalise the reply check and the prompt from "the scheme's topics" to "a
 node's options", add the `Node` tree, and pin the flat behaviour so it cannot change.
 
-- [ ] T004 [P] Write the failing tests:
+- [x] T004 [P] Write the failing tests:
   - `tests/test_reply.py`: `parse_options_reply(text, option_ids, batch_size, order)` accepts only the given ids, rejects any other with `ReplyError`, and sorts strongest first with ties in `order`. The existing `parse_reply(text, scheme, n)` returns exactly what it returned before, for the existing cases.
   - `tests/test_tiered.py`: `build_tree(scheme)` gives a root whose children are the domains in order, whose children are the topics. `node.is_leaf` holds for topics. `tree.find(id)` returns the node. A 3-level hand-built tree is accepted by the same `Node` type.
-- [ ] T005 [P] Write the failing tests in `tests/test_prompt.py`:
+- [x] T005 [P] Write the failing tests in `tests/test_prompt.py`:
   - `build_option_messages(guidance, node, batch, show_children_of_options=True)` lists exactly `node.children` (id, label, description). With `show_children_of_options`, each option is followed by its children's labels, comma-separated (R2).
   - Its reply format instructions name only those ids.
   - `build_messages(scheme, batch)` (flat) is byte-for-byte unchanged on the fixture (assert against a snapshot taken from the current code before changing it).
-- [ ] T006 Implement `parse_options_reply` in `src/topic_tagger/reply.py`, reusing `_model(tuple(option_ids))`, and make `parse_reply` call it. Commit `feat(tagger): reply checks against any set of options`.
-- [ ] T007 Implement `Node` (`id`, `label`, `description`, `children: tuple[Node, ...]`, `is_leaf`) and `build_tree(scheme)` in the new `src/topic_tagger/tiered.py`, with Google-style docstrings. Implement `build_option_messages` in `src/topic_tagger/prompt.py`. Keep `build_messages` unchanged. Commit `feat(tagger): a taxonomy tree and prompts over a node's options`.
+- [x] T006 Implement `parse_options_reply` in `src/topic_tagger/reply.py`, reusing `_model(tuple(option_ids))`, and make `parse_reply` call it. Commit `feat(tagger): reply checks against any set of options`.
+- [x] T007 Implement `Node` (`id`, `label`, `description`, `children: tuple[Node, ...]`, `is_leaf`) and `build_tree(scheme)` in the new `src/topic_tagger/tiered.py`, with Google-style docstrings. Implement `build_option_messages` in `src/topic_tagger/prompt.py`. Keep `build_messages` unchanged. Commit `feat(tagger): a taxonomy tree and prompts over a node's options`.
 
 **Checkpoint**: `uv run pytest` passes, and the flat output is unchanged.
 
