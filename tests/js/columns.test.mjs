@@ -47,3 +47,9 @@ test("fixDots replaces non-word characters and keeps names distinct", () => {
     ["x_y", "x_y_2", "pid_2", "z"],
   );
 });
+
+test("choosing Stata code applies Stata's name rules whatever the output format", () => {
+  assert.match(problems([col("a", "a.b")], "PID", "csv", ["stata"]).get("f:a"), /a_b/);
+  assert.match(problems([col("a", "a".repeat(33))], "PID", "sav", ["r", "stata"]).get("f:a"), /32/);
+  assert.equal(problems([col("a", "a.b")], "PID", "csv", ["r", "python"]).size, 0);
+});

@@ -57,7 +57,7 @@ export function restoreOptions() {
   if (!saved || typeof saved !== "object") return;
   const o = state.options;
   if (Array.isArray(saved.languages)) {
-    const langs = saved.languages.filter((l) => l === "r" || l === "python");
+    const langs = saved.languages.filter((l) => ["r", "python", "stata"].includes(l));
     if (langs.length) o.languages = langs;
   }
   o.missingToNa = saved.missingToNa === true;
