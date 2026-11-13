@@ -483,6 +483,12 @@ code, kbd { font-family: var(--mono); font-size: .92em; }
 .vm-values.is-na .vm-lossy { color: var(--ochre); }
 .vm-kept .vm-code { font-weight: 700; color: var(--ink); }
 .vm-topics, .vm-also { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+/* Quiet: most people never need it, but it is there where a wrong tag is seen. */
+.vm-suggest {
+  margin-left: 4px; padding: 2px 0;
+  font-family: var(--mono); font-size: 11px; color: var(--sea);
+}
+.vm-suggest:hover, .vm-suggest:focus-visible { color: var(--contour); }
 .vm-key {
   min-width: 10ch;
   font-family: var(--mono); font-size: 10px; color: var(--ink-3);

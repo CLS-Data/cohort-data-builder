@@ -19,6 +19,7 @@ import {
   toggle,
   toItem,
 } from "../core/selection.js";
+import { tagSuggestionUrl } from "../core/feedback.js";
 import { esc, highlight, levelName } from "../core/text.js";
 import { ensure, flatten, rowTopics, toggle as toggleTopic } from "../core/topics.js";
 import { renderSpine, renderTopicGrid, wireOverview } from "./overview.js";
@@ -281,8 +282,10 @@ function sameLabelHtml(row) {
 }
 
 /* Every topic in the dictionary entry, with its confidence; those under the threshold are
-   dimmed rather than hidden. Clicking one filters by it. */
-function topicsHtml(entry) {
+   dimmed rather than hidden. Clicking one filters by it. The tags come from a language
+   model, so the line ends with a link to suggest better ones (a GitHub issue form). */
+function topicsHtml(entry, file) {
+  if (!state.topics.length) return "";
   const byId = new Map(state.topics.map((t, i) => [t.id, i]));
   const tags = (entry.topics || [])
     .filter(([id]) => byId.has(id))
@@ -294,7 +297,9 @@ function topicsHtml(entry) {
         data-domain="${esc(domain.id)}" title="${esc(domain.label)} › ${esc(state.topics[i].label)} · filter by this topic">${esc(state.topics[i].label)} <span class="vm-pct">${pct}%</span></button>`;
     })
     .join("");
-  return tags ? `<div class="vm-topics"><span class="vm-key">Topics</span>${tags}</div>` : "";
+  const suggest = `<a class="vm-suggest" href="${esc(tagSuggestionUrl(entry, file.name, state.manifest))}"
+    target="_blank" rel="noopener">${tags ? "Suggest a tag change" : "Suggest a tag"}</a>`;
+  return `<div class="vm-topics">${tags ? `<span class="vm-key">Topics</span>${tags}` : ""}${suggest}</div>`;
 }
 
 function moreHtml(row) {
@@ -316,7 +321,7 @@ function moreHtml(row) {
         )
         .join(" · ");
   return `${valuesHtml(row, d)}
-    ${topicsHtml(entry)}
+    ${topicsHtml(entry, file)}
     ${sameLabelHtml(row)}
     ${file.hasId ? "" : `<p class="vm-note vm-warn">This file has no ${esc(state.manifest.identifier)} column, so it cannot be merged.</p>`}
     <div class="vm-meta"><span>${facts}</span>

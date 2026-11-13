@@ -38,6 +38,12 @@ Ollama, with live progress and an HTML report. It is a self-contained tool, usab
 this project. `scripts/topics.py` exports a cohort from `site/data` for it and merges the
 tags back; [docs/data-format.md](docs/data-format.md#adding-topics) has the three commands.
 
+**Suggesting a tag change.** A variable's details end the Topics line with "Suggest a tag
+change" ("Suggest a tag" when it has none). It opens a GitHub issue form, labelled
+`tag-suggestion`, with the cohort, variable, file, label and current tags filled in; raising
+it needs a GitHub account. Maintainers list them with the `tag-suggestion` label and review
+them by hand.
+
 ## Repository layout
 
 ```text

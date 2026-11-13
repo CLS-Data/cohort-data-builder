@@ -1,0 +1,51 @@
+name: Tag suggestion
+description: A variable's topic tags are wrong or missing.
+title: "Tag suggestion: "
+labels: ["tag-suggestion"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Topic tags are assigned by a large language model, so some are wrong. Tell us
+        which topics this variable should (or should not) have; a maintainer reviews
+        every suggestion by hand. Opened from Cohort Data Builder, the details below are
+        already filled in.
+  - type: input
+    id: cohort
+    attributes:
+      label: Cohort
+    validations:
+      required: true
+  - type: input
+    id: variable
+    attributes:
+      label: Variable
+    validations:
+      required: true
+  - type: input
+    id: file
+    attributes:
+      label: Data file
+    validations:
+      required: true
+  - type: textarea
+    id: label
+    attributes:
+      label: Variable label
+  - type: textarea
+    id: current
+    attributes:
+      label: Current tags
+      description: With the model's confidence.
+  - type: textarea
+    id: suggested
+    attributes:
+      label: Suggested tags
+      description: Which topics should it have, or not have?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: Optional. Anything that helps, such as the question wording.
