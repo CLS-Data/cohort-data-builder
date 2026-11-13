@@ -112,14 +112,14 @@ thresholds.
   - Leaves are kept when ≥ `keep_at`, else the single strongest leaf is kept, and `keep_at=0` keeps every leaf (FR-017).
   - **Flat** with the decider (R14) walks `flat_tree(scheme)`, a root whose children are every topic. With the bundled CLOSER scheme it sends 2 requests per variable (split at 64), and returns the same keep rule.
 - [x] T018 [US4] Implement `DecisionDecider` and `flat_tree(scheme)` in `src/topic_tagger/tiered.py`. Commit.
-- [ ] T019 [US4] Write the failing tests in `tests/test_cli.py`:
+- [x] T019 [US4] Write the failing tests in `tests/test_cli.py`:
   - `--provider ollama-decision --method flat` tags the fixture against the fake server, asking every topic per variable.
   - With `--provider ollama` (chat), `--method flat` still uses the unchanged flat prompt (FR-009).
   - `--keep-at` without the decision provider gives exit 2.
   - A run against the fake decision server tags the fixture.
   - `--model clef:cloud` without `--yes` asks before sending.
   - `--dry-run` with the decision provider prints the first variable's tier-1 and tier-2 `/v1/systemone` bodies as JSON.
-- [ ] T020 [US4] Implement `--keep-at`, the decider choice (chat or decision, flat or tiered) and the decision dry-run in `src/topic_tagger/cli.py`. In the same commit, document `--provider ollama-decision`, `--keep-at`, `ollama pull clef:cloud` and the request cost (1 + areas per variable tiered, 2 per variable flat) in `README.md`. Commit.
+- [x] T020 [US4] Implement `--keep-at`, the decider choice (chat or decision, flat or tiered) and the decision dry-run in `src/topic_tagger/cli.py`. In the same commit, document `--provider ollama-decision`, `--keep-at`, `ollama pull clef:cloud` and the request cost (1 + areas per variable tiered, 2 per variable flat) in `README.md`. Commit.
 - [ ] T021 [US4] Maintainer, outside the sandbox: `uv run topic-tagger tag tests/fixtures/variables.jsonl --out "$TMPDIR/clef" --provider ollama-decision --model clef:cloud --method tiered --yes`. All 60 should be tagged with 0 failed (SC-005). If Clef's real responses differ from the documented shape (`answers.<id>.noul`), first add a failing provider test with the real shape, then fix it.
 
 **Checkpoint**: Clef tags the fixture for real.

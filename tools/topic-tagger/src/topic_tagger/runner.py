@@ -19,7 +19,7 @@ from topic_tagger.providers import Provider, ProviderError
 from topic_tagger.reply import ReplyError, parse_reply
 from topic_tagger.scheme import Scheme
 from topic_tagger.store import TagStore, make_record
-from topic_tagger.tiered import ChatDecider, Decider, build_tree, walk
+from topic_tagger.tiered import ChatDecider, Decider, build_tree, flat_tree, walk
 from topic_tagger.variables import Variable
 
 Tags = list[tuple[str, float]]
@@ -85,8 +85,9 @@ class Runner:
         clock: Gives the time stored with each record.
         on_event: Called in the main thread as ``on_event(kind, data)`` with ``retry``,
             ``batch_done`` (``n`` and each variable's ``tags``) and ``failed`` (``key``).
-        decider: Tiered: what answers each tier; a ``ChatDecider`` on ``provider`` if not
-            given.
+        decider: What answers each tier. Given (a decision model), every run walks the
+            tree, flat ones over a single tier of every topic. Not given, a ``ChatDecider``
+            on ``provider`` is used for tiered runs and flat runs keep the flat prompt.
     """
 
     def __init__(
@@ -106,7 +107,8 @@ class Runner:
         self.clock = clock
         self.on_event = on_event
         self._schema = reply_schema(scheme)
-        self._tree = build_tree(scheme)
+        self._walks = settings.method == "tiered" or decider is not None
+        self._tree = build_tree(scheme) if settings.method == "tiered" else flat_tree(scheme)
         self.decider = decider or ChatDecider(provider, scheme.guidance)
         self._stop = threading.Event()
 
@@ -155,7 +157,7 @@ class Runner:
         out = _Outcome()
         if self._stop.is_set():
             return out  # never sent: neither tagged nor failed, so the next run does it
-        if self.settings.method == "tiered":
+        if self._walks:
             return self._tiered(batch, out)
         got = None
         for attempt in range(self.settings.retries + 1):

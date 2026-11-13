@@ -168,6 +168,18 @@ class DecisionDecider:
         return got, sent
 
 
+def decision_request(model: str, node: Node, variable: Variable) -> dict:
+    """The ``/v1/systemone`` body the decision decider sends for one variable at ``node``.
+
+    Used by ``--dry-run``; the provider builds the same body (split at 64 questions).
+    """
+    return {
+        "model": model,
+        "state": _state(variable),
+        "questions": {c.id: {"type": "noul", "instructions": _question(c)} for c in node.children},
+    }
+
+
 def _state(v: Variable) -> dict:
     """One variable as the decision model's state, with value labels capped as in prompts."""
     values = [f"{value}: {label}" for value, label in v.values[:MAX_VALUES]]

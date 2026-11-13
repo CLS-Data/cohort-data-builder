@@ -116,7 +116,7 @@ The scheme as used, with its hash:
 | Field | Meaning |
 |---|---|
 | `status` | `finished` or `stopped` (Ctrl-C). |
-| `settings` | Provider, base URL, model, `method` (`flat` or `tiered`), for tiered runs `descend_at` and `max_areas`, batch size, workers, timeout, retries, files, limit, retag, grouping field, variables path, scheme path and hash. Never an API key. |
+| `settings` | Provider, base URL, model, `method` (`flat` or `tiered`), for tiered runs `descend_at` and `max_areas`, for decision models (`ollama-decision`) `keep_at`, batch size, workers, timeout, retries, files, limit, retag, grouping field, variables path, scheme path and hash. Never an API key. |
 | `counts` | `total`, `todo`, `tagged`, `skipped` (already current), `failed`, `requests`, `retries`, `singles` (variables retried one at a time). |
 | `failed` | `file/variable` of each variable that could not be tagged. |
 | `timeline` | `[seconds, variables]`: variables tagged in each 10-second step. |

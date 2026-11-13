@@ -230,6 +230,33 @@ request is short. Failed requests are retried as in flat runs, per area. A varia
 the tags from the areas that answered, and fails only if it ends with none.
 `--dry-run --method tiered` prints the first tier's request and one area's.
 
+### With a decision model (Clef)
+
+[Clef](https://ollama.com/library/clef) is a decision model: it does not write replies but
+answers typed questions about one thing with probabilities. To use it:
+
+```sh
+ollama --version          # 0.40.6 or later
+ollama signin             # clef:cloud runs in Ollama's cloud: a plan or credits
+ollama pull clef:cloud    # or `ollama pull clef` for the 18–20 GB local model
+uv run topic-tagger tag variables.jsonl --out tags/ --scheme my-scheme.toml \
+  --provider ollama-decision --model clef:cloud --method tiered
+```
+
+For each variable, every option of a tier becomes a yes/no question ("Is this survey
+variable about Housing? …"), and the probability of yes is the confidence. Areas are
+followed as above. Topics are kept at `--keep-at` (0.3) or above, and the strongest is
+always kept. `--method flat` asks every topic at once instead.
+
+Clef is asked one variable at a time:
+- tiered: 1 request, plus 1 per area followed;
+- flat: 1 request per 64 topics (2 for the bundled scheme).
+
+A cohort of 30,000 variables is therefore 60,000 requests or more. Clef's cloud tag is
+billed per input token, so try `--limit` first. A model ending `:cloud` (or `-cloud`) runs
+off this machine, so the tool asks before sending unless you pass `--yes`.
+`--dry-run` prints the first variable's request bodies.
+
 ## Every option
 
 `uv run topic-tagger --help` lists the commands and `uv run topic-tagger tag --help` the
@@ -246,12 +273,13 @@ options, with their defaults.
 |---|---|---|
 | `--scheme FILE` | required | The topics and instructions. |
 | `--group-by FIELD` | `sweep` | Input field the statistics are grouped by. |
-| `--provider NAME` | `ollama` | The model host. |
+| `--provider NAME` | `ollama` | The model host: `ollama` for chat models, `ollama-decision` for decision models such as Clef. |
 | `--base-url URL` | `http://localhost:11434/v1` | Where the host's API is; also `TOPIC_TAGGER_BASE_URL`. |
 | `--model NAME` | `gpt-oss:20b` | Model name on the host. |
 | `--method flat\|tiered` | `flat` | `flat`: every topic in one request. `tiered`: areas first, then topics within them. See [Tiered tagging](#tiered-tagging). |
 | `--descend-at X` | 0.5 | Tiered: follow an area at this confidence or above. |
 | `--max-areas N` | 3 | Tiered: follow at most N areas per variable; 0 for no cap. |
+| `--keep-at X` | 0.3 | Decision models: keep a topic at this probability or above; 0 keeps every topic. The strongest is always kept. |
 | `--batch-size N` | 20 | Variables per request. |
 | `--workers N` | 2 | Requests in flight at once. |
 | `--timeout S` | 120 | Seconds before a request is abandoned and retried. |
