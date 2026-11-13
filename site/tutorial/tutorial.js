@@ -12,6 +12,18 @@ try {
   // No storage: follow the system setting.
 }
 
+/* The text size: the builder's setting too. */
+const TEXT_KEY = "cohort-data-builder:_site:text-size";
+const TEXT_SIZES = ["", "large", "larger"];
+let textSize = "";
+try {
+  const stored = JSON.parse(localStorage.getItem(TEXT_KEY));
+  if (TEXT_SIZES.includes(stored)) textSize = stored;
+} catch {
+  // No storage: the browser's own size.
+}
+if (textSize) document.documentElement.dataset.text = textSize;
+
 // topic id → [label, domain id]
 const TOPICS = {
   smoking: ["Smoking", "health_behaviour"],
@@ -542,6 +554,30 @@ function setupConfidence() {
   renderConfidence(0.5);
 }
 
+/* The Text size buttons, as in the builder. */
+
+function setupTextSize() {
+  const root = document.documentElement;
+  const buttons = document.querySelectorAll("[data-text-size]");
+  const show = () => {
+    if (textSize) root.dataset.text = textSize;
+    else delete root.dataset.text;
+    for (const b of buttons) b.setAttribute("aria-pressed", String(b.dataset.textSize === textSize));
+  };
+  for (const b of buttons) {
+    b.addEventListener("click", () => {
+      textSize = b.dataset.textSize;
+      show();
+      try {
+        localStorage.setItem(TEXT_KEY, JSON.stringify(textSize));
+      } catch {
+        // Not remembered: fine.
+      }
+    });
+  }
+  show();
+}
+
 /* The theme button, as in the builder. */
 
 function setupTheme() {
@@ -559,6 +595,7 @@ function setupTheme() {
 
 document.addEventListener("DOMContentLoaded", () => {
   setupTheme();
+  setupTextSize();
   loadCounts();
   $("#search-input").addEventListener("input", renderSearch);
   renderSearch();

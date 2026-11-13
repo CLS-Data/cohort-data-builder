@@ -154,6 +154,15 @@ with `variable=smoke5`, `cohort=Mini`, the file and current tags.
 
 ---
 
+## Phase 6b: User Story 5 - Larger text (Priority: P3)
+
+**Goal**: Text follows browser settings, plus a text-size control (FR-016, FR-017).
+
+- [x] T036 [US5] Add `tests/python/test_text_scales.py` (no `font-size: …px` in `site/styles.css` or `site/tutorial/tutorial.css`; viewport meta has no `user-scalable`/`maximum-scale`) and `tests/python/e2e/test_text_size.py` (group "Text size" with "Normal text", "Larger text", "Largest text" buttons using `aria-pressed`; largest = 1.5× body and variable-name size; remembered after reload and on the tutorial; no sideways scroll at 1366px and 390px; axe clean). See them fail; commit `test(a11y): …`.
+- [x] T037 [US5] Convert every pixel font size to `rem` (px ÷ 16) in both stylesheets; add `html[data-text="large"] { font-size: 125% }` and `"larger"` 150%; add the control to the header of `site/index.html` and `site/tutorial/index.html`, wired in `site/js/ui/boot.js` and `site/tutorial/tutorial.js`, stored as `cohort-data-builder:_site:text-size`; document in README; run all tests; commit `feat(a11y): …`.
+
+---
+
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 - [x] T032 [P] Check `README.md` and the contracts against the merged stories and fix anything the story pull requests missed.

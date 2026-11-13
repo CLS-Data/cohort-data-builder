@@ -32,6 +32,10 @@ project.
    or later, `do stata/merge.do` from the project folder (Stata writes `.dta` or `.csv`, not
    `.sav`).
 
+**Larger text.** Every font size follows the browser's own text-size setting and zoom
+(Ctrl/Cmd +). The three **A** buttons in the header set normal, 125% or 150% text; the
+choice is remembered and shared with the tutorial.
+
 ## Topic tagging
 
 Cohorts often arrive without topics. The [Topic Tagger](tools/topic-tagger/README.md) in

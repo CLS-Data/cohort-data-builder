@@ -128,6 +128,28 @@ already filled in, leaving only the suggestion to write.
 4. **Given** suggestions arrive, **When** a maintainer views the issue tracker, **Then** they
    can list every tag suggestion together.
 
+### User Story 5 - Larger text (Priority: P3)
+
+A researcher who is hard of seeing wants the text larger. Their browser's zoom and its
+default text size both enlarge the site's text, and a "Text size" control in the header
+offers normal, larger (125%) and largest (150%) text, remembered across visits and shared
+with the tutorial.
+
+**Why this priority**: Accessibility for readers with low vision. Requested after user testing.
+
+**Independent Test**: Choose "Largest text": every text on the page is 1.5 times its normal
+size, nothing scrolls sideways at 1366px or 390px wide, and the choice is still there after
+a reload and on the tutorial.
+
+**Acceptance Scenarios**:
+
+1. **Given** the builder, **When** the reader chooses a larger text size, **Then** all text
+   grows by that factor and the layout reflows without sideways scrolling.
+2. **Given** the reader has set a larger default font size in their browser, **When** they
+   open the site, **Then** its text is larger too (no font size is fixed in pixels).
+3. **Given** a chosen text size, **When** the reader reloads or opens the tutorial,
+   **Then** the same size applies.
+
 ### Edge Cases
 
 - A selection of several hundred variables: the list scrolls smoothly and the download area
@@ -179,6 +201,10 @@ already filled in, leaving only the suggestion to write.
   selection.
 - **FR-014**: All new and changed controls MUST be usable by keyboard and screen reader and
   meet the site's existing accessibility checks in light and dark themes.
+- **FR-016**: Font sizes MUST be relative, so browser zoom and the browser's default text
+  size enlarge all text; the pages MUST NOT block zooming.
+- **FR-017**: A "Text size" control MUST offer normal, 125% and 150% text, remembered across
+  visits and shared by the builder and the tutorial.
 - **FR-015**: The site MUST still hold and send no study data: a tag suggestion contains
   only metadata already published on the site.
 
