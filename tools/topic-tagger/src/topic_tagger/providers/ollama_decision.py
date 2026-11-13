@@ -1,8 +1,9 @@
 """Ollama's decision API (``POST /v1/systemone``), for decision models such as Clef.
 
 A decision model does not chat. It is given a ``state`` (here, one variable) and named,
-typed questions, and answers each with a probability. The tagger asks only ``noul``
-(yes/no) questions: "is this variable about X?", one per option of a tier. See
+typed questions, and answers each with probabilities. The tagger asks one ``choice``
+question per request: which of a tier's options the variable is about. The answer gives
+every option a probability, summing to about 1. See
 https://docs.ollama.com/capabilities/decision.
 
 The call is a single JSON POST, so it uses the standard library rather than a client package.
@@ -11,7 +12,6 @@ The call is a single JSON POST, so it uses the standard library rather than a cl
 from __future__ import annotations
 
 import json
-import math
 import socket
 import urllib.error
 import urllib.request
@@ -20,8 +20,29 @@ from urllib.parse import urlparse
 from topic_tagger.providers import ProviderError
 from topic_tagger.providers.openai_compat import LOCAL_HOSTS, is_cloud_model
 
-#: Most questions Ollama's cloud accepts in one request; more are split across requests.
-MAX_QUESTIONS = 64
+#: Fewest and most options a ``choice`` question may have.
+MIN_OPTIONS, MAX_OPTIONS = 2, 26
+
+#: The name of the one question in each request.
+QUESTION = "option"
+
+
+def choice_body(model: str, state: dict, instructions: str, options: dict[str, str]) -> dict:
+    """The ``/v1/systemone`` body asking one ``choice`` question among ``options``.
+
+    Args:
+        model: The decision model, e.g. ``clef:cloud``.
+        state: What is being judged, as JSON (here, one variable).
+        instructions: The question.
+        options: ``{option id: description}``, 2 to 26 of them.
+    """
+    return {
+        "model": model,
+        "state": state,
+        "questions": {
+            QUESTION: {"type": "choice", "instructions": instructions, "criteria": options}
+        },
+    }
 
 
 class OllamaDecisionProvider:
@@ -59,39 +80,34 @@ class OllamaDecisionProvider:
         """True for a host other than this machine, or a model Ollama runs in its cloud."""
         return urlparse(self.base_url).hostname not in LOCAL_HOSTS or is_cloud_model(self.model)
 
-    @staticmethod
-    def requests_for(questions: int) -> int:
-        """How many requests ``decide`` sends for this many questions."""
-        return max(1, math.ceil(questions / MAX_QUESTIONS))
-
-    def decide(self, state: dict, questions: dict[str, str]) -> dict[str, float]:
-        """Ask yes/no questions about one state.
+    def decide(self, state: dict, instructions: str, options: dict[str, str]) -> dict[str, float]:
+        """Ask which of ``options`` fits ``state``, as one ``choice`` question.
 
         Args:
             state: What is being judged, as JSON (here, one variable).
-            questions: ``{question id: instructions}``.
+            instructions: The question.
+            options: ``{option id: description}``, 2 to 26 of them.
 
         Returns:
-            ``{question id: probability the answer is yes}``.
+            ``{option id: probability}``, summing to about 1.
 
         Raises:
-            ProviderError: If a request fails, times out, or leaves a question unanswered.
+            ProviderError: If there are too few or too many options, or a request fails,
+                times out, or leaves an option without a probability.
         """
-        ids = list(questions)
-        got: dict[str, float] = {}
-        for start in range(0, len(ids), MAX_QUESTIONS):
-            chunk = ids[start : start + MAX_QUESTIONS]
-            body = {
-                "model": self.model,
-                "state": state,
-                "questions": {q: {"type": "noul", "instructions": questions[q]} for q in chunk},
-            }
-            answers = self._call("POST", "/systemone", body).get("answers", {})
-            for q in chunk:
-                try:
-                    got[q] = float(answers[q]["noul"])
-                except (KeyError, TypeError, ValueError) as e:
-                    raise ProviderError(f"the decision model gave no answer for {q}") from e
+        if not MIN_OPTIONS <= len(options) <= MAX_OPTIONS:
+            raise ProviderError(
+                f"a choice needs {MIN_OPTIONS} to {MAX_OPTIONS} options, not {len(options)}"
+            )
+        body = choice_body(self.model, state, instructions, options)
+        answer = self._call("POST", "/systemone", body).get("answers", {}).get(QUESTION, {})
+        probabilities = answer.get("probabilities") or {}
+        got = {}
+        for option in options:
+            try:
+                got[option] = float(probabilities[option])
+            except (KeyError, TypeError, ValueError) as e:
+                raise ProviderError(f"the decision model gave no probability for {option}") from e
         return got
 
     def _call(self, method: str, path: str, body: dict | None = None) -> dict:

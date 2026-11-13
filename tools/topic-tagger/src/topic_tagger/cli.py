@@ -21,7 +21,7 @@ from topic_tagger.runner import Runner, Settings, install_stop_handler
 from topic_tagger.scheme import SchemeError, bundled_scheme_text, load_scheme, scheme_from_json
 from topic_tagger.stats import compute_stats
 from topic_tagger.store import LockedError, StaleLockError, TagStore
-from topic_tagger.tiered import DecisionDecider, build_tree, decision_request, flat_tree
+from topic_tagger.tiered import DecisionDecider, build_tree, choice_problems, decision_request
 from topic_tagger.variables import InputError, read_variables
 
 OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED, STOPPED = 0, 1, 2, 3, 4, 130
@@ -97,8 +97,8 @@ def _parser() -> argparse.ArgumentParser:
     tag.add_argument(
         "--method",
         choices=["flat", "tiered"],
-        default="flat",
-        help="flat: every topic in one request; tiered: areas first, then topics within them",
+        help="flat: every topic in one request; tiered: areas first, then topics within them "
+        "(default flat; tiered for ollama-decision, which can only tag tiered)",
     )
     tag.add_argument(
         "--descend-at",
@@ -169,6 +169,11 @@ def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
     except (InputError, SchemeError, ProviderError) as e:
         _err(str(e))
         return BAD_INPUT
+    if args.provider == "ollama-decision":
+        problems = choice_problems(build_tree(scheme))
+        if problems:
+            _err("This scheme does not fit a decision model: " + "; ".join(problems) + ".")
+            return BAD_INPUT
 
     if args.dry_run:
         batch = variables[: args.batch_size]
@@ -199,9 +204,16 @@ def _check_method(args: argparse.Namespace) -> str | None:
     if args.provider != "ollama-decision" and args.keep_at is not None:
         return "--keep-at needs --provider ollama-decision"
     if args.provider == "ollama-decision":
+        if args.method == "flat":
+            return (
+                "--provider ollama-decision tags tiered only: a decision model chooses among "
+                "at most 26 options, so it cannot be asked every topic at once"
+            )
+        args.method = "tiered"
         args.keep_at = 0.3 if args.keep_at is None else args.keep_at
         if not 0 <= args.keep_at <= 1:
             return "--keep-at must be between 0 and 1"
+    args.method = args.method or "flat"
     if args.method != "tiered":
         if args.descend_at is not None or args.max_areas is not None:
             return "--descend-at and --max-areas need --method tiered"
@@ -228,9 +240,6 @@ def _print_tiered_requests(scheme, batch) -> None:
 
 def _print_decision_requests(args, scheme, variable) -> None:
     """Print the first variable's first request to the decision model, and a tier-2 example."""
-    if args.method != "tiered":
-        print(json.dumps(decision_request(args.model, flat_tree(scheme), variable), indent=1))
-        return
     root = build_tree(scheme)
     print(json.dumps(decision_request(args.model, root, variable), indent=1))
     area = root.children[0]

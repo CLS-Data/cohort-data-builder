@@ -19,7 +19,7 @@ from topic_tagger.providers import Provider, ProviderError
 from topic_tagger.reply import ReplyError, parse_reply
 from topic_tagger.scheme import Scheme
 from topic_tagger.store import TagStore, make_record
-from topic_tagger.tiered import ChatDecider, Decider, build_tree, flat_tree, walk
+from topic_tagger.tiered import ChatDecider, Decider, build_tree, walk
 from topic_tagger.variables import Variable
 
 Tags = list[tuple[str, float]]
@@ -86,9 +86,8 @@ class Runner:
         clock: Gives the time stored with each record.
         on_event: Called in the main thread as ``on_event(kind, data)`` with ``retry``,
             ``batch_done`` (``n`` and each variable's ``tags``) and ``failed`` (``key``).
-        decider: What answers each tier. Given (a decision model), every run walks the
-            tree, flat ones over a single tier of every topic. Not given, a ``ChatDecider``
-            on ``provider`` is used for tiered runs and flat runs keep the flat prompt.
+        decider: Tiered: what answers each tier; a ``ChatDecider`` on ``provider`` if not
+            given. A decision model can only tag tiered.
     """
 
     def __init__(
@@ -108,8 +107,10 @@ class Runner:
         self.clock = clock
         self.on_event = on_event
         self._schema = reply_schema(scheme)
-        self._walks = settings.method == "tiered" or decider is not None
-        self._tree = build_tree(scheme) if settings.method == "tiered" else flat_tree(scheme)
+        if decider is not None and settings.method != "tiered":
+            raise ValueError("a decision model tags tiered only")
+        self._walks = settings.method == "tiered"
+        self._tree = build_tree(scheme)
         self.decider = decider or ChatDecider(provider, scheme.guidance)
         self._stop = threading.Event()
 

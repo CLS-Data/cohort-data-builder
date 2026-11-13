@@ -240,19 +240,26 @@ ollama --version          # 0.40.6 or later
 ollama signin             # clef:cloud runs in Ollama's cloud: a plan or credits
 ollama pull clef:cloud    # or `ollama pull clef` for the 18–20 GB local model
 uv run topic-tagger tag variables.jsonl --out tags/ --scheme my-scheme.toml \
-  --provider ollama-decision --model clef:cloud --method tiered
+  --provider ollama-decision --model clef:cloud
 ```
 
-For each variable, every option of a tier becomes a yes/no question ("Is this survey
-variable about Housing? …"), and the probability of yes is the confidence. Areas are
-followed as above. Topics are kept at `--keep-at` (0.3) or above, and the strongest is
-always kept. `--method flat` asks every topic at once instead.
+For each variable and tier, Clef is asked one choice question: "Which area of a survey is
+this variable about?", then "Which topic…" within each area followed. Each option is
+described by its label and description, and an area also by its topics. Clef gives every
+option a probability, and these sum to about 1. The probability is the confidence.
 
-Clef is asked one variable at a time:
-- tiered: 1 request, plus 1 per area followed;
-- flat: 1 request per 64 topics (2 for the bundled scheme).
+Areas are followed as above. Topics are kept at `--keep-at` (0.3) or above, and the
+strongest is always kept. Because the probabilities are shared out between the options,
+a variable rarely has two areas or topics above 0.5. Lower `--descend-at` and `--keep-at`
+to keep more than one.
 
-A cohort of 30,000 variables is therefore 60,000 requests or more. Clef's cloud tag is
+Clef tags tiered only: a choice question takes at most 26 options, too few for every
+topic at once, so `--method flat` is refused. For the same reason the tool refuses a scheme
+with more than 26 areas, or an area with more than 26 topics, before sending anything. The
+bundled scheme has 15 areas and at most 23 topics in one.
+
+Clef is asked one variable at a time: 1 request, plus 1 per area followed. A cohort of
+30,000 variables is therefore 60,000 requests or more. Clef's cloud tag is
 billed per input token, so try `--limit` first. A model ending `:cloud` (or `-cloud`) runs
 off this machine, so the tool asks before sending unless you pass `--yes`.
 `--dry-run` prints the first variable's request bodies.
@@ -276,7 +283,7 @@ options, with their defaults.
 | `--provider NAME` | `ollama` | The model host: `ollama` for chat models, `ollama-decision` for decision models such as Clef. |
 | `--base-url URL` | `http://localhost:11434/v1` | Where the host's API is; also `TOPIC_TAGGER_BASE_URL`. |
 | `--model NAME` | `gpt-oss:20b` | Model name on the host. |
-| `--method flat\|tiered` | `flat` | `flat`: every topic in one request. `tiered`: areas first, then topics within them. See [Tiered tagging](#tiered-tagging). |
+| `--method flat\|tiered` | `flat` | `flat`: every topic in one request. `tiered`: areas first, then topics within them. See [Tiered tagging](#tiered-tagging). Always `tiered` with `ollama-decision`. |
 | `--descend-at X` | 0.5 | Tiered: follow an area at this confidence or above. |
 | `--max-areas N` | 3 | Tiered: follow at most N areas per variable; 0 for no cap. |
 | `--keep-at X` | 0.3 | Decision models: keep a topic at this probability or above; 0 keeps every topic. The strongest is always kept. |

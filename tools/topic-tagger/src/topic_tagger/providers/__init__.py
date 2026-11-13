@@ -2,7 +2,8 @@
 
 There are two kinds of host. A chat host is a ``Provider``: it completes chat messages. A
 decision host (``ollama-decision``, for models such as Clef) is a ``DecisionProvider``: it
-answers yes/no questions about one state, and is used only through ``tiered.DecisionDecider``.
+answers a choice question about one state, and is used only through
+``tiered.DecisionDecider``.
 
 To add a host, write a class with the three methods of ``Provider`` and register it in
 ``get_provider``. A host with an OpenAI-compatible API needs no new class: register
@@ -45,11 +46,8 @@ class DecisionProvider(Protocol):
     def is_remote(self) -> bool:
         """True when requests leave the maintainer's machine."""
 
-    def requests_for(self, questions: int) -> int:
-        """How many requests ``decide`` sends for this many questions."""
-
-    def decide(self, state: dict, questions: dict[str, str]) -> dict[str, float]:
-        """Ask yes/no questions about ``state``; return each one's probability of yes."""
+    def decide(self, state: dict, instructions: str, options: dict[str, str]) -> dict[str, float]:
+        """Ask which of ``options`` fits ``state``; return each option's probability."""
 
 
 def get_provider(

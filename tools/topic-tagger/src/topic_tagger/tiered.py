@@ -12,6 +12,7 @@ from typing import Protocol
 
 from topic_tagger.prompt import MAX_VALUES, build_option_messages
 from topic_tagger.providers import DecisionProvider, Provider, ProviderError
+from topic_tagger.providers.ollama_decision import MAX_OPTIONS, choice_body
 from topic_tagger.reply import ReplyError, options_schema, parse_options_reply
 from topic_tagger.scheme import Scheme
 from topic_tagger.variables import Variable
@@ -67,17 +68,6 @@ def build_tree(scheme: Scheme) -> Node:
     )
 
 
-def flat_tree(scheme: Scheme) -> Node:
-    """The scheme as one tier: the root's children are every topic.
-
-    Walking it asks every topic at once, as the flat method does; a decision model uses it
-    to tag flat with the same questions and keep rule as tiered.
-    """
-    return Node(
-        "", scheme.name, "", tuple(Node(t.id, t.label, t.description) for t in scheme.topics)
-    )
-
-
 Tags = list[tuple[str, float]]
 
 
@@ -124,10 +114,11 @@ class ChatDecider:
 class DecisionDecider:
     """Decides with a decision model such as Clef: one variable per request.
 
-    Each option of the tier becomes a yes/no (``noul``) question, "Is this survey variable
-    about <label>? <description>", and its probability is the confidence. Yes/no questions
-    give each option its own probability, so a variable can belong to several areas or
-    topics; a single ``choice`` question would make them compete.
+    Each request is one ``choice`` question over the tier's options ("Which area of a survey
+    is this variable about?"), each described by its label, description and, for an area,
+    its topics. Clef gives every option a probability, summing to about 1, which is used as
+    the confidence. Choice questions take 2 to 26 options, so Clef tags tiered only (see
+    ``choice_problems``).
 
     Args:
         provider: The decision-model host.
@@ -140,21 +131,19 @@ class DecisionDecider:
         self.keep_at = keep_at
 
     def decide(self, node: Node, variables: list[Variable]) -> tuple[dict[int, Tags], int]:
-        """Ask each variable about ``node``'s children, one request (or more) per variable.
+        """Ask each variable which of ``node``'s children fits, one request per variable.
 
         A variable whose request fails is left out, so the walk asks it again alone; the
         others keep their answers.
         """
-        questions = {c.id: _question(c) for c in node.children}
+        instructions, options = _choice(node)
         leaf = {c.id: c.is_leaf for c in node.children}
         position = {c.id: i for i, c in enumerate(node.children)}
         got: dict[int, Tags] = {}
-        sent = 0
         error: ProviderError | None = None
         for i, v in enumerate(variables):
-            sent += self.provider.requests_for(len(questions))
             try:
-                probs = self.provider.decide(_state(v), questions)
+                probs = self.provider.decide(_state(v), instructions, options)
             except ProviderError as e:
                 error = e
                 continue
@@ -165,18 +154,43 @@ class DecisionDecider:
             got[i] = sorted(kept + areas, key=lambda kv: (-kv[1], position[kv[0]]))
         if not got and error is not None:
             raise error  # nothing answered: let the walk retry the whole group
-        return got, sent
+        return got, len(variables)
+
+
+def choice_problems(root: Node) -> list[str]:
+    """Tiers too big for one ``choice`` question (more than 26 options), as messages.
+
+    A tier with a single option needs no question: the walk routes straight through it.
+    """
+    problems = []
+    if len(root.children) > MAX_OPTIONS:
+        problems.append(
+            f"the scheme has {len(root.children)} areas; Clef can choose among at most "
+            f"{MAX_OPTIONS}"
+        )
+    for area in root.children:
+        if len(area.children) > MAX_OPTIONS:
+            problems.append(
+                f"area {area.id} has {len(area.children)} topics; Clef can choose among at "
+                f"most {MAX_OPTIONS}"
+            )
+    return problems
 
 
 def decision_request(model: str, node: Node, variable: Variable) -> dict:
     """The ``/v1/systemone`` body the decision decider sends for one variable at ``node``.
 
-    Used by ``--dry-run``; the provider builds the same body (split at 64 questions).
+    Used by ``--dry-run``; the provider sends the same body.
     """
-    return {
-        "model": model,
-        "state": _state(variable),
-        "questions": {c.id: {"type": "noul", "instructions": _question(c)} for c in node.children},
+    instructions, options = _choice(node)
+    return choice_body(model, _state(variable), instructions, options)
+
+
+def _choice(node: Node) -> tuple[str, dict[str, str]]:
+    """The question and described options for ``node``'s children."""
+    kind = "topic" if all(c.is_leaf for c in node.children) else "area"
+    return f"Which {kind} of a survey is this variable about?", {
+        c.id: _criterion(c) for c in node.children
     }
 
 
@@ -188,8 +202,8 @@ def _state(v: Variable) -> dict:
     return {"name": v.variable, "label": v.label or "", "values": values}
 
 
-def _question(option: Node) -> str:
-    text = f"Is this survey variable about {option.label}? {option.description}"
+def _criterion(option: Node) -> str:
+    text = f"{option.label}: {option.description}"
     if option.children:
         text += " It includes: " + ", ".join(c.label for c in option.children) + "."
     return text
