@@ -77,7 +77,7 @@ the followed areas.
 
   Comments say *why*: single-child routing, and always following the strongest area.
 - [x] T010 [US1] Write the failing tests in `tests/test_runner.py`: `Settings(method="tiered", descend_at=0.5, max_areas=3)` makes `Runner.run` use the walk for each batch. Stop (`request_stop`) still finishes and stores the batches in flight. `RunResult.requests_by_tier` is summed across batches. `method="flat"` behaves exactly as before.
-- [x] T011 [US1] Implement in `src/topic_tagger/runner.py`: add the `method`, `descend_at` and `max_areas` settings, add `RunResult.requests_by_tier`, and have `_batch` call `walk` when tiered, reusing the ladder via a shared `_with_ladder(ask, variables)` helper so flat and tiered retry alike. Commit.
+- [x] T011 [US1] Implement in `src/topic_tagger/runner.py`: add the `method`, `descend_at` and `max_areas` settings, add `RunResult.requests_by_tier`, and have `_batch` call `walk` when tiered, reusing the ladder via a shared `_with_ladder(ask, variables)` helper so flat and tiered retry alike. Commit. *(As built: the walk keeps its own ladder in `tiered.py`; see plan.md.)*
 - [x] T012 [US1] Write the failing tests in `tests/test_cli.py`:
   - `--method tiered` is accepted, and `--method` defaults to `flat`.
   - `--descend-at 1.5` gives exit 2. So do `--max-areas -1` and `--descend-at` without `--method tiered`. `--max-areas 0` is accepted as no cap.
@@ -152,11 +152,11 @@ thresholds.
 
 **Independent Test**: The scoring runs on finished output folders with no model.
 
-- [ ] T025 [US3] Write the scoring part of `adhoc/tiered/compare.py` (not committed) first, with a `--self-check` that scores two tiny hand-written folders with known answers and asserts the numbers, so scoring can be trusted without a model. Run the self-check, and see it fail, then pass.
+- [x] T025 [US3] Write the scoring part of `adhoc/tiered/compare.py` (not committed) first, with a `--self-check` that scores two tiny hand-written folders with known answers and asserts the numbers, so scoring can be trusted without a model. Run the self-check, and see it fail, then pass.
   - **Measures:** top-1 hit rate, recall, precision and mean tags per variable.
   - **Area recall:** the share of expected topics whose area was followed.
   - **Thresholds (R13):** re-scoring at each descend threshold t in `--sweep` (default `0.1,0.2,0.3,0.5,0.7`) and keep threshold k in `--keep-sweep` (default `0.2,0.3,0.5`). It keeps topics whose area had path confidence ≥ t (always the strongest area) and whose confidence is ≥ k, and estimates the requests per variable a run at t would need.
-- [ ] T026 [US3] Add the runs to `compare.py`. It calls `topic-tagger tag` (via `sys.executable -m topic_tagger`) on `adhoc/tiered/variables.jsonl`, into `adhoc/tiered/runs/<name>-<YYYYMMDD-HHMM>/`:
+- [x] T026 [US3] Add the runs to `compare.py`. It calls `topic-tagger tag` (via `sys.executable -m topic_tagger`) on `adhoc/tiered/variables.jsonl`, into `adhoc/tiered/runs/<name>-<YYYYMMDD-HHMM>/`:
   - `flat-gptoss`: `--method flat --model gpt-oss:20b-cloud`;
   - `tiered-gptoss`: `--method tiered --model gpt-oss:20b-cloud --descend-at 0.1 --max-areas 0`;
   - `flat-clef`: `--provider ollama-decision --model clef:cloud --method flat --keep-at 0`;
@@ -178,9 +178,9 @@ thresholds.
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T028 [P] Final pass over `tools/topic-tagger/docs/formats.md` against `contracts/formats.md` and the code: every field documented, examples valid.
-- [ ] T029 [P] Final pass over `tools/topic-tagger/README.md`: options, the Clef setup, costs, and the `:cloud` confirmation all match `--help`.
-- [ ] T030 Run the whole tagger suite and lint. From the repository root, run `uv run pytest` to confirm the site is unaffected (`scripts/topics.py` ignores the new fields). Run `quickstart.md` steps 1–2 locally. Steps 3–6 are T002, T021 and T027.
+- [x] T028 [P] Final pass over `tools/topic-tagger/docs/formats.md` against `contracts/formats.md` and the code: every field documented, examples valid.
+- [x] T029 [P] Final pass over `tools/topic-tagger/README.md`: options, the Clef setup, costs, and the `:cloud` confirmation all match `--help`.
+- [x] T030 Run the whole tagger suite and lint. From the repository root, run `uv run pytest` to confirm the site is unaffected (`scripts/topics.py` ignores the new fields). Run `quickstart.md` steps 1–2 locally. Steps 3–6 are T002, T021 and T027.
 - [ ] T031 Open the PR `004-tiered-tagger` → `main`. Its "How to review" section covers the offline tests, the dry-run to try, and the Clef run as a maintainer step. Mark the ad hoc comparison and real-data runs as out of scope.
 
 ---

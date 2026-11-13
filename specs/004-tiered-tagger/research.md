@@ -51,6 +51,9 @@
   failed only if it ends with no tags.
 - **Rationale**: This is the same behaviour as flat, applied per request. A variable keeps
   its good areas' tags even when one area fails.
+- **As built**: the walk's ladder lives in `tiered.py` (`_ask`); the flat runner's own
+  ladder is untouched. A decision model is asked one variable at a time, so a failure there
+  loses only that variable, which is then retried alone.
 
 ## R6. Mixing methods in one output folder
 

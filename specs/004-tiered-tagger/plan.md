@@ -135,11 +135,16 @@ files.
   the walk takes one (a node and its variables).
   - If the node has more than one child, it sends one request listing them.
   - If it has exactly one child, it routes every variable there without asking, with the
-    parent's confidence. This is how the bundled `other` area, whose only topic is
-    `other`, becomes the fallback with no special case.
+    parent's confidence. This saves a request for any one-topic area.
+  - *As built:* the bundled scheme's `other` topic sits in the Administration area, not an
+    area of its own. So a variable that fits nothing is routed to Administration at tier 1
+    (every reply must name at least one area) and picks `other` there, with no special case.
   - Children that are topics become tags. Children that are areas get new groups, with
     the variables routed to them (R3).
-- **Retries** (R5): each request runs the existing ladder. A variable left out at one area
+- **Retries** (R5): each request runs the same ladder as flat. *As built:* the walk in
+  `tiered.py` has its own copy (`_ask`), and the flat path in `runner.py` is unchanged,
+  rather than a shared `_with_ladder` helper. That keeps the flat method byte-for-byte as it
+  was. The behaviour matches flat, and `tests/test_tiered.py` covers it. A variable left out at one area
   is asked alone at that area. A variable is stored when all its groups have finished. It
   is failed only if it ends with no tags.
 - **Confidence** (R4): a stored topic keeps its tier-2 confidence, so the site's confidence
