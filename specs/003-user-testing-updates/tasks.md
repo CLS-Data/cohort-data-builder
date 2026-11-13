@@ -34,7 +34,7 @@ the `mini` / `mini_site` fixtures.
 **Purpose**: Things the stories need from outside the code.
 
 - [x] T001a Amend `.specify/memory/constitution.md` with the licensed-tools exception to Principle I (v1.2.0, Sync Impact Report, Last Amended 2026-11-13); commit `docs(constitution): licensed-tools exception to tests in CI`.
-- [ ] T001 Create the `tag-suggestion` label in the GitHub repository (colour of your choice, description "A user's suggestion to change a variable's topic tags") with `gh label create tag-suggestion --description "…"`; record in the US4 pull request that it exists.
+- [x] T001 Create the `tag-suggestion` label in the GitHub repository (colour of your choice, description "A user's suggestion to change a variable's topic tags") with `gh label create tag-suggestion --description "…"`; record in the US4 pull request that it exists.
 
 ---
 
