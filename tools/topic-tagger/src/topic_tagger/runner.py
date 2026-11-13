@@ -19,6 +19,7 @@ from topic_tagger.providers import Provider, ProviderError
 from topic_tagger.reply import ReplyError, parse_reply
 from topic_tagger.scheme import Scheme
 from topic_tagger.store import TagStore, make_record
+from topic_tagger.tiered import ChatDecider, Decider, build_tree, walk
 from topic_tagger.variables import Variable
 
 Tags = list[tuple[str, float]]
@@ -33,12 +34,18 @@ class Settings:
         workers: Requests in flight at once.
         retries: Retries of a failed batch before its variables go one at a time.
         model: ``provider:model``, stored with each record.
+        method: ``flat`` (one request per batch, every topic) or ``tiered`` (one per tier).
+        descend_at: Tiered: the confidence an area needs to be followed.
+        max_areas: Tiered: most areas followed per variable; 0 for no cap.
     """
 
     batch_size: int = 20
     workers: int = 2
     retries: int = 2
     model: str = "ollama:gpt-oss:20b"
+    method: str = "flat"
+    descend_at: float = 0.5
+    max_areas: int = 3
 
 
 @dataclass
@@ -52,6 +59,7 @@ class RunResult:
     singles: int = 0
     last_error: str = ""
     stopped: bool = False
+    requests_by_tier: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -62,6 +70,8 @@ class _Outcome:
     retries: int = 0
     singles: int = 0
     last_error: str = ""
+    requests_by_tier: list[int] = field(default_factory=list)
+    paths: dict[str, list[tuple[str, float]]] = field(default_factory=dict)
 
 
 class Runner:
@@ -75,6 +85,8 @@ class Runner:
         clock: Gives the time stored with each record.
         on_event: Called in the main thread as ``on_event(kind, data)`` with ``retry``,
             ``batch_done`` (``n`` and each variable's ``tags``) and ``failed`` (``key``).
+        decider: Tiered: what answers each tier; a ``ChatDecider`` on ``provider`` if not
+            given.
     """
 
     def __init__(
@@ -85,6 +97,7 @@ class Runner:
         settings: Settings,
         clock,
         on_event: Callable[[str, dict], None] = lambda kind, data: None,
+        decider: Decider | None = None,
     ):
         self.scheme = scheme
         self.provider = provider
@@ -93,6 +106,8 @@ class Runner:
         self.clock = clock
         self.on_event = on_event
         self._schema = reply_schema(scheme)
+        self._tree = build_tree(scheme)
+        self.decider = decider or ChatDecider(provider, scheme.guidance)
         self._stop = threading.Event()
 
     def request_stop(self) -> None:
@@ -130,11 +145,18 @@ class Runner:
         result.retries += out.retries
         result.singles += out.singles
         result.last_error = out.last_error or result.last_error
+        by_tier = out.requests_by_tier or [out.requests]
+        if len(result.requests_by_tier) < len(by_tier):
+            result.requests_by_tier += [0] * (len(by_tier) - len(result.requests_by_tier))
+        for tier, n in enumerate(by_tier):
+            result.requests_by_tier[tier] += n
 
     def _batch(self, batch: list[Variable]) -> _Outcome:
         out = _Outcome()
         if self._stop.is_set():
             return out  # never sent: neither tagged nor failed, so the next run does it
+        if self.settings.method == "tiered":
+            return self._tiered(batch, out)
         got = None
         for attempt in range(self.settings.retries + 1):
             out.requests += 1
@@ -160,6 +182,21 @@ class Runner:
                 out.tagged.append((v, one[0]))
             else:
                 out.failed.append(v)
+        return out
+
+    def _tiered(self, batch: list[Variable], out: _Outcome) -> _Outcome:
+        s = self.settings
+        walked = walk(self._tree, batch, self.decider, s.descend_at, s.max_areas, s.retries)
+        out.tagged = [(batch[i], tags) for i, tags in sorted(walked.tags.items())]
+        out.failed = [batch[i] for i in walked.failed]
+        out.paths = {batch[i].key: path for i, path in walked.paths.items()}
+        out.requests_by_tier = walked.requests_by_tier
+        out.requests = sum(walked.requests_by_tier)
+        out.retries, out.singles, out.last_error = (
+            walked.retries,
+            walked.singles,
+            walked.last_error,
+        )
         return out
 
     def _ask(self, batch: list[Variable]) -> dict[int, Tags]:
