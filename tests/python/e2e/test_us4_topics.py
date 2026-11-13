@@ -1,6 +1,8 @@
 import json
+import re
 import shutil
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from playwright.sync_api import expect
@@ -127,6 +129,34 @@ def test_details_list_every_topic_dim_those_below_and_filter_on_click(mini):
     tags.nth(0).click()
     count(mini, "1 variable")
     expect(mini.locator("#active-filters .chip-topic")).to_have_text("Smoking ✕")
+
+
+def test_details_offer_a_tag_suggestion_link(mini):
+    mini.get_by_label("Search variables").fill("5")
+    row(mini, "smoke5").get_by_role("button", name="Show details for smoke5").click()
+    link = row(mini, "smoke5").get_by_role("link", name="Suggest a tag change")
+    expect(link).to_have_attribute("target", "_blank")
+    expect(link).to_have_attribute("rel", re.compile(r"\bnoopener\b"))
+    href = link.get_attribute("href")
+    assert href.startswith(
+        "https://github.com/CLS-Data/cohort-data-builder/issues/new?template=tag-suggestion.yml"
+    )
+    query = parse_qs(urlparse(href).query)
+    assert query["variable"] == ["smoke5"] and query["cohort"] == ["Mini"]
+    assert query["current"] == ["Smoking (95%); Alcohol (55%)"]
+
+    row(mini, "nolab5").get_by_role("button", name="Show details for nolab5").click()
+    expect(
+        row(mini, "nolab5").get_by_role("link", name="Suggest a tag", exact=True)
+    ).to_be_visible()
+
+    tally = mini.locator("#basket-tally").inner_text()
+    mini.route("https://github.com/**", lambda route: route.fulfill(body="issue form"))
+    with mini.expect_popup() as popup:
+        link.click()
+    popup.value.close()
+    expect(mini.get_by_label("Search variables")).to_have_value("5")
+    expect(mini.locator("#basket-tally")).to_have_text(tally)
 
 
 @pytest.fixture
