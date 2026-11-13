@@ -112,7 +112,7 @@ def test_download_options_update_the_summary(tutorial):
     page = tutorial
     demo = page.locator("#download-demo")
     demo.get_by_label("Python").check()
-    demo.get_by_label("Stata").check()
+    demo.get_by_label("Stata", exact=True).check()
     demo.get_by_label("Turn missing codes into NA").uncheck()
     summary = page.locator("#dl-summary")
     expect(summary).to_contain_text("R and Python")
@@ -122,11 +122,28 @@ def test_download_options_update_the_summary(tutorial):
     expect(summary).not_to_contain_text("R and Python")
 
 
+def test_stata_code_is_a_download_option(tutorial):
+    page = tutorial
+    demo = page.locator("#download-demo")
+    demo.get_by_label("Python").check()
+    demo.get_by_label("Stata (do-file)").check()
+    expect(page.locator("#dl-summary")).to_contain_text("R, Python and Stata")
+    expect(page.locator("#dl-tree")).to_contain_text("stata/merge.do")
+
+
 def test_run_command_follows_the_language(tutorial):
     page = tutorial
     expect(page.locator("#run-cmd")).to_have_text("Rscript R/merge.R")
     page.locator("#run").get_by_role("button", name="Python").click()
     expect(page.locator("#run-cmd")).to_have_text("python python/merge.py")
+    page.locator("#run").get_by_role("button", name="Stata").click()
+    expect(page.locator("#run-cmd")).to_have_text("do stata/merge.do")
+
+
+def test_describes_the_one_selection_list_and_tag_suggestions(tutorial):
+    page = tutorial
+    expect(page.locator("#download")).to_contain_text("stay in view")
+    expect(page.locator("#topics")).to_contain_text("Suggest a tag change")
 
 
 def test_shade_switch_rescales_the_topic_map(tutorial):
