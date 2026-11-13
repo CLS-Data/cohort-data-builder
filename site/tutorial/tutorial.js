@@ -198,7 +198,7 @@ const SHADE_TEXT = {
     "Across topics: every cell is on one scale, so you can see which topics dominate the study overall. Rare topics fade out.",
 };
 
-const RUN = { r: "Rscript R/merge.R", py: "python python/merge.py" };
+const RUN = { r: "Rscript R/merge.R", py: "python python/merge.py", stata: "do stata/merge.do" };
 const FORMATS = { CSV: "a CSV file", Stata: "a Stata (.dta) file", SPSS: "an SPSS (.sav) file" };
 const EXT = { CSV: "csv", Stata: "dta", SPSS: "sav" };
 
@@ -475,17 +475,22 @@ function setupSelection() {
 
 /* Step 4: download options */
 
+/* "R", "R and Python", "R, Python and Stata". */
+const listOf = (names) =>
+  names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+
 function renderSummary() {
   const form = $("#download-demo");
   const langs = [...form.querySelectorAll('input[name="lang"]:checked')].map((i) => i.value);
   const format = form.querySelector('input[name="fmt"]:checked').value;
   const na = $("#dl-na").checked;
   $("#dl-summary").textContent = langs.length
-    ? `You get ${langs.length > 1 ? "R and Python projects that each write" : `an ${langs[0]} project that writes`} ${FORMATS[format]}, with missing codes ${na ? "turned into NA" : "kept as they are"}.`
+    ? `You get ${langs.length > 1 ? `${listOf(langs)} code that each write` : `${langs[0] === "Stata" ? "a Stata do-file" : `an ${langs[0]} project`} that writes`} ${FORMATS[format]}, with missing codes ${na ? "turned into NA" : "kept as they are"}.`
     : "Choose at least one language.";
-  const lines = ["<b>cohort-data-builder-project.zip</b>", "├─ README.md", "├─ config.yml", "├─ data/        ← your copy goes here"];
+  const lines = ["<b>cohort-data-builder-project.zip</b>", "├─ README.md", "├─ codebook.csv", "├─ data/        ← your copy goes here"];
   if (langs.includes("R")) lines.push("├─ R/merge.R");
   if (langs.includes("Python")) lines.push("├─ python/merge.py");
+  if (langs.includes("Stata")) lines.push("├─ stata/merge.do");
   lines.push(`└─ output/merged.${EXT[format]}`);
   $("#dl-tree").innerHTML = lines.join("\n");
 }

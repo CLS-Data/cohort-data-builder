@@ -156,8 +156,8 @@ with `variable=smoke5`, `cohort=Mini`, the file and current tags.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T032 [P] Check `README.md` and the contracts against the merged stories and fix anything the story pull requests missed.
-- [ ] T033 [P] Update the tutorial so it matches: in `site/tutorial/index.html` and `site/tutorial/tutorial.js`, add Stata to the Step 04 language checkboxes and the zip tree (`stata/merge.do`), add Stata to Step 05's R/Python switch (`do stata/merge.do`), describe the single Selection list and fixed download area in Step 03/04, and mention "Suggest a tag change" in Step 06; first extend `tests/python/e2e/test_tutorial.py` (Stata in the summary and run command) and see it fail.
+- [x] T032 [P] Check `README.md` and the contracts against the merged stories and fix anything the story pull requests missed.
+- [x] T033 [P] Update the tutorial so it matches: in `site/tutorial/index.html` and `site/tutorial/tutorial.js`, add Stata to the Step 04 language checkboxes and the zip tree (`stata/merge.do`), add Stata to Step 05's R/Python switch (`do stata/merge.do`), describe the single Selection list and fixed download area in Step 03/04, and mention "Suggest a tag change" in Step 06; first extend `tests/python/e2e/test_tutorial.py` (Stata in the summary and run command) and see it fail.
 - [ ] T034 Run the quickstart (`specs/003-user-testing-updates/quickstart.md`) end to end, including the Stata run, and fix anything it shows.
 - [ ] T035 Merge `003-user-testing-updates` into `main` by pull request once every story's pull request is merged and CI is green; the "How to review" includes the local Stata run.
 

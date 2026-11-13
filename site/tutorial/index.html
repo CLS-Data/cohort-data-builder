@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tutorial · Cohort Data Builder</title>
-<meta name="description" content="How to find variables in longitudinal cohort studies, select them and download a ready-to-run R or Python project that merges them.">
+<meta name="description" content="How to find variables in longitudinal cohort studies, select them and download a ready-to-run R, Python or Stata project that merges them.">
 <link rel="stylesheet" href="../styles.css">
 <link rel="stylesheet" href="tutorial.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🧵</text></svg>">
@@ -40,7 +40,7 @@
       <p class="t-kicker">Tutorial · six steps, about five minutes</p>
       <h1>From a question to a merged dataset, without opening a codebook</h1>
       <p class="t-lede">Search every variable in the studies, see where a topic was measured,
-        pick what you need and download a small R or Python project that builds your dataset
+        pick what you need and download a small R, Python or Stata project that builds your dataset
         from your own copy of the data. Every panel below is a working copy of the builder:
         try it as you read.</p>
       <ul class="t-stats" aria-label="What the builder holds">
@@ -178,11 +178,13 @@
       <div>
         <span class="field-label">Step 04 · Download</span>
         <h2 id="h-download">Download a project, not the data</h2>
-        <p><strong>Review &amp; download</strong> shows what you picked and asks how you want
-          it. You get a zip of code: it reads only the files your variables are in, keeps only
-          those columns, and joins the sweeps on the person identifier.</p>
+        <p>The <strong>Selection</strong> tab lists what you picked, once, as the columns you
+          will get: rename or remove any of them there. The download options and button stay in
+          view below the list, however long it is. You get a zip of code: it reads only the
+          files your variables are in, keeps only those columns, and joins the sweeps on the
+          person identifier.</p>
         <ul class="t-do">
-          <li><span>Choose R, Python or both, and the format to write.</span></li>
+          <li><span>Choose R, Python, a Stata do-file or any mix, and the format to write.</span></li>
           <li><span>Missing codes such as <code>-9 Refused</code> can become <code>NA</code>, or
             be kept as they are.</span></li>
           <li><span>The site never holds study data: you bring your own copy, from the
@@ -195,6 +197,7 @@
             <legend>Language</legend>
             <label><input type="checkbox" name="lang" value="R" checked>R</label>
             <label><input type="checkbox" name="lang" value="Python">Python</label>
+            <label><input type="checkbox" name="lang" value="Stata">Stata (do-file)</label>
           </fieldset>
           <fieldset>
             <legend>Write</legend>
@@ -218,11 +221,12 @@
         <span class="field-label">Step 05 · Run</span>
         <h2 id="h-run">Point it at your data and run</h2>
         <p>Unzip the project, put the study's files in its <code>data/</code> folder (or set the
-          path in the config file), and run one command. It writes your merged dataset to
-          <code>output/</code>, with a README listing every variable and where it came from.</p>
+          <code>DATA_DIR</code> at the top of the merge script), and run one command. It writes your merged dataset to
+          <code>output/</code>, with a codebook listing every variable and where it came from.</p>
         <ul class="t-do">
-          <li><span>The R project needs only <code>haven</code> and <code>dplyr</code>; the
-            Python one needs <code>pandas</code> and <code>pyreadstat</code>.</span></li>
+          <li><span>R needs only <code>haven</code>, and only for <code>.dta</code> and
+            <code>.sav</code> files; Python needs <code>pandas</code> (and <code>pyreadstat</code>
+            for <code>.sav</code>); Stata needs version 16 or later.</span></li>
           <li><span>It stops with a clear message if a file or variable is missing from your copy.</span></li>
         </ul>
       </div>
@@ -231,6 +235,7 @@
           <div class="t-seg" role="group" aria-label="Language">
             <button type="button" data-lang="r" aria-pressed="true">R</button>
             <button type="button" data-lang="py" aria-pressed="false">Python</button>
+            <button type="button" data-lang="stata" aria-pressed="false">Stata</button>
           </div>
           <span class="t-demo-tag">in the unzipped folder</span>
         </div>
@@ -251,6 +256,9 @@
           gives it one or more topics, each with a confidence. In the builder,
           <strong>Topic tags ≥</strong> sets how sure a tag must be before it is shown, counted
           and used in the filter. Try it on the right.</p>
+        <p>A model gets some tags wrong. Open a variable's details and choose
+          <strong>Suggest a tag change</strong>: it opens a pre-filled issue on GitHub, where
+          you say which topics it should have.</p>
         <ul class="t-domains" id="t-domain-list" aria-label="Topic domains"></ul>
       </div>
       <div>
