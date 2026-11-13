@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { REPOSITORY, tagSuggestionUrl } from "../../site/js/core/feedback.js";
+import { REPOSITORY, tagSuggestionUrl, topicChanges } from "../../site/js/core/feedback.js";
 
 const manifest = {
   name: "Mini",
@@ -91,4 +91,47 @@ test("a URL over 8,000 characters is cut, keeping cohort, variable and file whol
   assert.equal(p.get("cohort"), "Mini");
   assert.equal(p.get("file"), "mini_age5");
   assert.ok(p.get("current").endsWith("…"));
+});
+
+/* ── A suggestion chosen in the builder ─────────────────────────────── */
+
+const withHousing = {
+  ...manifest,
+  topics: {
+    domains: [
+      ...manifest.topics.domains,
+      { id: "housing", label: "Housing", topics: [{ id: "tenure", label: "Tenure" }] },
+    ],
+  },
+};
+
+test("the chosen topics become what to add and what to remove", () => {
+  const p = params(
+    tagSuggestionUrl(entry(), "f", withHousing, {
+      topics: ["smoking", "tenure"],
+      why: "It asks about rent.",
+    }),
+  );
+  assert.equal(p.get("suggested"), "Add: Housing › Tenure\nRemove: Health › Pregnancy");
+  assert.equal(p.get("why"), "It asks about rent.");
+});
+
+test("only additions, or only removals, say only that", () => {
+  const add = tagSuggestionUrl(entry({ topics: [] }), "f", withHousing, { topics: ["tenure"] });
+  assert.equal(params(add).get("suggested"), "Add: Housing › Tenure");
+  assert.equal(params(add).has("why"), false);
+  const drop = tagSuggestionUrl(entry(), "f", withHousing, { topics: [] });
+  assert.equal(params(drop).get("suggested"), "Remove: Health › Smoking; Health › Pregnancy");
+});
+
+test("without a suggestion the form's suggestion is left for the user", () => {
+  assert.equal(params(tagSuggestionUrl(entry(), "f", manifest)).has("suggested"), false);
+});
+
+test("topicChanges says what a choice adds and removes", () => {
+  assert.deepEqual(topicChanges(entry(), ["smoking", "tenure"]), {
+    add: ["tenure"],
+    remove: ["pregnancy"],
+  });
+  assert.deepEqual(topicChanges(entry({ topics: undefined }), []), { add: [], remove: [] });
 });
