@@ -602,7 +602,7 @@ def test_a_clef_run_records_keep_at(tmp_path, variables_path):
     assert run_json(tmp_path / "o")["settings"]["keep_at"] == 0.3
 
 
-def test_switching_method_redoes_every_variable(tmp_path, variables_path):
+def test_switching_method_redoes_every_variable(tmp_path, variables_path, capsys):
     from test_runner import tiered_answer
 
     out = tmp_path / "o"
@@ -610,6 +610,7 @@ def test_switching_method_redoes_every_variable(tmp_path, variables_path):
     stub = StubProvider(tiered_answer)
     tag(variables_path, out, stub, "--method", "tiered")
     assert run_json(out)["counts"]["todo"] == 60 and stub.calls
+    capsys.readouterr()
     stub = StubProvider(tiered_answer)
     tag(variables_path, out, stub, "--method", "tiered")
-    assert run_json(out)["counts"]["todo"] == 0 and not stub.calls
+    assert "60 already tagged, 0 to do" in capsys.readouterr().err and not stub.calls

@@ -78,7 +78,8 @@ date. Each topic's **number** is its position across the whole scheme, counting 
 ### `tags.jsonl`
 
 ```json
-{"file": "wave1", "variable": "SMOKE", "topics": [["smoking", 0.9], ["health_general", 0.4]], "scheme": "c87a35ec8bc2", "model": "ollama:gpt-oss:20b", "tagged": "2027-01-15T08:00:00Z"}
+{"file": "wave1", "variable": "SMOKE", "topics": [["smoking", 0.9], ["health_general", 0.4]], "scheme": "c87a35ec8bc2", "model": "ollama:gpt-oss:20b", "tagged": "2027-01-15T08:00:00Z", "method": "flat"}
+{"file": "wave1", "variable": "SMOKE", "topics": [["smoking", 0.9]], "scheme": "c87a35ec8bc2", "model": "ollama-decision:clef:cloud", "tagged": "2027-01-15T08:00:00Z", "method": "tiered", "path": [["health", 0.95]]}
 ```
 
 | Field | Rules |
@@ -88,12 +89,17 @@ date. Each topic's **number** is its position across the whole scheme, counting 
 | `scheme` | The hash of the scheme the tags were made with. |
 | `model` | `provider:model`. |
 | `tagged` | ISO 8601 UTC time. |
+| `method` | `flat` or `tiered`: how the tags were made. A line without it was made by the flat method. |
+| `path` | Tiered only: the areas followed, in order, as `[area id, confidence]`. |
+
+`topics` means the same for both methods: each topic with its own confidence. In a tiered
+line it is the topic-level confidence, merged across areas (highest per topic).
 
 During a run lines are only appended, so a variable may appear more than once: the last
 line wins, and a cut-off last line is ignored. When a run ends the file is rewritten with
 one line per variable, sorted by `file` then `variable`. A variable that could not be
 tagged has no line, so the next run tries it again. A line whose `scheme` differs from the
-current scheme's hash is out of date and is redone.
+current scheme's hash, or whose `method` differs from the run's, is out of date and is redone.
 
 ### `scheme.json`
 
@@ -117,7 +123,7 @@ The scheme as used, with its hash:
 |---|---|
 | `status` | `finished` or `stopped` (Ctrl-C). |
 | `settings` | Provider, base URL, model, `method` (`flat` or `tiered`), for tiered runs `descend_at` and `max_areas`, for decision models (`ollama-decision`) `keep_at`, batch size, workers, timeout, retries, files, limit, retag, grouping field, variables path, scheme path and hash. Never an API key. |
-| `counts` | `total`, `todo`, `tagged`, `skipped` (already current), `failed`, `requests`, `retries`, `singles` (variables retried one at a time). |
+| `counts` | `total`, `todo`, `tagged`, `skipped` (already current), `failed`, `requests`, `requests_by_tier` (index 0 is tier 1; a flat run has one entry), `retries`, `singles` (variables retried one at a time). |
 | `failed` | `file/variable` of each variable that could not be tagged. |
 | `timeline` | `[seconds, variables]`: variables tagged in each 10-second step. |
 | `stats` | The statistics below, from the records current when the run ended. |

@@ -244,7 +244,11 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
     if args.files:
         wanted = {f.strip() for f in args.files.split(",")}
         chosen = [v for v in chosen if v.file in wanted]
-    todo = [v for v in chosen if args.retag or store.state(v.key, scheme.hash) != "current"]
+
+    def current(v) -> bool:
+        return store.state(v.key, scheme.hash, args.method) == "current"
+
+    todo = [v for v in chosen if args.retag or not current(v)]
     skipped = len(chosen) - len(todo)
     if args.limit is not None:
         todo = todo[: args.limit]
@@ -304,6 +308,8 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
         f"{result.requests} requests; {len(result.failed)} failed."
     )
     print(_summary(run, stats, scheme, store.folder))
+    if args.method == "tiered":
+        print(_tier_lines(result))
     if result.stopped:
         _err("Stopped. Run the same command again to carry on.")
     if result.failed:
@@ -356,6 +362,7 @@ def _run_record(args, scheme, started, ended, result, total, todo, skipped) -> d
             "skipped": skipped,
             "failed": len(result.failed),
             "requests": result.requests,
+            "requests_by_tier": result.requests_by_tier or [result.requests],
             "retries": result.retries,
             "singles": result.singles,
         },
@@ -371,6 +378,13 @@ def _save(folder: Path, run: dict, records, variables, scheme, group_by: str) ->
     text = json.dumps({**run, "stats": stats}, ensure_ascii=False, indent=1)
     (folder / "run.json").write_text(text + "\n", encoding="utf-8")
     return stats
+
+
+def _tier_lines(result) -> str:
+    """Requests per tier and areas followed per variable, for a tiered run's summary."""
+    tiers = ", ".join(f"{i}: {n}" for i, n in enumerate(result.requests_by_tier, 1))
+    mean = result.areas_followed / result.tagged if result.tagged else 0
+    return f"Requests by tier: {tiers or 'none'}\nAreas followed per variable: {mean:.1f}"
 
 
 def _summary(run: dict, stats: dict, scheme, folder: Path) -> str:

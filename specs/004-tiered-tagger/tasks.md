@@ -133,16 +133,16 @@ thresholds.
 **Independent Test**: After a tiered stand-in run, every record has `method: "tiered"` and a
 `path`, and `run.json` has the method and `requests_by_tier`.
 
-- [ ] T022 [P] [US2] Write the failing tests in `tests/test_store.py`:
+- [x] T022 [P] [US2] Write the failing tests in `tests/test_store.py`:
   - `make_record(..., method="flat")` adds `"method": "flat"`, and `make_record(..., method="tiered", path=[["health", 0.9]])` adds both fields.
   - `state(key, hash, method)` is `current` only when the hash and method both match, and is `stale` when the method differs.
   - A record without `method` counts as `"flat"`.
-- [ ] T023 [P] [US2] Write the failing tests in `tests/test_cli.py`:
+- [x] T023 [P] [US2] Write the failing tests in `tests/test_cli.py`:
   - A tiered run's `run.json` has `method`, `descend_at`, `max_areas` and `requests_by_tier` (and `keep_at` with the decision provider).
   - A flat run's `run.json` has `"method": "flat"` and `"requests_by_tier": [requests]`.
   - The summary prints `Requests by tier: 1: <n>, 2: <n>` and `Areas followed per variable: <mean>`.
   - Running tiered over a flat output folder redoes every variable.
-- [ ] T024 [US2] Implement these in `src/topic_tagger/store.py`, `src/topic_tagger/runner.py` (pass `method` and `path` to `make_record`) and `src/topic_tagger/cli.py` (`_run_record`, `_summary`, and pass `method` to `state`). Check that `report.html` still builds from a tiered folder (`tests/test_report.py` passes). In the same commit, update `docs/formats.md` with `method`, `path`, `descend_at`, `max_areas`, `keep_at` and `requests_by_tier`, from `contracts/formats.md`. Commit.
+- [x] T024 [US2] Implement these in `src/topic_tagger/store.py`, `src/topic_tagger/runner.py` (pass `method` and `path` to `make_record`) and `src/topic_tagger/cli.py` (`_run_record`, `_summary`, and pass `method` to `state`). Check that `report.html` still builds from a tiered folder (`tests/test_report.py` passes). In the same commit, update `docs/formats.md` with `method`, `path`, `descend_at`, `max_areas`, `keep_at` and `requests_by_tier`, from `contracts/formats.md`. Commit.
 
 ---
 

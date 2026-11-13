@@ -60,6 +60,7 @@ class RunResult:
     last_error: str = ""
     stopped: bool = False
     requests_by_tier: list[int] = field(default_factory=list)
+    areas_followed: int = 0
 
 
 @dataclass
@@ -133,8 +134,20 @@ class Runner:
         now = self.clock.now()
         h = self.scheme.hash
         self.store.append(
-            [make_record(v, tags, h, self.settings.model, now) for v, tags in out.tagged]
+            [
+                make_record(
+                    v,
+                    tags,
+                    h,
+                    self.settings.model,
+                    now,
+                    self.settings.method,
+                    out.paths.get(v.key) if self.settings.method == "tiered" else None,
+                )
+                for v, tags in out.tagged
+            ]
         )
+        result.areas_followed += sum(len(out.paths.get(v.key, [])) for v, _ in out.tagged)
         for _ in range(out.retries):
             self.on_event("retry", {})
         if out.tagged:
