@@ -88,5 +88,59 @@
     consent to send them to a cloud model. Left as an option in the quickstart.
   - The 60-variable test fixture: it uses the small 3-area scheme and has no expected
     topics.
-- **Model**: "Ollama's clef model" is read as Ollama's cloud model, `gpt-oss:20b-cloud`,
-  as used before. Any `--model` works.
+- **Models**: three runs:
+  - flat with `gpt-oss:20b-cloud`;
+  - tiered with `gpt-oss:20b-cloud`;
+  - tiered with `clef:cloud` (`--provider ollama-decision`).
+
+## R9. Clef: how to ask
+
+- **Decision**:
+  - At each tier, one `noul` question per option, keyed by the option id. Its
+    `instructions` are "Is this survey variable about <label>? <description>". For areas,
+    the topic labels are appended, as in R2.
+  - The `state` is the variable as a JSON object: `{"name", "label", "values"}`, with values
+    capped at 30, as the chat prompt does.
+  - Confidence is the `noul` probability.
+  - Areas are followed by `--descend-at` and `--max-areas` (R3).
+  - Leaves are kept at ≥ `--keep-at` (default 0.3, the threshold the scheme's guidance
+    already gives chat models). The strongest leaf is kept if none passes.
+- **Rationale**: Topics are multi-label. A `choice` question returns one winner, and its
+  probabilities sum to 1, so a second true topic would look weak. `noul` gives each option
+  an independent probability, which matches "every topic that applies".
+- **Alternatives**: One `choice` question per tier. It is cheaper, but single-label. The ad
+  hoc script can try it as a variant if `noul` proves slow or costly.
+
+## R10. Calling `/v1/systemone`
+
+- **Decision**: A small `OllamaDecisionProvider` uses `urllib.request` to send
+  `POST {base}/v1/systemone` with
+  `{"model", "state", "questions": {id: {"type": "noul", "instructions": …}}}`, and reads
+  `answers[id].noul`.
+  - **Checking the model:** `check()` reuses `GET /v1/models`, as the chat provider does.
+  - **Splitting:** more than 64 options are split across requests (the cloud limit).
+  - **Retries and timeouts:** none in the client, since retries are the runner's job. The
+    timeout comes from `--timeout`.
+- **Rationale**: The `openai` client has no such endpoint, and the `ollama` Python package
+  would be a new dependency for one POST. The standard library is enough, and it is easy to
+  fake in tests with the existing local-server pattern.
+- **Alternatives**: The `ollama` package (`ollama.systemone`): a new runtime dependency.
+  `typesafe-sdk`: the same objection.
+
+## R11. One variable per Clef request
+
+- **Decision**: The decision decider sends one variable per request. Concurrency comes from
+  `--workers`. `--batch-size` still groups variables for the walk and for storing.
+- **Rationale**: `state` describes one thing, and its questions are about that thing.
+  Packing variables into one state and naming questions per variable would mix them up.
+- **Cost**: about 1 + (areas followed) requests per variable. For the 80-variable set that
+  is about 250 requests. For a full cohort it is large, which is one reason this is
+  compared before becoming any default.
+
+## R12. Remote models
+
+- **Decision**: For both Ollama providers, a model counts as remote when it ends in
+  `-cloud` or `:cloud`.
+- **Rationale**: `clef:cloud` uses the `:cloud` form, which today's `-cloud` check misses,
+  so the tool would not ask before sending metadata off the machine. This is a fix that
+  applies to chat models too (FR-014).
