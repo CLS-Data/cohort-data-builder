@@ -51,21 +51,20 @@ class Node:
 
 
 def build_tree(scheme: Scheme) -> Node:
-    """The scheme as a tree: root → one node per domain → one leaf per topic."""
-    return Node(
-        "",
-        scheme.name,
-        "",
-        tuple(
-            Node(
-                d.id,
-                d.label,
-                d.description,
-                tuple(Node(t.id, t.label, t.description) for t in d.topics),
-            )
-            for d in scheme.domains
-        ),
-    )
+    """The scheme as a tree: root → one node per domain → one leaf per topic.
+
+    The fallback topic is moved out of its domain and offered at tier 1, beside the areas,
+    as an exit for variables the model cannot place: it is taken like an area (see ``walk``)
+    and kept only when nothing else is found. A domain left empty by the move is dropped.
+    """
+    fallback = next(t for t in scheme.topics if t.id == scheme.fallback_topic)
+    areas = []
+    for d in scheme.domains:
+        topics = tuple(Node(t.id, t.label, t.description) for t in d.topics if t is not fallback)
+        if topics:
+            areas.append(Node(d.id, d.label, d.description, topics))
+    exit_ = Node(fallback.id, fallback.label, fallback.description)
+    return Node("", scheme.name, "", (*areas, exit_))
 
 
 Tags = list[tuple[str, float]]
@@ -123,7 +122,8 @@ class DecisionDecider:
     Args:
         provider: The decision-model host.
         keep_at: Topics below this probability are dropped, but the strongest is always kept.
-            Areas are all returned; the walk decides which to follow.
+            Areas, and a topic offered among them (the exit), are all returned; the walk decides
+            which to follow.
     """
 
     def __init__(self, provider: DecisionProvider, keep_at: float = 0.3):
@@ -147,11 +147,16 @@ class DecisionDecider:
             except ProviderError as e:
                 error = e
                 continue
-            ranked = sorted(probs.items(), key=lambda kv: (-kv[1], position[kv[0]]))
-            leaves = [(c, round(p, 2)) for c, p in ranked if leaf[c]]
-            kept = [(c, p) for c, p in leaves if p >= self.keep_at] or leaves[:1]
-            areas = [(c, round(p, 2)) for c, p in ranked if not leaf[c]]
-            got[i] = sorted(kept + areas, key=lambda kv: (-kv[1], position[kv[0]]))
+            ranked = [
+                (c, round(p, 2))
+                for c, p in sorted(probs.items(), key=lambda kv: (-kv[1], position[kv[0]]))
+            ]
+            if not all(leaf.values()):
+                # A tier of areas (and the exit): every option comes back with its
+                # probability, and the walk applies --descend-at to all of them alike.
+                got[i] = ranked
+                continue
+            got[i] = [(c, p) for c, p in ranked if p >= self.keep_at] or ranked[:1]
         if not got and error is not None:
             raise error  # nothing answered: let the walk retry the whole group
         return got, len(variables)
@@ -247,7 +252,9 @@ def walk(
     children apply. Children that are topics become tags. Children that are areas are
     followed when their confidence is at least ``descend_at``, at most ``max_areas`` of them
     (0 means no cap); the strongest is always followed, so no variable stalls. Each followed
-    area is then asked once, for all the batch's variables routed to it.
+    area is then asked once, for all the batch's variables routed to it. A topic offered
+    among areas (the fallback, an exit) is chosen the same way, and kept only if no area
+    gives the variable a topic.
 
     Args:
         root: The tree's root.
@@ -263,6 +270,7 @@ def walk(
     result = WalkResult(requests_by_tier=[0] * _height(root))
     order = _positions(root)
     best: dict[int, dict[str, float]] = {}
+    exits: set[str] = set()
     # Groups waiting to be asked, by node id: (node, tier, [(position, incoming confidence)]).
     # A node has one parent, so every group is complete before it is asked.
     pending: dict[str, tuple[Node, int, list[tuple[int, float]]]] = {}
@@ -286,20 +294,30 @@ def walk(
                 reach(node.children[0], tier + 1, i, conf)
             continue
         answers = _ask(decider, node, [i for i, _ in members], batch, tier, retries, result)
+        mixed = any(not c.is_leaf for c in node.children)
         for i, _ in members:
             chosen = answers.get(i, [])
-            for child_id, conf in chosen:
-                child = _child(node, child_id)
-                if child.is_leaf:
-                    reach(child, tier + 1, i, conf)
-            areas = [(c, conf) for c, conf in chosen if not _child(node, c).is_leaf]
+            if not mixed:
+                for child_id, conf in chosen:
+                    reach(_child(node, child_id), tier + 1, i, conf)
+                continue
+            # A tier of areas, perhaps with an exit topic: all are chosen alike, by
+            # descend_at, the strongest always, at most max_areas.
+            areas = sorted(chosen, key=lambda kv: (-kv[1], order[kv[0]]))
             follow = [(c, conf) for c, conf in areas if conf >= descend_at] or areas[:1]
             if max_areas:
                 follow = follow[:max_areas]
             for child_id, conf in follow:
-                reach(_child(node, child_id), tier + 1, i, conf)
+                child = _child(node, child_id)
+                if child.is_leaf:
+                    exits.add(child.id)
+                reach(child, tier + 1, i, conf)
 
     for i in range(len(batch)):
+        found = best.get(i, {})
+        if any(t not in exits for t in found):
+            # The exit is for variables nothing else fits: drop it when an area gave topics.
+            best[i] = {t: c for t, c in found.items() if t not in exits}
         if best.get(i):
             result.tags[i] = sorted(best[i].items(), key=lambda kv: (-kv[1], order[kv[0]]))
         else:

@@ -112,6 +112,7 @@ thresholds.
   - Leaves are kept when ≥ `keep_at`, else the single strongest leaf is kept, and `keep_at=0` keeps every leaf (FR-017).
   - **Flat** with the decider (R14) walks `flat_tree(scheme)`, a root whose children are every topic. With the bundled CLOSER scheme it sends 2 requests per variable (split at 64), and returns the same keep rule.
 - [x] T018 [US4] Implement `DecisionDecider` and `flat_tree(scheme)` in `src/topic_tagger/tiered.py`. Commit.
+- [x] T017c *(After the 10k pilot.)* Offer the fallback topic at tier 1 as an exit, chosen like an area and dropped when an area gives topics, for both tiered deciders (`build_tree`, `walk`, `DecisionDecider`). Tests first.
 - [x] T017b [US4] *(After review.)* Ask Clef one `choice` question per tier instead of one `noul` question per option, and use its `probabilities`. A choice takes 2 to 26 options, so remove flat with Clef (`flat_tree`): `--method flat` with `ollama-decision` exits 2, the method defaults to tiered, and a scheme with a tier over 26 options is refused before any request (`choice_problems`). Tests first, then code; README and spec documents updated.
 - [x] T019 [US4] Write the failing tests in `tests/test_cli.py`:
   - `--provider ollama-decision --method flat` tags the fixture against the fake server, asking every topic per variable.

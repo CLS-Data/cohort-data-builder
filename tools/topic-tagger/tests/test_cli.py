@@ -505,7 +505,7 @@ def test_clef_tags_tiered_by_default(tmp_path, variables_path):
     recs = records(tmp_path / "o")
     assert len(recs) == 60 and all(r["topics"] and r["method"] == "tiered" for r in recs)
     asked = {tuple(o) for _, o in stub.calls}
-    assert ("demographics", "health", "survey") in asked
+    assert ("demographics", "health", "survey", "other") in asked
     assert ("smoking", "alcohol", "physical_health") in asked
     assert run_json(tmp_path / "o")["settings"]["method"] == "tiered"
 
@@ -523,7 +523,7 @@ def test_a_scheme_too_big_for_clef_is_refused_before_any_request(tmp_path, varia
     )
     path = tmp_path / "big.toml"
     path.write_text(
-        'name = "Big"\nversion = 1\nfallback_topic = "t0"\nguidance = "G"\n\n'
+        'name = "Big"\nversion = 1\nfallback_topic = "x"\nguidance = "G"\n\n'
         '[[domains]]\nid = "big"\nlabel = "Big"\ndescription = "Many."\n'
         + topics
         + '\n[[domains]]\nid = "two"\nlabel = "Two"\ndescription = "One."\n'
@@ -578,7 +578,7 @@ def test_decision_dry_run_prints_the_request_bodies(tmp_path, variables_path, ca
     assert tier1["model"] == "clef:cloud" and tier1["state"]["name"] == "PID"
     question = tier1["questions"]["option"]
     assert question["type"] == "choice"
-    assert list(question["criteria"]) == ["demographics", "health", "survey"]
+    assert list(question["criteria"]) == ["demographics", "health", "survey", "other"]
     assert list(tier2["questions"]["option"]["criteria"]) == ["age", "gender"]
     assert stub.calls == []
 

@@ -135,9 +135,10 @@ files.
   - If the node has more than one child, it sends one request listing them.
   - If it has exactly one child, it routes every variable there without asking, with the
     parent's confidence. This saves a request for any one-topic area.
-  - *As built:* the bundled scheme's `other` topic sits in the Administration area, not an
-    area of its own. So a variable that fits nothing is routed to Administration at tier 1
-    (every reply must name at least one area) and picks `other` there, with no special case.
+  - *Changed after the pilot:* the fallback topic (`other`) is moved out of its area and
+    offered at tier 1 beside the areas, as an exit. It is chosen like an area (descend
+    threshold, or strongest) and kept only when no followed area gives a topic. Before, a
+    variable that fit nothing had to be routed into Administration to reach `other`.
   - Children that are topics become tags. Children that are areas get new groups, with
     the variables routed to them (R3).
 - **Retries** (R5): each request runs the same ladder as flat. *As built:* the walk in

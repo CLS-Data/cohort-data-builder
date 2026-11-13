@@ -222,7 +222,12 @@ By default each request lists every topic in the scheme (`--method flat`). With
 
 An area is followed when its confidence is at least `--descend-at` (0.5), at most
 `--max-areas` of them (3; 0 for no cap). The strongest area is always followed, so no
-variable stops at the first tier. A stored tag keeps its topic-level confidence, so it
+variable stops at the first tier.
+
+The scheme's fallback topic (`other` in the bundled scheme) is not inside an area when
+tagging tiered. It is offered at the first tier, beside the areas, as a way out for a
+variable the model cannot place. It is chosen like an area (at `--descend-at`, or if it is
+the strongest option), and it is kept only if no followed area gives the variable a topic. A stored tag keeps its topic-level confidence, so it
 means the same as a flat tag.
 
 A batch takes 1 + (the number of different areas followed) requests instead of 1, but each

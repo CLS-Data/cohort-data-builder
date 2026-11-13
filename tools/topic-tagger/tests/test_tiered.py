@@ -20,7 +20,7 @@ from topic_tagger.variables import Variable
 def test_the_tree_is_domains_then_topics(small_scheme):
     root = build_tree(small_scheme)
     assert root.id == "" and not root.is_leaf
-    assert [d.id for d in root.children] == [d.id for d in small_scheme.domains]
+    assert [d.id for d in root.children] == [d.id for d in small_scheme.domains] + ["other"]
     health = root.find("health")
     assert [t.id for t in health.children] == ["smoking", "alcohol", "physical_health"]
     assert health.label == "Health" and health.description
@@ -100,7 +100,7 @@ ANSWERS = {
 def test_tier_1_asks_areas_then_each_followed_area_is_asked_once(small_scheme):
     result, stub = do_walk(small_scheme, ANSWERS, ["smk", "age", "both", "weak"])
     asked = [options_in(m) for m, _ in stub.calls]
-    assert asked[0] == ["demographics", "health", "survey"]
+    assert asked[0] == ["demographics", "health", "survey", "other"]
     assert sorted(map(tuple, asked[1:])) == [
         ("age", "gender"),
         ("smoking", "alcohol", "physical_health"),
@@ -254,12 +254,12 @@ def test_clef_is_asked_one_choice_question_per_variable_per_tier(small_scheme):
     assert len(state["values"]) == 31 and state["values"][0] == "0: L0"
     assert state["values"][-1] == "… and 10 more"
     assert instructions == "Which area of a survey is this variable about?"
-    assert list(options) == ["demographics", "health", "survey"]
+    assert list(options) == ["demographics", "health", "survey", "other"]
     assert options["health"] == (
         "Health: Health and health behaviour. It includes: Smoking, Alcohol, Physical health."
     )
     # areas come back with every probability; the walk applies --descend-at
-    assert got[0] == [("health", 0.9), ("demographics", 0.06), ("survey", 0.04)]
+    assert got[0] == [("health", 0.9), ("demographics", 0.06), ("survey", 0.04), ("other", 0.0)]
     stub.calls.clear()
     DecisionDecider(stub).decide(build_tree(small_scheme).find("health"), [v])
     _, instructions, options = stub.calls[0]
