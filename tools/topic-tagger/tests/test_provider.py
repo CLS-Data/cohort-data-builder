@@ -190,3 +190,8 @@ def test_get_provider_lists_the_known_ones_for_an_unknown_name():
     with pytest.raises(ProviderError) as err:
         get_provider("nope", base_url="http://x/v1", model="m", timeout=3)
     assert "nope" in str(err.value) and "ollama" in str(err.value)
+
+
+@pytest.mark.parametrize("model", ["gpt-oss:20b-cloud", "clef:cloud"])
+def test_both_cloud_suffixes_are_remote(model):
+    assert ollama("http://localhost:11434/v1", model=model).is_remote()

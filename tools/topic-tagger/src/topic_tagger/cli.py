@@ -14,13 +14,14 @@ from rich.console import Console
 
 from topic_tagger.clock import SystemClock
 from topic_tagger.display import RunView
-from topic_tagger.prompt import build_messages
+from topic_tagger.prompt import build_messages, build_option_messages
 from topic_tagger.providers import Provider, ProviderError, get_provider
 from topic_tagger.report import render_report
 from topic_tagger.runner import Runner, Settings, install_stop_handler
 from topic_tagger.scheme import SchemeError, bundled_scheme_text, load_scheme, scheme_from_json
 from topic_tagger.stats import compute_stats
 from topic_tagger.store import LockedError, StaleLockError, TagStore
+from topic_tagger.tiered import DecisionDecider, build_tree, choice_problems, decision_request
 from topic_tagger.variables import InputError, read_variables
 
 OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED, STOPPED = 0, 1, 2, 3, 4, 130
@@ -81,13 +82,40 @@ def _parser() -> argparse.ArgumentParser:
     tag.add_argument(
         "--group-by", default="sweep", help="input field the statistics are grouped by"
     )
-    tag.add_argument("--provider", default="ollama", help="the model host")
+    tag.add_argument(
+        "--provider",
+        default="ollama",
+        help="the model host: ollama (chat models) or ollama-decision (decision models, "
+        "e.g. --model clef:cloud)",
+    )
     tag.add_argument(
         "--base-url",
         default=os.environ.get("TOPIC_TAGGER_BASE_URL", DEFAULT_BASE_URL),
         help="where the host's API is (also TOPIC_TAGGER_BASE_URL)",
     )
     tag.add_argument("--model", default="gpt-oss:20b", help="model name on the host")
+    tag.add_argument(
+        "--method",
+        choices=["flat", "tiered"],
+        help="flat: every topic in one request; tiered: areas first, then topics within them "
+        "(default flat; tiered for ollama-decision, which can only tag tiered)",
+    )
+    tag.add_argument(
+        "--descend-at",
+        type=float,
+        help="tiered: follow an area at this confidence or above (default 0.5)",
+    )
+    tag.add_argument(
+        "--keep-at",
+        type=float,
+        help="decision models (--provider ollama-decision): keep a topic at this probability "
+        "or above; 0 keeps every topic (default 0.3)",
+    )
+    tag.add_argument(
+        "--max-areas",
+        type=int,
+        help="tiered: follow at most this many areas per variable; 0 for no cap (default 3)",
+    )
     tag.add_argument("--batch-size", type=int, default=20, help="variables per request")
     tag.add_argument("--workers", type=int, default=2, help="requests in flight at once")
     tag.add_argument(
@@ -130,6 +158,10 @@ def _err(message: str) -> None:
 
 
 def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
+    problem = _check_method(args)
+    if problem:
+        _err(problem)
+        return BAD_INPUT
     try:
         variables = read_variables(args.variables)
         scheme = load_scheme(args.scheme)
@@ -137,9 +169,20 @@ def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
     except (InputError, SchemeError, ProviderError) as e:
         _err(str(e))
         return BAD_INPUT
+    if args.provider == "ollama-decision":
+        problems = choice_problems(build_tree(scheme))
+        if problems:
+            _err("This scheme does not fit a decision model: " + "; ".join(problems) + ".")
+            return BAD_INPUT
 
     if args.dry_run:
         batch = variables[: args.batch_size]
+        if args.provider == "ollama-decision":
+            _print_decision_requests(args, scheme, variables[0])
+            return OK
+        if args.method == "tiered":
+            _print_tiered_requests(scheme, batch)
+            return OK
         system, user = build_messages(scheme, batch)
         print(system["content"], user["content"], sep="\n\n---\n\n")
         return OK
@@ -156,13 +199,65 @@ def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
         store.unlock()
 
 
+def _check_method(args: argparse.Namespace) -> str | None:
+    """Fill in the tiered and decision defaults, or say what is wrong with them."""
+    if args.provider != "ollama-decision" and args.keep_at is not None:
+        return "--keep-at needs --provider ollama-decision"
+    if args.provider == "ollama-decision":
+        if args.method == "flat":
+            return (
+                "--provider ollama-decision tags tiered only: a decision model chooses among "
+                "at most 26 options, so it cannot be asked every topic at once"
+            )
+        args.method = "tiered"
+        args.keep_at = 0.3 if args.keep_at is None else args.keep_at
+        if not 0 <= args.keep_at <= 1:
+            return "--keep-at must be between 0 and 1"
+    args.method = args.method or "flat"
+    if args.method != "tiered":
+        if args.descend_at is not None or args.max_areas is not None:
+            return "--descend-at and --max-areas need --method tiered"
+        return None
+    args.descend_at = 0.5 if args.descend_at is None else args.descend_at
+    args.max_areas = 3 if args.max_areas is None else args.max_areas
+    if not 0 <= args.descend_at <= 1:
+        return "--descend-at must be between 0 and 1"
+    if args.max_areas < 0:
+        return "--max-areas must be 0 (no cap) or more"
+    return None
+
+
+def _print_tiered_requests(scheme, batch) -> None:
+    """Print the tier-1 request and, as an example, the first area's tier-2 request."""
+    root = build_tree(scheme)
+    system, user = build_option_messages(scheme.guidance, root, batch)
+    print(system["content"], user["content"], sep="\n\n---\n\n")
+    area = root.children[0]
+    print(f"\n--- tier 2 example ({area.label}) ---\n")
+    system, user = build_option_messages(scheme.guidance, area, batch)
+    print(system["content"], user["content"], sep="\n\n---\n\n")
+
+
+def _print_decision_requests(args, scheme, variable) -> None:
+    """Print the first variable's first request to the decision model, and a tier-2 example."""
+    root = build_tree(scheme)
+    print(json.dumps(decision_request(args.model, root, variable), indent=1))
+    area = root.children[0]
+    print(f"\n--- tier 2 example ({area.label}) ---\n")
+    print(json.dumps(decision_request(args.model, area, variable), indent=1))
+
+
 def _run(args, variables, scheme, provider, store, clock, runner_created) -> int:
     store.load()
     chosen = variables
     if args.files:
         wanted = {f.strip() for f in args.files.split(",")}
         chosen = [v for v in chosen if v.file in wanted]
-    todo = [v for v in chosen if args.retag or store.state(v.key, scheme.hash) != "current"]
+
+    def current(v) -> bool:
+        return store.state(v.key, scheme.hash, args.method) == "current"
+
+    todo = [v for v in chosen if args.retag or not current(v)]
     skipped = len(chosen) - len(todo)
     if args.limit is not None:
         todo = todo[: args.limit]
@@ -184,9 +279,17 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
         workers=args.workers,
         retries=args.retries,
         model=f"{args.provider}:{args.model}",
+        method=args.method,
+        descend_at=args.descend_at if args.descend_at is not None else 0.5,
+        max_areas=args.max_areas if args.max_areas is not None else 3,
     )
     view = RunView(len(variables), len(todo), scheme, clock)
-    runner = Runner(scheme, provider, store, settings, clock, on_event=view.on_event)
+    decider = None
+    if args.provider == "ollama-decision":
+        decider = DecisionDecider(provider, keep_at=args.keep_at)
+    runner = Runner(
+        scheme, provider, store, settings, clock, on_event=view.on_event, decider=decider
+    )
     if runner_created:
         runner_created(runner)
     started = clock.now()
@@ -214,6 +317,8 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
         f"{result.requests} requests; {len(result.failed)} failed."
     )
     print(_summary(run, stats, scheme, store.folder))
+    if args.method == "tiered":
+        print(_tier_lines(result))
     if result.stopped:
         _err("Stopped. Run the same command again to carry on.")
     if result.failed:
@@ -240,6 +345,13 @@ def _run_record(args, scheme, started, ended, result, total, todo, skipped) -> d
             "provider": args.provider,
             "base_url": args.base_url,
             "model": args.model,
+            "method": args.method,
+            **(
+                {"descend_at": args.descend_at, "max_areas": args.max_areas}
+                if args.method == "tiered"
+                else {}
+            ),
+            **({"keep_at": args.keep_at} if args.provider == "ollama-decision" else {}),
             "batch_size": args.batch_size,
             "workers": args.workers,
             "timeout": args.timeout,
@@ -259,6 +371,7 @@ def _run_record(args, scheme, started, ended, result, total, todo, skipped) -> d
             "skipped": skipped,
             "failed": len(result.failed),
             "requests": result.requests,
+            "requests_by_tier": result.requests_by_tier or [result.requests],
             "retries": result.retries,
             "singles": result.singles,
         },
@@ -274,6 +387,13 @@ def _save(folder: Path, run: dict, records, variables, scheme, group_by: str) ->
     text = json.dumps({**run, "stats": stats}, ensure_ascii=False, indent=1)
     (folder / "run.json").write_text(text + "\n", encoding="utf-8")
     return stats
+
+
+def _tier_lines(result) -> str:
+    """Requests per tier and areas followed per variable, for a tiered run's summary."""
+    tiers = ", ".join(f"{i}: {n}" for i, n in enumerate(result.requests_by_tier, 1))
+    mean = result.areas_followed / result.tagged if result.tagged else 0
+    return f"Requests by tier: {tiers or 'none'}\nAreas followed per variable: {mean:.1f}"
 
 
 def _summary(run: dict, stats: dict, scheme, folder: Path) -> str:

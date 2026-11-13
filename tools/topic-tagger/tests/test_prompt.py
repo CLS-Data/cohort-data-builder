@@ -87,3 +87,38 @@ def test_the_reply_format_comes_from_the_langchain_parser(small_scheme):
     system, _ = build_messages(small_scheme, batch())
     parser = PydanticOutputParser(pydantic_object=reply_model(small_scheme))
     assert system["content"].endswith(parser.get_format_instructions())
+
+
+def test_the_flat_prompt_is_unchanged(small_scheme, fixtures_dir):
+    system, user = build_messages(small_scheme, batch())
+    expected = (fixtures_dir / "flat_prompt.txt").read_text()
+    assert system["content"] + "\n---\n" + user["content"] == expected
+
+
+def test_a_tier_prompt_lists_only_the_node_options(small_scheme):
+    from topic_tagger.prompt import build_option_messages
+    from topic_tagger.tiered import build_tree
+
+    root = build_tree(small_scheme)
+    system, user = build_option_messages(small_scheme.guidance, root, batch())
+    text = system["content"]
+    assert "Tag each variable with the topics it measures." in text
+    for d in small_scheme.domains:
+        assert f"- {d.id}: {d.label} — {d.description}" in text
+    # each area shows its topics' labels, so the model knows what lives where (R2)
+    assert "Includes: Smoking, Alcohol, Physical health" in text
+    assert "Tobacco use." not in text  # no topic descriptions at tier 1
+    rules = text.split("Rules:")[1]  # the reply format names only these options
+    assert '"demographics"' in rules and '"smoking"' not in rules
+    assert user["content"] == build_messages(small_scheme, batch())[1]["content"]
+
+
+def test_a_tier_2_prompt_lists_one_area_topics(small_scheme):
+    from topic_tagger.prompt import build_option_messages
+    from topic_tagger.tiered import build_tree
+
+    health = build_tree(small_scheme).find("health")
+    system, _ = build_option_messages(small_scheme.guidance, health, batch()[:1])
+    text = system["content"]
+    assert "- smoking: Smoking — Tobacco use." in text
+    assert "age:" not in text and "Includes:" not in text

@@ -1,0 +1,37 @@
+Tag each variable with the topics it measures.
+
+Topics, grouped by area. Use only these ids:
+
+## Demographics
+- age: Age — Age or date of birth.
+- gender: Sex and gender — Sex or gender.
+
+## Health
+- smoking: Smoking — Tobacco use.
+- alcohol: Alcohol — Drinking alcohol.
+- physical_health: Physical health — Conditions, height, weight.
+
+## Survey administration
+- identifiers: Identifiers — Person and household identifiers.
+- survey_weights: Survey weights — Weights and design variables.
+- other: Other — Nothing else fits.
+
+Rules:
+- Each line of the next message is one variable: its id, name, label and value labels.
+- Reply with every variable's id and its topics, each with a confidence from 0 to 1.
+- Give every variable at least one topic. If nothing fits, use `other` with a low confidence.
+
+The output should be formatted as a JSON instance that conforms to the JSON schema below.
+
+As an example, for the schema {"properties": {"foo": {"title": "Foo", "description": "a list of strings", "type": "array", "items": {"type": "string"}}}, "required": ["foo"]}
+the object {"foo": ["bar", "baz"]} is a well-formatted instance of the schema. The object {"properties": {"foo": ["bar", "baz"]}} is not well-formatted.
+
+Here is the output schema:
+```
+{"$defs": {"TopicTag": {"additionalProperties": false, "properties": {"topic": {"enum": ["age", "gender", "smoking", "alcohol", "physical_health", "identifiers", "survey_weights", "other"], "title": "Topic", "type": "string"}, "confidence": {"maximum": 1, "minimum": 0, "title": "Confidence", "type": "number"}}, "required": ["topic", "confidence"], "title": "TopicTag", "type": "object"}, "VariableTags": {"additionalProperties": false, "properties": {"id": {"title": "Id", "type": "integer"}, "topics": {"items": {"$ref": "#/$defs/TopicTag"}, "title": "Topics", "type": "array"}}, "required": ["id", "topics"], "title": "VariableTags", "type": "object"}}, "additionalProperties": false, "properties": {"variables": {"items": {"$ref": "#/$defs/VariableTags"}, "title": "Variables", "type": "array"}}, "required": ["variables"]}
+```
+---
+Variables:
+{"id": 0, "name": "A01SMOK", "label": "Smokes now", "values": ["1: Yes", "2: No"]}
+{"id": 1, "name": "A02X", "label": "", "values": []}
+{"id": 2, "name": "B01BIG", "label": "Many values", "values": ["0: L0", "1: L1", "2: L2", "3: L3", "4: L4", "5: L5", "6: L6", "7: L7", "8: L8", "9: L9", "10: L10", "11: L11", "12: L12", "13: L13", "14: L14", "15: L15", "16: L16", "17: L17", "18: L18", "19: L19", "20: L20", "21: L21", "22: L22", "23: L23", "24: L24", "25: L25", "26: L26", "27: L27", "28: L28", "29: L29", "… and 170 more"]}
