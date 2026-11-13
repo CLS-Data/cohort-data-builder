@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pyreadstat
 import pytest
+from conftest import stata_binary
 
 ROOT = Path(__file__).resolve().parents[3]
 FIXTURE = ROOT / "tests" / "fixtures" / "data"
@@ -91,8 +92,24 @@ def generate(out, *, missing=False, fmt="csv", langs="r,python", picks=PICKS):
 
 
 def run(project, lang):
+    if lang == "stata":
+        return run_stata(project)
     cmd = ["Rscript", "R/merge.R"] if lang == "r" else [sys.executable, "python/merge.py"]
     return subprocess.run(cmd, cwd=project, capture_output=True, text=True, timeout=300)
+
+
+def run_stata(project):
+    """Run merge.do in batch mode. Stata exits 0 even on error, so the log decides."""
+    done = subprocess.run(
+        [stata_binary(), "-b", "do", "stata/merge.do"],
+        cwd=project,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    log = (project / "merge.log").read_text() if (project / "merge.log").exists() else ""
+    failed = done.returncode != 0 or "\nr(" in log
+    return subprocess.CompletedProcess(done.args, 1 if failed else 0, log, done.stderr)
 
 
 def read(path):
@@ -320,3 +337,80 @@ def test_driver_refuses_unselectable_variables(tmp_path):
     )
     assert done.returncode != 0
     assert shutil.which("node")
+
+
+# ── Stata (runs only where Stata is installed; never in CI) ──────────────
+
+
+@pytest.mark.needs_r
+@pytest.mark.needs_stata
+@pytest.mark.parametrize("ext", INPUTS)
+@pytest.mark.parametrize("fmt", ["csv", "dta"])
+def test_stata_agrees_with_r(tmp_path, ext, fmt):
+    outs = {}
+    for lang in ("r", "stata"):
+        project = project_with_data(
+            tmp_path, f"{lang}-{fmt}", ext, fmt=fmt, missing=True, langs=lang
+        )
+        run_ok(project, lang)
+        outs[lang] = {
+            "merged": read(project / "output" / f"merged.{fmt}"),
+            "long": read(project / "output" / f"mini_grid_long.{fmt}"),
+        }
+    assert list(outs["stata"]["merged"].columns) == COLUMNS
+    for part in ("merged", "long"):
+        pd.testing.assert_frame_equal(comparable(outs["stata"][part]), comparable(outs["r"][part]))
+
+
+@pytest.mark.needs_stata
+def test_stata_writes_the_grid_apart(tmp_path):
+    project = project_with_data(tmp_path, "stata", "tab", langs="stata")
+    run_ok(project, "stata")
+    long = read(project / "output" / "mini_grid_long.csv")
+    assert list(long.columns) == ["PID", "hhrel"]
+    assert "hhrel" not in read(project / "output" / "merged.csv").columns
+
+
+@pytest.mark.needs_stata
+@pytest.mark.parametrize("missing", [True, False])
+def test_stata_missing_to_na(tmp_path, missing):
+    project = project_with_data(tmp_path, "stata", "csv", missing=missing, langs="stata")
+    run_ok(project, "stata")
+    merged = read(project / "output" / "merged.csv").set_index("PID")
+    frames = fabricate()
+    if missing:
+        expected = expected_after_na(frames)
+        assert (merged["alc10"] == -1).any(), "kept code -1 'Dislike' must survive"
+    else:
+        a10 = frames["mini_age10"].assign(pid=lambda d: d["pid"].str.strip()).set_index("pid")
+        expected = {"mood10": a10["mood10"], "alc10": a10["alc10"]}
+    for column, values in expected.items():
+        got = merged[column].reindex(values.index).astype(float)
+        pd.testing.assert_series_equal(got, values.astype(float), check_names=False)
+
+
+@pytest.mark.needs_stata
+def test_stata_missing_file_stops(tmp_path):
+    project = generate(tmp_path / "stata", langs="stata")
+    write_data(fabricate(), project / "data", "csv", skip=("mini_age10", "mini_grid"))
+    done = run(project, "stata")
+    assert done.returncode != 0
+    assert "mini_age10" in done.stdout and "mini_grid" in done.stdout
+    assert "r(601)" in done.stdout
+    assert not (project / "output" / "merged.csv").exists()
+
+
+@pytest.mark.needs_stata
+def test_stata_sav_output_writes_dta_with_a_note(tmp_path):
+    project = project_with_data(tmp_path, "stata", "csv", fmt="sav", langs="stata")
+    done = run_ok(project, "stata")
+    assert (project / "output" / "merged.dta").exists()
+    assert not (project / "output" / "merged.sav").exists()
+    assert "cannot write .sav" in done.stdout
+    variable, values = labels_of(project / "output" / "merged.dta")
+    assert variable["tenure5"] == "Housing tenure of the family home"
+    assert {int(k): v for k, v in values["tenure5"].items()} == {
+        1: "Owned",
+        2: "Rented",
+        -1: "Not applicable",
+    }

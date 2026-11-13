@@ -115,8 +115,45 @@ def test_options_persist_and_no_language_disables_download(mini):
     expect(mini.get_by_label("Python", exact=True)).to_be_checked()
     expect(mini.get_by_label("SPSS (.sav)")).to_be_checked()
     expect(mini.get_by_label("Convert to NA")).to_be_checked()
+    expect(mini.get_by_label("Stata (do-file)")).not_to_be_checked()
+    mini.get_by_label("Stata (do-file)").check()
+    mini.reload()
+    expect(mini.locator("#result-count")).to_have_text("16 variables")
+    review(mini)
+    expect(mini.get_by_label("Stata (do-file)")).to_be_checked()
+    expect(download_button(mini)).to_have_text("Download Python + Stata do-file code")
     mini.get_by_label("Python", exact=True).uncheck()
+    mini.get_by_label("Stata (do-file)").uncheck()
     expect(download_button(mini)).to_be_disabled()
+
+
+def test_options_saved_before_stata_still_load(mini):
+    mini.evaluate(
+        """localStorage.setItem("cohort-data-builder:_site:options",
+             JSON.stringify({languages: ["r", "spss"]}))"""
+    )
+    mini.reload()
+    pick(mini, "smoke5")
+    review(mini)
+    expect(mini.get_by_label("R", exact=True)).to_be_checked()
+    expect(mini.get_by_label("Python", exact=True)).not_to_be_checked()
+    expect(mini.get_by_label("Stata (do-file)")).not_to_be_checked()
+
+
+def test_stata_option_adds_do_files_to_the_zip(mini, tmp_path):
+    pick(mini, "smoke5")
+    review(mini)
+    mini.get_by_label("Stata (do-file)").check()
+    mini.get_by_label("R", exact=True).uncheck()
+    mini.get_by_label("Python", exact=True).uncheck()
+    with mini.expect_download() as info:
+        download_button(mini).click()
+    path = tmp_path / "stata.zip"
+    info.value.save_as(path)
+    with zipfile.ZipFile(path) as z:
+        names = [n.split("/", 1)[1] for n in z.namelist()]
+    assert "stata/merge.do" in names and "stata/load_data.do" in names
+    assert not any(n.startswith(("R/", "python/")) for n in names)
 
 
 def test_download_produces_the_project_zip(mini, tmp_path):
