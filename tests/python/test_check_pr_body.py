@@ -94,3 +94,18 @@ def test_main_reports_ok(check, monkeypatch, capsys):
     monkeypatch.setenv("PR_BODY", FILLED)
     assert check.main() == 0
     assert "How to review: OK" in capsys.readouterr().out
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_dependabot_pull_requests_skip_the_description_check():
+    """A bot cannot write review steps, so its pull requests skip the check."""
+    workflow = (ROOT / ".github" / "workflows" / "pr-description.yml").read_text()
+    assert "if: github.event.pull_request.user.login != 'dependabot[bot]'" in workflow
+
+
+def test_dependabot_targets_main():
+    """Feature 001 has merged, so updates go to main, not its old integration branch."""
+    config = (ROOT / ".github" / "dependabot.yml").read_text()
+    assert "target-branch" not in config
