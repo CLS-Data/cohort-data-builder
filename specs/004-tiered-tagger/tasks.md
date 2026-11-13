@@ -104,14 +104,14 @@ thresholds.
   - `is_remote()` is true for `clef:cloud`, `x-cloud`, and any host other than localhost.
 - [x] T015 [P] [US4] Write a failing test in `tests/test_provider.py`: the chat `ollama` provider's `is_remote()` is true for a model ending `:cloud`, as well as `-cloud` (FR-014, R12).
 - [x] T016 [US4] Implement `OllamaDecisionProvider` in the new `src/topic_tagger/providers/ollama_decision.py`, using `urllib.request` with no client retries and splitting at 64. Register it as `ollama-decision` in `providers/__init__.py`, and document the second provider kind in that module's docstring. Make `remote_suffix` accept both `-cloud` and `:cloud` for both providers. Commit.
-- [ ] T017 [US4] Write the failing tests in `tests/test_tiered.py` for `DecisionDecider(provider, keep_at=0.3)`:
+- [x] T017 [US4] Write the failing tests in `tests/test_tiered.py` for `DecisionDecider(provider, keep_at=0.3)`:
   - It asks one request per variable.
   - The `state` is `{"name", "label", "values"}`, with values capped at 30 (`prompt.MAX_VALUES`).
   - Each question has `{"type": "noul", "instructions": "Is this survey variable about <label>? <description>"}`, plus the area's topic labels at tier 1.
   - Areas are returned with their probabilities, for the walk to apply `descend_at`.
   - Leaves are kept when ≥ `keep_at`, else the single strongest leaf is kept, and `keep_at=0` keeps every leaf (FR-017).
   - **Flat** with the decider (R14) walks `flat_tree(scheme)`, a root whose children are every topic. With the bundled CLOSER scheme it sends 2 requests per variable (split at 64), and returns the same keep rule.
-- [ ] T018 [US4] Implement `DecisionDecider` and `flat_tree(scheme)` in `src/topic_tagger/tiered.py`. Commit.
+- [x] T018 [US4] Implement `DecisionDecider` and `flat_tree(scheme)` in `src/topic_tagger/tiered.py`. Commit.
 - [ ] T019 [US4] Write the failing tests in `tests/test_cli.py`:
   - `--provider ollama-decision --method flat` tags the fixture against the fake server, asking every topic per variable.
   - With `--provider ollama` (chat), `--method flat` still uses the unchanged flat prompt (FR-009).

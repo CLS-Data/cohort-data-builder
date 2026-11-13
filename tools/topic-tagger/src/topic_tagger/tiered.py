@@ -10,8 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from topic_tagger.prompt import build_option_messages
-from topic_tagger.providers import Provider, ProviderError
+from topic_tagger.prompt import MAX_VALUES, build_option_messages
+from topic_tagger.providers import DecisionProvider, Provider, ProviderError
 from topic_tagger.reply import ReplyError, options_schema, parse_options_reply
 from topic_tagger.scheme import Scheme
 from topic_tagger.variables import Variable
@@ -67,6 +67,17 @@ def build_tree(scheme: Scheme) -> Node:
     )
 
 
+def flat_tree(scheme: Scheme) -> Node:
+    """The scheme as one tier: the root's children are every topic.
+
+    Walking it asks every topic at once, as the flat method does; a decision model uses it
+    to tag flat with the same questions and keep rule as tiered.
+    """
+    return Node(
+        "", scheme.name, "", tuple(Node(t.id, t.label, t.description) for t in scheme.topics)
+    )
+
+
 Tags = list[tuple[str, float]]
 
 
@@ -108,6 +119,68 @@ class ChatDecider:
         messages = build_option_messages(self.guidance, node, variables)
         text = self.provider.complete(messages, options_schema(ids))
         return parse_options_reply(text, ids, len(variables), position.__getitem__), 1
+
+
+class DecisionDecider:
+    """Decides with a decision model such as Clef: one variable per request.
+
+    Each option of the tier becomes a yes/no (``noul``) question, "Is this survey variable
+    about <label>? <description>", and its probability is the confidence. Yes/no questions
+    give each option its own probability, so a variable can belong to several areas or
+    topics; a single ``choice`` question would make them compete.
+
+    Args:
+        provider: The decision-model host.
+        keep_at: Topics below this probability are dropped, but the strongest is always kept.
+            Areas are all returned; the walk decides which to follow.
+    """
+
+    def __init__(self, provider: DecisionProvider, keep_at: float = 0.3):
+        self.provider = provider
+        self.keep_at = keep_at
+
+    def decide(self, node: Node, variables: list[Variable]) -> tuple[dict[int, Tags], int]:
+        """Ask each variable about ``node``'s children, one request (or more) per variable.
+
+        A variable whose request fails is left out, so the walk asks it again alone; the
+        others keep their answers.
+        """
+        questions = {c.id: _question(c) for c in node.children}
+        leaf = {c.id: c.is_leaf for c in node.children}
+        position = {c.id: i for i, c in enumerate(node.children)}
+        got: dict[int, Tags] = {}
+        sent = 0
+        error: ProviderError | None = None
+        for i, v in enumerate(variables):
+            sent += self.provider.requests_for(len(questions))
+            try:
+                probs = self.provider.decide(_state(v), questions)
+            except ProviderError as e:
+                error = e
+                continue
+            ranked = sorted(probs.items(), key=lambda kv: (-kv[1], position[kv[0]]))
+            leaves = [(c, round(p, 2)) for c, p in ranked if leaf[c]]
+            kept = [(c, p) for c, p in leaves if p >= self.keep_at] or leaves[:1]
+            areas = [(c, round(p, 2)) for c, p in ranked if not leaf[c]]
+            got[i] = sorted(kept + areas, key=lambda kv: (-kv[1], position[kv[0]]))
+        if not got and error is not None:
+            raise error  # nothing answered: let the walk retry the whole group
+        return got, sent
+
+
+def _state(v: Variable) -> dict:
+    """One variable as the decision model's state, with value labels capped as in prompts."""
+    values = [f"{value}: {label}" for value, label in v.values[:MAX_VALUES]]
+    if len(v.values) > MAX_VALUES:
+        values.append(f"… and {len(v.values) - MAX_VALUES} more")
+    return {"name": v.variable, "label": v.label or "", "values": values}
+
+
+def _question(option: Node) -> str:
+    text = f"Is this survey variable about {option.label}? {option.description}"
+    if option.children:
+        text += " It includes: " + ", ".join(c.label for c in option.children) + "."
+    return text
 
 
 @dataclass
