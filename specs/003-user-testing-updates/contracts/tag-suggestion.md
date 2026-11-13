@@ -31,6 +31,10 @@ https://github.com/CLS-Data/cohort-data-builder/issues/new
   &why=<the reason, when given>
 ```
 
+The link also carries `body`: the same details as Markdown ("**Cohort:** …", "**Suggested
+tags:** …"). GitHub fills an issue form's fields only when the form is on the default branch;
+without it (before this is merged, or in a fork) the plain body is used instead.
+
 Every value is URL-encoded. The whole URL is at most 8,000 characters: if longer, `current`
 then `why`, then `label` are cut, ending with `…`. Built by
 `tagSuggestionUrl(entry, file, manifest, suggestion)`

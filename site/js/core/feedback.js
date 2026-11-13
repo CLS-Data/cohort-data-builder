@@ -38,6 +38,7 @@ const cut = (s, max) => (s.length > max ? `${s.slice(0, Math.max(0, max - 1))}�
  *   The cohort manifest, for its name and topic labels.
  * @param {{topics: string[], why?: string}} [suggestion] The topic ids the variable should
  *   have, and why. Written into the form as "Add: Domain › Topic…" and "Remove: …" lines.
+ *   The same details also go in the issue body, used when GitHub has no form to fill.
  * @returns {string} The URL, at most 8,000 characters: when longer, the current tags, the
  *   reason and then the label are shortened, never the cohort, variable or file.
  */
@@ -70,13 +71,29 @@ export function tagSuggestionUrl(entry, file, manifest, suggestion) {
       .join("\n");
     if (suggestion.why?.trim()) fields.why = suggestion.why.trim();
   }
-  const url = () => `${REPOSITORY}/issues/new?${new URLSearchParams(fields)}`;
+  // GitHub fills an issue form's fields only when the form is on the default branch. The
+  // same details go in the plain body too, which GitHub uses when there is no form (before
+  // the form is merged, or in a fork without it).
+  const body = () =>
+    [
+      `**Cohort:** ${fields.cohort}`,
+      `**Variable:** ${fields.variable}`,
+      `**File:** ${fields.file}`,
+      `**Label:** ${fields.label}`,
+      `**Current tags:** ${fields.current}`,
+      `**Suggested tags:**\n${fields.suggested || "_Which topics should it have, or not have?_"}`,
+      fields.why ? `**Why:** ${fields.why}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  const url = () => `${REPOSITORY}/issues/new?${new URLSearchParams({ ...fields, body: body() })}`;
   for (const key of ["current", "why", "label"]) {
     if (!(key in fields)) continue;
     // Each pass drops what was over, in encoded characters, plus a little for the ellipsis.
     while (url().length > MAX_URL && fields[key].length > 1) {
       const over = url().length - MAX_URL;
-      fields[key] = cut(fields[key], Math.max(1, fields[key].length - Math.ceil(over / 3) - 1));
+      // Each field appears twice (its own and in the body), so half the excess at a time.
+      fields[key] = cut(fields[key], Math.max(1, fields[key].length - Math.ceil(over / 6) - 1));
     }
   }
   return url();
