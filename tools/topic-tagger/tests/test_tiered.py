@@ -11,7 +11,6 @@ from topic_tagger.tiered import (
     DecisionDecider,
     Node,
     build_tree,
-    choice_problems,
     walk,
 )
 from topic_tagger.variables import Variable
@@ -83,7 +82,7 @@ def do_walk(scheme, answers, names, fail=(), **kw):
         [var(n) for n in names],
         decider,
         descend_at=kw.get("descend_at", 0.5),
-        max_areas=kw.get("max_areas", 3),
+        max_follow=kw.get("max_follow", 3),
         retries=kw.get("retries", 1),
     )
     return result, stub
@@ -116,10 +115,10 @@ def test_areas_are_followed_by_threshold_and_the_strongest_always(small_scheme):
     assert result.tags[3] == [("alcohol", 0.5)]
 
 
-def test_max_areas_caps_and_zero_means_no_cap(small_scheme):
-    result, _ = do_walk(small_scheme, ANSWERS, ["both"], descend_at=0.1, max_areas=1)
+def test_max_follow_caps_and_zero_means_no_cap(small_scheme):
+    result, _ = do_walk(small_scheme, ANSWERS, ["both"], descend_at=0.1, max_follow=1)
     assert result.paths[0] == [("health", 0.8)]
-    result, _ = do_walk(small_scheme, ANSWERS, ["both"], descend_at=0.1, max_areas=0)
+    result, _ = do_walk(small_scheme, ANSWERS, ["both"], descend_at=0.1, max_follow=0)
     assert [a for a, _ in result.paths[0]] == ["health", "demographics"]
 
 
@@ -135,7 +134,7 @@ def test_a_node_with_one_child_is_routed_without_asking():
     other = Node("misc", "Misc", "Other.", (Node("x", "X", "X."), Node("y", "Y", "Y.")))
     root = Node("", "T", "", (only, other))
     stub = StubProvider(scripted({"v": {"resp": 0.7}}))
-    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_areas=3)
+    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_follow=3)
     assert len(stub.calls) == 1  # tier 1 only
     assert result.tags[0] == [("asthma", 0.7)]
 
@@ -143,7 +142,7 @@ def test_a_node_with_one_child_is_routed_without_asking():
 def test_a_scheme_with_one_area_sends_no_tier_1_request():
     root = Node("", "T", "", (Node("a", "A", "A.", (Node("x", "X", "X."), Node("y", "Y", "Y."))),))
     stub = StubProvider(scripted({"v": {"y": 0.6}}))
-    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_areas=3)
+    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_follow=3)
     assert [options_in(m) for m, _ in stub.calls] == [["x", "y"]]
     assert result.tags[0] == [("y", 0.6)] and result.requests_by_tier == [0, 1]
 
@@ -159,7 +158,7 @@ def test_three_tiers_take_three_rounds_of_requests():
     misc = Node("misc", "Misc", "Other.", (Node("x", "X", "X."), Node("y", "Y", "Y.")))
     root = Node("", "T", "", (health, misc))
     stub = StubProvider(scripted({"v": {"health": 0.9, "resp": 0.8, "asthma": 0.7}}))
-    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_areas=3)
+    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_follow=3)
     assert result.requests_by_tier == [1, 1, 1]
     assert result.tags[0] == [("asthma", 0.7)]
     assert result.paths[0] == [("health", 0.9), ("resp", 0.8)]
@@ -238,7 +237,7 @@ def clef_walk(scheme, names, keep_at=0.3, fail_for=(), **kw):
         [var(n) for n in names],
         decider,
         descend_at=kw.get("descend_at", 0.5),
-        max_areas=kw.get("max_areas", 3),
+        max_follow=kw.get("max_follow", 3),
         retries=kw.get("retries", 1),
     )
     return result, stub
@@ -292,21 +291,6 @@ def test_a_clef_failure_for_one_variable_leaves_the_others(small_scheme):
     result, stub = clef_walk(small_scheme, ["smk", "age"], fail_for={"age"})
     assert result.tags[0] == [("smoking", 0.6), ("alcohol", 0.35)]
     assert 1 in result.failed and result.singles == 1
-
-
-def test_the_bundled_scheme_fits_clefs_choice_limit(bundled_scheme_path):
-    from topic_tagger.scheme import load_scheme
-
-    assert choice_problems(build_tree(load_scheme(bundled_scheme_path))) == []
-
-
-def test_a_tier_with_more_than_26_options_is_named():
-    big = Node("big", "Big", "", tuple(Node(f"t{i}", f"T{i}", "") for i in range(27)))
-    root = Node("", "S", "", (big, Node("small", "Small", "", (Node("x", "X", ""),))))
-    assert choice_problems(root) == ["area big has 27 topics; Clef can choose among at most 26"]
-    areas = tuple(Node(f"a{i}", f"A{i}", "", (Node(f"x{i}", "X", ""),)) for i in range(30))
-    many = Node("", "S", "", areas)
-    assert choice_problems(many) == ["the scheme has 30 areas; Clef can choose among at most 26"]
 
 
 # --- The fallback topic is an exit at tier 1 -----------------------------------------
@@ -370,7 +354,7 @@ def test_clef_follows_every_area_at_the_threshold_and_tags_from_each(small_schem
              "smoking": 0.8, "alcohol": 0.15, "age": 0.7, "gender": 0.3}  # fmt: skip
     stub = StubDecision(lambda n, o: probs.get(o, 0.0))
     result = walk(build_tree(small_scheme), [var("pregsmk")], DecisionDecider(stub, 0.3),
-                  descend_at=0.3, max_areas=3)  # fmt: skip
+                  descend_at=0.3, max_follow=3)  # fmt: skip
     assert result.paths[0] == [("health", 0.5), ("demographics", 0.4)]
     assert result.tags[0] == [("smoking", 0.8), ("age", 0.7), ("gender", 0.3)]
 
@@ -385,3 +369,208 @@ def test_clefs_questions_ask_for_every_option_that_applies(small_scheme):
     assert tier2.startswith("Which topics of a survey is this variable about?")
     for text in (tier1, tier2):
         assert "If more than one applies, share the probability between them" in text
+
+
+# --- Any depth, uneven taxonomies (feature 005, US1) ------------------------------------
+
+
+def three_tier():
+    from conftest import FIXTURES
+    from topic_tagger.scheme import load_scheme
+
+    return load_scheme(FIXTURES / "scheme_3tier.toml")
+
+
+def test_the_tree_keeps_three_tiers_and_offers_the_fallback_at_tier_1():
+    from topic_tagger.tiered import _height
+
+    root = build_tree(three_tier())
+    assert [c.id for c in root.children] == ["health", "demographics", "other"]
+    physical = root.find("physical_health")
+    assert [c.id for c in physical.children] == ["respiratory", "cardiac", "diabetes"]
+    assert root.find("smoking").is_leaf and root.find("other").is_leaf
+    assert _height(root) == 3
+
+
+def test_moving_the_fallback_prunes_groups_left_empty_up_the_tree(tmp_path):
+    from topic_tagger.scheme import load_scheme
+
+    path = tmp_path / "s.toml"
+    path.write_text(
+        'name = "S"\nversion = 1\nfallback_topic = "other"\nguidance = "G"\n'
+        '[[categories]]\nid = "a"\nlabel = "A"\n'
+        '  [[categories.categories]]\n  id = "x"\n  label = "X"\n'
+        '  [[categories.categories]]\n  id = "y"\n  label = "Y"\n'
+        '[[categories]]\nid = "misc"\nlabel = "Misc"\n'
+        '  [[categories.categories]]\n  id = "rest"\n  label = "Rest"\n'
+        '    [[categories.categories.categories]]\n    id = "other"\n    label = "Other"\n'
+    )
+    root = build_tree(load_scheme(path))
+    assert [c.id for c in root.children] == ["a", "other"]
+    assert root.find("misc") is None and root.find("rest") is None
+
+
+THREE = {
+    "asthma": {"health": 0.9, "physical_health": 0.8, "smoking": 0.7, "respiratory": 0.9},
+    "heart": {"other": 0.6, "health": 0.7, "physical_health": 0.9, "cardiac": 0.8},
+}
+
+
+def test_a_three_tier_walk_keeps_a_leaf_chosen_beside_groups():
+    result, _ = do_walk(three_tier(), THREE, ["asthma"])
+    # smoking is a real tier-2 leaf, not an exit: it is kept beside respiratory
+    assert result.tags[0] == [("respiratory", 0.9), ("smoking", 0.7)]
+    assert result.paths[0] == [("health", 0.9), ("physical_health", 0.8)]
+    assert len(result.requests_by_tier) == 3
+
+
+def test_in_three_tiers_the_fallback_is_still_dropped_when_a_group_gives_tags():
+    result, _ = do_walk(three_tier(), THREE, ["heart"])
+    assert result.tags[0] == [("cardiac", 0.8)]
+
+
+# --- Flat with a decision model, and refusals (feature 005, US2) ------------------------
+
+from topic_tagger.providers import OptionLimitError  # noqa: E402
+
+
+def test_the_flat_tree_offers_every_leaf_at_once(small_scheme):
+    from topic_tagger.tiered import flat_tree
+
+    root = flat_tree(small_scheme)
+    assert [c.id for c in root.children] == small_scheme.topic_ids
+    assert all(c.is_leaf for c in root.children)
+
+
+def test_a_decision_model_tags_flat_with_one_request_per_variable(small_scheme):
+    from topic_tagger.tiered import flat_tree
+
+    probs = {"smoking": 0.6, "alcohol": 0.25, "age": 0.15}
+    stub = StubDecision(lambda n, o: probs.get(o, 0.0))
+    result = walk(
+        flat_tree(small_scheme), [var("a"), var("b")], DecisionDecider(stub, keep_at=0.2), 0.5, 3
+    )
+    assert result.tags[0] == [("smoking", 0.6), ("alcohol", 0.25)]
+    assert result.paths == {} and result.requests_by_tier == [2] and len(stub.calls) == 2
+    weak = StubDecision(lambda n, o: 0.1 if o == "age" else 0.05)
+    result = walk(flat_tree(small_scheme), [var("a")], DecisionDecider(weak), 0.5, 3)
+    assert result.tags[0] == [("age", 0.1)]  # the strongest, though below keep_at
+
+
+class Refusing(StubDecision):
+    """Refuses any question with more than ``limit`` options, as a model's host would."""
+
+    def __init__(self, limit, probability=lambda n, o: 0.5):
+        super().__init__(probability)
+        self.limit = limit
+
+    def decide(self, state, instructions, options):
+        if len(options) > self.limit:
+            self.calls.append((state, instructions, options))
+            raise OptionLimitError(400, "too many options", len(options))
+        return super().decide(state, instructions, options)
+
+
+def test_a_refusal_at_the_flat_question_names_it_and_is_not_retried(small_scheme):
+    from topic_tagger.tiered import flat_tree
+
+    stub = Refusing(limit=5)
+    with pytest.raises(OptionLimitError) as err:
+        walk(flat_tree(small_scheme), [var("a"), var("b")], DecisionDecider(stub), 0.5, 3)
+    assert err.value.question == "every topic, asked flat"
+    assert "tiered" in err.value.advice
+    assert len(stub.calls) == 1  # no retry, no other variable, no single request
+
+
+def test_a_refusal_at_tier_1_names_it(small_scheme):
+    stub = Refusing(limit=3)  # tier 1 offers 3 areas and the exit
+    with pytest.raises(OptionLimitError) as err:
+        walk(build_tree(small_scheme), [var("a")], DecisionDecider(stub), 0.5, 3)
+    assert err.value.question == "the tier-1 categories and the fallback exit"
+    assert len(stub.calls) == 1
+
+
+def test_a_refusal_at_a_group_names_the_group_and_its_tier():
+    scheme = three_tier()
+    probs = {"health": 0.9, "physical_health": 0.9}
+
+    class BelowTier1(Refusing):  # tier 1 is answered; any group with 3 options is refused
+        def decide(self, state, instructions, options):
+            if "health" in options:
+                return StubDecision.decide(self, state, instructions, options)
+            return super().decide(state, instructions, options)
+
+    stub = BelowTier1(limit=2, probability=lambda n, o: probs.get(o, 0.01))
+    with pytest.raises(OptionLimitError) as err:
+        walk(build_tree(scheme), [var("a")], DecisionDecider(stub), 0.5, 3)
+    assert err.value.question == 'the categories in group health, "Health", tier 1'
+    assert "Split health" in err.value.advice
+
+
+# --- Questions and guidance (feature 005, US4) ------------------------------------------
+
+from conftest import FIXTURES  # noqa: E402
+from topic_tagger.scheme import load_scheme  # noqa: E402
+from topic_tagger.tiered import decision_request  # noqa: E402
+
+BUILT_IN_TOPICS = (
+    "Which topics of a survey is this variable about? If more than one applies, share the "
+    "probability between them."
+)
+
+
+def run_scheme():
+    return load_scheme(FIXTURES / "scheme_run.toml")
+
+
+def group(tree, id_):
+    return next(c for c in tree.children if c.id == id_)
+
+
+def test_a_tier_question_follows_the_guidance_with_the_group_filled_in():
+    scheme = run_scheme()
+    health = group(build_tree(scheme), "health")
+    body = decision_request("m", health, var("x"), scheme.guidance)
+    instructions = body["questions"]["option"]["instructions"]
+    assert instructions == scheme.guidance.strip() + "\n\nWhich topic within Health?"
+    assert body["state"] == {"name": "x", "label": "x", "values": []}
+
+
+def test_with_no_question_for_a_tier_the_built_in_wording_is_used(small_scheme):
+    health = group(build_tree(small_scheme), "health")
+    body = decision_request("m", health, var("x"), small_scheme.guidance)
+    expected = small_scheme.guidance.strip() + "\n\n" + BUILT_IN_TOPICS
+    assert body["questions"]["option"]["instructions"] == expected
+
+
+def test_the_flat_question_is_used_flat(tmp_path):
+    from topic_tagger.tiered import flat_tree
+
+    text = (FIXTURES / "scheme_small.toml").read_text()
+    path = tmp_path / "s.toml"
+    path.write_text(text.replace("[[domains]]", '[questions]\nflat = "Which?"\n\n[[domains]]', 1))
+    scheme = load_scheme(path)
+    body = decision_request("m", flat_tree(scheme), var("x"), scheme.guidance)
+    assert body["questions"]["option"]["instructions"].endswith("\n\nWhich?")
+
+
+def test_the_tier1_question_names_the_taxonomy(tmp_path):
+    text = (FIXTURES / "scheme_small.toml").read_text()
+    path = tmp_path / "s.toml"
+    path.write_text(
+        text.replace("[[domains]]", '[questions]\ntier1 = "In {group}?"\n\n[[domains]]', 1)
+    )
+    scheme = load_scheme(path)
+    assert build_tree(scheme).question == f"In {scheme.name}?"
+
+
+def test_the_guidance_reaches_every_decision_question_flat_and_tiered():
+    from topic_tagger.tiered import flat_tree
+
+    scheme = run_scheme()
+    start = scheme.guidance.strip() + "\n\n"
+    for tree in (build_tree(scheme), flat_tree(scheme)):
+        stub = StubDecision(lambda n, o: 0.9 if o in ("health", "smoking") else 0.01)
+        walk(tree, [var("a")], DecisionDecider(stub, guidance=scheme.guidance), 0.5, 3)
+        assert stub.calls and all(i.startswith(start) for _, i, _ in stub.calls)
+        assert all(s == {"name": "a", "label": "a", "values": []} for s, _, _ in stub.calls)

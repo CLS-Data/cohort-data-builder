@@ -53,7 +53,10 @@ def build_option_messages(
         ``[system message, user message]``; the user message is the same as the flat one.
     """
     ids = [c.id for c in node.children]
-    lines = [guidance, "", "Options. Use only these ids:"]
+    lines = [guidance, ""]
+    if node.question:  # with no question set, the prompt is as it was in 004
+        lines += [f"Question: {node.question}", ""]
+    lines += ["Options. Use only these ids:"]
     for c in node.children:
         lines.append(f"- {c.id}: {c.label} — {c.description}")
         if show_children_of_options and c.children:
@@ -81,10 +84,13 @@ def reply_schema(scheme: Scheme) -> dict:
 
 
 def _system(scheme: Scheme) -> str:
-    lines = [scheme.guidance, "", "Topics, grouped by area. Use only these ids:"]
-    for d in scheme.domains:
-        lines += ["", f"## {d.label}"]
-        lines += [f"- {t.id}: {t.label} — {t.description}" for t in d.topics]
+    heading = "Topics, grouped by area." if scheme.tiers > 1 else "Topics."
+    lines = [scheme.guidance, ""]
+    question = scheme.questions.get("flat", "").replace("{group}", scheme.name).strip()
+    if question:  # with no question set, the prompt is as it was in 004
+        lines += [f"Question: {question}", ""]
+    lines += [f"{heading} Use only these ids:"]
+    lines += _leaf_sections(scheme)
     lines += [
         "",
         "Rules:",
@@ -97,6 +103,38 @@ def _system(scheme: Scheme) -> str:
         output_parser(scheme).get_format_instructions(),
     ]
     return "\n".join(lines)
+
+
+def _leaf_sections(scheme: Scheme) -> list[str]:
+    """Every leaf, under a heading naming the groups above it (``## Health › Smoking``).
+
+    Tier-1 leaves come first, with no heading, so they are not read as part of the group
+    listed before them. Leaves sharing a path are listed together, in scheme order.
+    """
+    label = {}
+
+    def visit(c) -> None:
+        label[c.id] = c.label
+        for child in c.children:
+            visit(child)
+
+    visit(scheme.root)
+    top = [t for t in scheme.topics if not scheme.path_of(t.id)]
+    lines = ["", *map(_leaf_line, top)] if top else []
+    current = None
+    for t in scheme.topics:
+        path = scheme.path_of(t.id)
+        if not path:
+            continue
+        if path != current:
+            current = path
+            lines += ["", "## " + " › ".join(label[g] for g in path)]
+        lines.append(_leaf_line(t))
+    return lines
+
+
+def _leaf_line(t) -> str:
+    return f"- {t.id}: {t.label} — {t.description}" if t.description else f"- {t.id}: {t.label}"
 
 
 def _user(batch: list[Variable]) -> str:

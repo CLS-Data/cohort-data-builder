@@ -1,0 +1,57 @@
+# A worked example: a one-tier taxonomy, a flat list of topics with no groups.
+#
+# Copy it and edit the copy. Check it with:  topic-tagger check-scheme my-scheme.toml
+# A one-tier taxonomy is always tagged flat: --method tiered would ask the same question.
+# Every [[categories]] entry here is a leaf: something a variable can be tagged with.
+
+name = "Example: one tier"
+version = 1
+fallback_topic = "other"          # must be one of the leaves below
+guidance = '''
+You are classifying variables from a UK cohort study by what they measure. Read each
+variable's name, label and value labels, and choose the topics it is about.
+'''
+
+# Optional: the wording of the question. Without it, the built-in wording is used.
+[questions]
+flat = "Which topic is this variable about?"
+
+[[categories]]
+id = "age"
+label = "Age"
+description = "Age, date of birth, age at an event."
+
+[[categories]]
+id = "sex_gender"
+label = "Sex and gender"
+description = "Sex at birth, gender identity."
+
+[[categories]]
+id = "education"
+label = "Education"
+description = "Schooling, qualifications, attainment."
+
+[[categories]]
+id = "employment"
+label = "Employment"
+description = "Work, occupation, hours, unemployment."
+
+[[categories]]
+id = "income"
+label = "Income"
+description = "Earnings, benefits, household income."
+
+[[categories]]
+id = "housing"
+label = "Housing"
+description = "Tenure, rooms, housing conditions."
+
+[[categories]]
+id = "health"
+label = "Health"
+description = "Physical and mental health, health behaviours."
+
+[[categories]]
+id = "other"
+label = "Other"
+description = "Nothing above fits, or the variable is administrative."

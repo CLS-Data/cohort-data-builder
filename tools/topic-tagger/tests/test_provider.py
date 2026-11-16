@@ -1,3 +1,4 @@
+import contextlib
 import json
 import threading
 import time
@@ -31,7 +32,9 @@ class FakeOllama:
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
-                self.wfile.write(data)
+                # The client may have given up first (the timeout tests).
+                with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+                    self.wfile.write(data)
 
             def do_GET(self):
                 fake.requests.append(
@@ -74,6 +77,8 @@ class FakeOllama:
                 )
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        # Request threads are joined on close, so none is left writing at exit.
+        self.server.daemon_threads = False
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}/v1"
         threading.Thread(target=self.server.serve_forever, args=(0.05,), daemon=True).start()
 

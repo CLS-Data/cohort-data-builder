@@ -1,8 +1,9 @@
-"""Tiered tagging: walk the taxonomy one tier at a time (feature 004).
+"""Tiered tagging: walk the taxonomy one tier at a time (features 004 and 005).
 
-The scheme becomes a tree of ``Node``s: a root, its areas (the scheme's domains), and their
-topics. Tagging tiered asks, for each variable, which areas apply, then which topics within
-each area that passed the threshold, and so on for deeper trees.
+The scheme becomes a tree of ``Node``s: a root, its tier-1 categories, and so on down to the
+leaves, one to three tiers deep. Tagging tiered asks, for each variable, which tier-1
+categories apply, then which categories within each group that passed the threshold, and so
+on down to the leaves.
 """
 
 from __future__ import annotations
@@ -11,8 +12,8 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from topic_tagger.prompt import MAX_VALUES, build_option_messages
-from topic_tagger.providers import DecisionProvider, Provider, ProviderError
-from topic_tagger.providers.ollama_decision import MAX_OPTIONS, choice_body
+from topic_tagger.providers import DecisionProvider, OptionLimitError, Provider, ProviderError
+from topic_tagger.providers.ollama_decision import choice_body
 from topic_tagger.reply import ReplyError, options_schema, parse_options_reply
 from topic_tagger.scheme import Scheme
 from topic_tagger.variables import Variable
@@ -20,19 +21,25 @@ from topic_tagger.variables import Variable
 
 @dataclass(frozen=True)
 class Node:
-    """One option in the taxonomy: an area (with children) or a topic (a leaf).
+    """One option in the taxonomy: a group (with children) or a leaf.
 
     Attributes:
-        id: The area or topic id; ``""`` for the root.
+        id: The category id; ``""`` for the root.
         label: Its label.
-        description: Its description.
-        children: Its children, in scheme order; empty for a topic.
+        description: Its description; may be empty.
+        children: Its children, in scheme order; empty for a leaf.
+        is_exit: True for the fallback offered at tier 1: kept only when nothing else is
+            found.
+        question: For a group, the scheme's question for its children, with ``{group}``
+            filled in; ``""`` for the built-in wording.
     """
 
     id: str
     label: str
     description: str
     children: tuple[Node, ...] = ()
+    is_exit: bool = False
+    question: str = ""
 
     @property
     def is_leaf(self) -> bool:
@@ -51,20 +58,65 @@ class Node:
 
 
 def build_tree(scheme: Scheme) -> Node:
-    """The scheme as a tree: root → one node per domain → one leaf per topic.
+    """The taxonomy as a tree of nodes, with the fallback offered at tier 1 as an exit.
 
-    The fallback topic is moved out of its domain and offered at tier 1, beside the areas,
-    as an exit for variables the model cannot place: it is taken like an area (see ``walk``)
-    and kept only when nothing else is found. A domain left empty by the move is dropped.
+    The fallback leaf is moved out of wherever it sits and offered beside the tier-1
+    categories, for variables the model cannot place: it is taken like a group (see
+    ``walk``) and kept only when nothing else is found. Groups the move leaves empty are
+    dropped, all the way up.
     """
-    fallback = next(t for t in scheme.topics if t.id == scheme.fallback_topic)
-    areas = []
-    for d in scheme.domains:
-        topics = tuple(Node(t.id, t.label, t.description) for t in d.topics if t is not fallback)
-        if topics:
-            areas.append(Node(d.id, d.label, d.description, topics))
-    exit_ = Node(fallback.id, fallback.label, fallback.description)
-    return Node("", scheme.name, "", (*areas, exit_))
+    fallback = scheme.fallback_topic
+
+    def convert(c, tier: int) -> Node | None:
+        if c.is_leaf:
+            return None if c.id == fallback else Node(c.id, c.label, c.description)
+        children = tuple(n for n in (convert(k, tier + 1) for k in c.children) if n)
+        if not children:
+            return None
+        question = _question(scheme, f"tier{tier + 1}", c.label)
+        return Node(c.id, c.label, c.description, children, question=question)
+
+    tier1 = [n for n in (convert(c, 1) for c in scheme.root.children) if n is not None]
+    leaf = next(t for t in scheme.topics if t.id == fallback)
+    exit_ = Node(leaf.id, leaf.label, leaf.description, is_exit=True)
+    question = _question(scheme, "tier1", scheme.name)
+    return Node("", scheme.name, "", (*tier1, exit_), question=question)
+
+
+def _question(scheme: Scheme, key: str, group: str) -> str:
+    """The scheme's question for ``key`` with ``{group}`` filled in, or ``""``."""
+    return scheme.questions.get(key, "").replace("{group}", group).strip()
+
+
+def flat_tree(scheme: Scheme) -> Node:
+    """Every leaf as an option of one question: flat tagging with a decision model.
+
+    The fallback is one of the leaves, as in a flat prompt. Walking this tree asks one
+    question per variable and keeps leaves as at any all-leaf tier (``keep_at``).
+    """
+    leaves = tuple(Node(t.id, t.label, t.description) for t in scheme.topics)
+    return Node("", scheme.name, "", leaves, question=_question(scheme, "flat", scheme.name))
+
+
+def question_sizes(tree: Node) -> dict[int, tuple[int, Node]]:
+    """The largest question asked at each tier of ``tree``: ``{tier: (options, group)}``.
+
+    A group's question offers its children, so it is asked at the tier below it: the root's
+    at tier 1. Ties go to the group first in scheme order. Used by ``check-scheme`` so the
+    user can compare a taxonomy with a model's option limit, which the tool cannot know.
+    """
+    sizes: dict[int, tuple[int, Node]] = {}
+
+    def visit(node: Node, tier: int) -> None:
+        if node.is_leaf:
+            return
+        if tier not in sizes or len(node.children) > sizes[tier][0]:
+            sizes[tier] = (len(node.children), node)
+        for child in node.children:
+            visit(child, tier + 1)
+
+    visit(tree, 1)
+    return sizes
 
 
 Tags = list[tuple[str, float]]
@@ -116,19 +168,25 @@ class DecisionDecider:
     Each request is one ``choice`` question over the tier's options ("Which area of a survey
     is this variable about?"), each described by its label, description and, for an area,
     its topics. Clef gives every option a probability, summing to about 1, which is used as
-    the confidence. Choice questions take 2 to 26 options, so Clef tags tiered only (see
-    ``choice_problems``).
+    the confidence. Walked over ``flat_tree`` it tags flat, over ``build_tree`` tiered. How
+    many options a question may offer is the model's limit; a refusal is raised, not
+    skipped, so the run stops (``OptionLimitError``).
+
+    The request has no field for background, so each question's instructions are the
+    scheme's guidance, a blank line, then the question (the scheme's, or the built-in one).
 
     Args:
         provider: The decision-model host.
         keep_at: Topics below this probability are dropped, but the strongest is always kept.
             Areas, and a topic offered among them (the exit), are all returned; the walk decides
             which to follow.
+        guidance: The scheme's instructions, put before every question.
     """
 
-    def __init__(self, provider: DecisionProvider, keep_at: float = 0.3):
+    def __init__(self, provider: DecisionProvider, keep_at: float = 0.3, guidance: str = ""):
         self.provider = provider
         self.keep_at = keep_at
+        self.guidance = guidance
 
     def decide(self, node: Node, variables: list[Variable]) -> tuple[dict[int, Tags], int]:
         """Ask each variable which of ``node``'s children fits, one request per variable.
@@ -136,7 +194,7 @@ class DecisionDecider:
         A variable whose request fails is left out, so the walk asks it again alone; the
         others keep their answers.
         """
-        instructions, options = _choice(node)
+        instructions, options = _choice(node, self.guidance)
         leaf = {c.id: c.is_leaf for c in node.children}
         position = {c.id: i for i, c in enumerate(node.children)}
         got: dict[int, Tags] = {}
@@ -144,6 +202,8 @@ class DecisionDecider:
         for i, v in enumerate(variables):
             try:
                 probs = self.provider.decide(_state(v), instructions, options)
+            except OptionLimitError:
+                raise  # the same question would be refused for every variable
             except ProviderError as e:
                 error = e
                 continue
@@ -162,45 +222,26 @@ class DecisionDecider:
         return got, len(variables)
 
 
-def choice_problems(root: Node) -> list[str]:
-    """Tiers too big for one ``choice`` question (more than 26 options), as messages.
-
-    A tier with a single option needs no question: the walk routes straight through it.
-    """
-    problems = []
-    if len(root.children) > MAX_OPTIONS:
-        problems.append(
-            f"the scheme has {len(root.children)} areas; Clef can choose among at most "
-            f"{MAX_OPTIONS}"
-        )
-    for area in root.children:
-        if len(area.children) > MAX_OPTIONS:
-            problems.append(
-                f"area {area.id} has {len(area.children)} topics; Clef can choose among at "
-                f"most {MAX_OPTIONS}"
-            )
-    return problems
-
-
-def decision_request(model: str, node: Node, variable: Variable) -> dict:
+def decision_request(model: str, node: Node, variable: Variable, guidance: str = "") -> dict:
     """The ``/v1/systemone`` body the decision decider sends for one variable at ``node``.
 
     Used by ``--dry-run``; the provider sends the same body.
     """
-    instructions, options = _choice(node)
+    instructions, options = _choice(node, guidance)
     return choice_body(model, _state(variable), instructions, options)
 
 
-def _choice(node: Node) -> tuple[str, dict[str, str]]:
-    """The question and described options for ``node``'s children."""
+def _choice(node: Node, guidance: str = "") -> tuple[str, dict[str, str]]:
+    """The instructions (guidance, then question) and described options for ``node``."""
     kind = "topics" if all(c.is_leaf for c in node.children) else "areas"
     # A choice question gives one answer; asking it to share the probability lets a variable
     # with two true areas or topics reach the thresholds with both.
-    question = (
+    question = node.question or (
         f"Which {kind} of a survey is this variable about? If more than one applies, share "
         "the probability between them."
     )
-    return question, {c.id: _criterion(c) for c in node.children}
+    instructions = f"{guidance.strip()}\n\n{question}" if guidance.strip() else question
+    return instructions, {c.id: _criterion(c) for c in node.children}
 
 
 def _state(v: Variable) -> dict:
@@ -247,14 +288,14 @@ def walk(
     batch: list[Variable],
     decider: Decider,
     descend_at: float,
-    max_areas: int,
+    max_follow: int,
     retries: int = 2,
 ) -> WalkResult:
     """Tag a batch by walking the tree from ``root``, one tier at a time.
 
     At each node, one request (through ``decider``) asks the node's variables which of its
     children apply. Children that are topics become tags. Children that are areas are
-    followed when their confidence is at least ``descend_at``, at most ``max_areas`` of them
+    followed when their confidence is at least ``descend_at``, at most ``max_follow`` of them
     (0 means no cap); the strongest is always followed, so no variable stalls. Each followed
     area is then asked once, for all the batch's variables routed to it. A topic offered
     among areas (the fallback, an exit) is chosen the same way, and kept only if no area
@@ -265,7 +306,7 @@ def walk(
         batch: The variables.
         decider: Answers each tier.
         descend_at: The confidence an area needs to be followed.
-        max_areas: Most areas followed per variable at each node; 0 for no cap.
+        max_follow: Most groups followed per variable at each question; 0 for no cap.
         retries: Retries of a failed group request before its variables are asked alone.
 
     Returns:
@@ -305,15 +346,16 @@ def walk(
                 for child_id, conf in chosen:
                     reach(_child(node, child_id), tier + 1, i, conf)
                 continue
-            # A tier of areas, perhaps with an exit topic: all are chosen alike, by
-            # descend_at, the strongest always, at most max_areas.
+            # A tier with groups, perhaps with leaves beside them (the exit, or real leaves
+            # in an uneven taxonomy): all are chosen alike, by descend_at, the strongest
+            # always, at most max_follow.
             areas = sorted(chosen, key=lambda kv: (-kv[1], order[kv[0]]))
             follow = [(c, conf) for c, conf in areas if conf >= descend_at] or areas[:1]
-            if max_areas:
-                follow = follow[:max_areas]
+            if max_follow:
+                follow = follow[:max_follow]
             for child_id, conf in follow:
                 child = _child(node, child_id)
-                if child.is_leaf:
+                if child.is_exit:
                     exits.add(child.id)
                 reach(child, tier + 1, i, conf)
 
@@ -330,13 +372,19 @@ def walk(
 
 
 def _ask(decider, node, positions, batch, tier, retries, result) -> dict[int, Tags]:
-    """Ask one group, with the same ladder as flat batches: retries, then each one alone."""
+    """Ask one group, with the same ladder as flat batches: retries, then each one alone.
+
+    A refusal for too many options is not retried: it is named and raised, to stop the run.
+    """
     got = None
     for attempt in range(retries + 1):
         try:
             got, sent = decider.decide(node, [batch[i] for i in positions])
             result.requests_by_tier[tier] += sent
             break
+        except OptionLimitError as e:
+            _name_refusal(e, node, tier)
+            raise
         except (ReplyError, ProviderError) as e:
             result.requests_by_tier[tier] += 1
             result.last_error = str(e)
@@ -348,6 +396,9 @@ def _ask(decider, node, positions, batch, tier, retries, result) -> dict[int, Ta
         try:
             one, sent = decider.decide(node, [batch[i]])
             result.requests_by_tier[tier] += sent
+        except OptionLimitError as e:
+            _name_refusal(e, node, tier)
+            raise
         except (ReplyError, ProviderError) as e:
             result.requests_by_tier[tier] += 1
             result.last_error = str(e)
@@ -355,6 +406,34 @@ def _ask(decider, node, positions, batch, tier, retries, result) -> dict[int, Ta
         if 0 in one:
             answers[i] = one[0]
     return answers
+
+
+def _name_refusal(error: OptionLimitError, node: Node, tier: int) -> None:
+    """Say which question was refused, and what the user can change, on the error."""
+    more = "or use a model that takes more options."
+    if node.id and tier:
+        error.question = f'the categories in group {node.id}, "{node.label}", tier {tier}'
+        error.advice = f"Split {node.id} into smaller groups, {more}"
+    elif any(c.is_exit for c in node.children):
+        error.question = "the tier-1 categories and the fallback exit"
+        error.advice = f"Put the tier-1 categories into fewer, larger groups, {more}"
+    else:
+        error.question = "every topic, asked flat"
+        error.advice = f"Tag tiered (--method tiered) so each question offers fewer options, {more}"
+
+
+def refusal_message(model: str, error: OptionLimitError) -> str:
+    """What to tell the user when a model refused a question: which, why, and what next.
+
+    Args:
+        model: The model's name as the user gave it.
+        error: The refusal, named by the walk.
+    """
+    return (
+        f"The model {model} refused a question with {error.options} options "
+        f"({error.question}):\n  HTTP {error.status}: {error.host_message}\n{error.advice} "
+        "Tags made so far are saved; a run with the same scheme and method carries on from them."
+    )
 
 
 def _child(node: Node, child_id: str) -> Node:

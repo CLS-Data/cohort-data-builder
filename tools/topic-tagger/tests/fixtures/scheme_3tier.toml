@@ -1,0 +1,66 @@
+# An uneven three-tier taxonomy for tests (feature 005), in the nested form. Health holds
+# two tier-2 groups and a tier-2 leaf (smoking); demographics holds only leaves; other is a
+# tier-1 leaf and the fallback. Some categories have no description.
+name = "Three tiers"
+version = 1
+fallback_topic = "other"
+guidance = """
+Tag each variable with the categories it measures.
+"""
+
+[[categories]]
+id = "health"
+label = "Health"
+description = "Physical and mental health, and health behaviour."
+
+  [[categories.categories]]
+  id = "physical_health"
+  label = "Physical health"
+
+    [[categories.categories.categories]]
+    id = "respiratory"
+    label = "Respiratory conditions"
+    description = "Asthma, bronchitis, wheeze."
+
+    [[categories.categories.categories]]
+    id = "cardiac"
+    label = "Heart conditions"
+
+    [[categories.categories.categories]]
+    id = "diabetes"
+    label = "Diabetes"
+
+  [[categories.categories]]
+  id = "mental_health"
+  label = "Mental health"
+  description = "Mood and wellbeing."
+
+    [[categories.categories.categories]]
+    id = "depression"
+    label = "Depression"
+
+    [[categories.categories.categories]]
+    id = "anxiety"
+    label = "Anxiety"
+
+  [[categories.categories]]
+  id = "smoking"
+  label = "Smoking"
+  description = "Tobacco use."
+
+[[categories]]
+id = "demographics"
+label = "Demographics"
+
+  [[categories.categories]]
+  id = "age"
+  label = "Age"
+
+  [[categories.categories]]
+  id = "gender"
+  label = "Sex and gender"
+
+[[categories]]
+id = "other"
+label = "Other"
+description = "Nothing else fits."

@@ -68,6 +68,9 @@ def test_to_json_has_the_documented_shape(small_scheme):
         "guidance",
         "fallback_topic",
         "domains",
+        "tiers",
+        "categories",
+        "questions",
     }
     assert data["hash"] == small_scheme.hash
     first = data["domains"][0]
@@ -196,3 +199,247 @@ def test_invalid_toml_names_the_line(tmp_path):
     with pytest.raises(SchemeError) as err:
         load_scheme(bad)
     assert "line 2" in str(err.value)
+
+
+# --- Taxonomies of one to three tiers (feature 005) -------------------------------------
+
+FIXTURES = __import__("pathlib").Path(__file__).parent / "fixtures"
+CLOSER = __import__("pathlib").Path(__file__).parents[1] / "src/topic_tagger/schemes/closer.toml"
+
+
+def nested(tmp_path, text, name="n.toml"):
+    path = tmp_path / name
+    path.write_text('name = "N"\nversion = 1\nguidance = "G"\n' + text)
+    return path
+
+
+def test_004_schemes_keep_their_hash_and_views():
+    closer = load_scheme(CLOSER)
+    small = load_scheme(FIXTURES / "scheme_small.toml")
+    assert closer.hash == "3c9f6b4b4ef9" and small.hash == "b2a923c4e9a5"
+    assert closer.tiers == small.tiers == 2
+    assert len(closer.topic_ids) == 107 and len(closer.domains) == 15
+    assert small.domain_of("alcohol").id == "health"
+    assert [t.id for t in small.domains[1].topics] == ["smoking", "alcohol", "physical_health"]
+
+
+def test_a_one_tier_taxonomy_is_a_list_of_leaves():
+    s = load_scheme(FIXTURES / "scheme_1tier.toml")
+    assert s.tiers == 1
+    assert s.topic_ids == ["age", "smoking", "housing", "income", "other"]
+    # Each tier-1 leaf is an area of its own, for statistics and reports.
+    assert [d.id for d in s.domains] == s.topic_ids
+    assert s.domain_of("age").id == "age" and [t.id for t in s.domains[0].topics] == ["age"]
+    assert s.path_of("age") == []
+
+
+def test_a_three_tier_taxonomy_may_be_uneven():
+    s = load_scheme(FIXTURES / "scheme_3tier.toml")
+    assert s.tiers == 3
+    assert s.topic_ids == [
+        "respiratory",
+        "cardiac",
+        "diabetes",
+        "depression",
+        "anxiety",
+        "smoking",
+        "age",
+        "gender",
+        "other",
+    ]
+    assert s.domain_of("respiratory").id == "health"
+    assert s.domain_of("smoking").id == "health"
+    assert s.path_of("respiratory") == ["health", "physical_health"]
+    assert s.path_of("smoking") == ["health"]
+    assert s.path_of("other") == []
+    cardiac = next(t for t in s.topics if t.id == "cardiac")
+    assert cardiac.description == ""
+    assert [c.id for c in s.root.children] == ["health", "demographics", "other"]
+
+
+LEAVES = """
+[[categories]]
+id = "a"
+label = "A"
+
+[[categories]]
+id = "other"
+label = "Other"
+"""
+
+
+@pytest.mark.parametrize(
+    ("text", "location", "words"),
+    [
+        (
+            'fallback_topic = "other"\n[[categories]]\nid = "g1"\nlabel = "G1"\n'
+            '[[categories.categories]]\nid = "g2"\nlabel = "G2"\n'
+            '[[categories.categories.categories]]\nid = "g3"\nlabel = "G3"\n'
+            '[[categories.categories.categories.categories]]\nid = "deep"\nlabel = "Deep"\n'
+            + LEAVES,
+            "categories[0].categories[0].categories[0].categories[0]",
+            "at most 3 tiers",
+        ),
+        (
+            'fallback_topic = "other"\n[[categories]]\nid = "a"\nlabel = "G"\n'
+            '[[categories.categories]]\nid = "x"\nlabel = "X"\n'
+            '[[categories.categories]]\nid = "y"\nlabel = "Y"\n' + LEAVES,
+            "categories[1].id",
+            "also used at categories[0].id",
+        ),
+        (
+            'fallback_topic = "other"\n[[categories]]\nid = "g"\nlabel = "G"\ncategories = []\n'
+            + LEAVES,
+            "categories[0].categories",
+            "no categories",
+        ),
+        (
+            'fallback_topic = "other"\n[[categories]]\nid = "other"\nlabel = "Other"\n',
+            "categories",
+            "at least two leaves",
+        ),
+        (
+            'fallback_topic = "g"\n[[categories]]\nid = "g"\nlabel = "G"\n'
+            '[[categories.categories]]\nid = "x"\nlabel = "X"\n' + LEAVES,
+            "fallback_topic",
+            "not a leaf",
+        ),
+        (
+            'fallback_topic = "other"\n[[domains]]\nid = "d"\nlabel = "D"\ndescription = "D."\n'
+            '[[domains.topics]]\nid = "t"\nlabel = "T"\ndescription = "T."\n' + LEAVES,
+            "categories",
+            "not both",
+        ),
+        (
+            'fallback_topic = "other"\n[[categories]]\nid = "nolabel"\n' + LEAVES,
+            "categories[0].label",
+            "missing",
+        ),
+    ],
+)
+def test_nested_mistakes_are_found_with_their_location(tmp_path, text, location, words):
+    with pytest.raises(SchemeError) as err:
+        load_scheme(nested(tmp_path, text))
+    found = {p.location: p.message for p in err.value.problems}
+    assert location in found, found
+    assert words in found[location]
+
+
+def test_every_nested_mistake_is_listed(tmp_path):
+    text = (
+        'fallback_topic = "zzz"\n[[categories]]\nid = "Bad"\nlabel = "B"\n'
+        '[[categories]]\nid = "g"\nlabel = "G"\ncategories = []\n' + LEAVES
+    )
+    with pytest.raises(SchemeError) as err:
+        load_scheme(nested(tmp_path, text))
+    assert len(err.value.problems) >= 3
+
+
+@pytest.mark.parametrize("name", ["scheme_1tier.toml", "scheme_small.toml", "scheme_3tier.toml"])
+def test_scheme_json_round_trips_and_keeps_domains(name):
+    from topic_tagger.scheme import scheme_from_json
+
+    s = load_scheme(FIXTURES / name)
+    data = s.to_json()
+    assert data["tiers"] == s.tiers and "categories" in data
+    assert [d["id"] for d in data["domains"]] == [d.id for d in s.domains]
+    back = scheme_from_json(json.loads(json.dumps(data)))
+    assert back.hash == s.hash and back.tiers == s.tiers
+    assert back.topic_ids == s.topic_ids and back.root == s.root
+
+
+def test_a_004_scheme_json_with_only_domains_still_reads(small_scheme):
+    from topic_tagger.scheme import scheme_from_json
+
+    data = small_scheme.to_json()
+    data.pop("categories")
+    data.pop("tiers")
+    back = scheme_from_json(data)
+    assert back.topic_ids == small_scheme.topic_ids and back.tiers == 2
+
+
+# --- The [run] table (feature 005, US3) -------------------------------------------------
+
+
+def test_the_run_table_is_read():
+    s = load_scheme(FIXTURES / "scheme_run.toml")
+    assert s.run.provider == "ollama-decision" and s.run.model == "fake-decision"
+    assert s.run.method == "tiered" and s.run.descend_at == 0.3
+    assert s.run.max_follow == 2 and s.run.keep_at == 0.2
+    assert load_scheme(FIXTURES / "scheme_small.toml").run is None
+
+
+@pytest.mark.parametrize(
+    ("line", "location", "words"),
+    [
+        ("colour = 1", "run.colour", "unknown setting"),
+        ('method = "deep"', "run.method", "flat or tiered"),
+        ('provider = "x"', "run.provider", "ollama or ollama-decision"),
+        ("descend_at = 1.5", "run.descend_at", "between 0 and 1"),
+        ("keep_at = -0.1", "run.keep_at", "between 0 and 1"),
+        ("max_follow = -1", "run.max_follow", "0 (no cap) or more"),
+        ("max_follow = 1.5", "run.max_follow", "0 (no cap) or more"),
+        ('model = ""', "run.model", "missing or empty"),
+    ],
+)
+def test_a_bad_run_setting_is_refused_with_its_location(tmp_path, line, location, words):
+    text = (FIXTURES / "scheme_small.toml").read_text()
+    path = tmp_path / "s.toml"
+    path.write_text(text.replace("[[domains]]", f"[run]\n{line}\n\n[[domains]]", 1))
+    with pytest.raises(SchemeError) as err:
+        load_scheme(path)
+    found = {p.location: p.message for p in err.value.problems}
+    assert location in found, found
+    assert words in found[location]
+
+
+def test_the_hash_leaves_out_the_run_table_but_not_the_questions(tmp_path):
+    original = load_scheme(FIXTURES / "scheme_run.toml")
+    text = (FIXTURES / "scheme_run.toml").read_text()
+    path = tmp_path / "s.toml"
+    path.write_text(text.replace("descend_at = 0.3", "descend_at = 0.6"))
+    assert load_scheme(path).hash == original.hash
+    path.write_text(text.replace("Which topic within", "Which subject within"))
+    assert load_scheme(path).hash != original.hash
+    # and a 004 file with a [run] table added keeps the hash it had without one
+    small = (FIXTURES / "scheme_small.toml").read_text()
+    path.write_text(small.replace("[[domains]]", '[run]\nmodel = "m"\n\n[[domains]]', 1))
+    assert load_scheme(path).hash == load_scheme(FIXTURES / "scheme_small.toml").hash
+
+
+# --- The [questions] table (feature 005, US4) -------------------------------------------
+
+
+def test_the_questions_are_read():
+    assert load_scheme(FIXTURES / "scheme_run.toml").questions == {
+        "tier2": "Which topic within {group}?"
+    }
+    assert load_scheme(FIXTURES / "scheme_small.toml").questions == {}
+
+
+@pytest.mark.parametrize(
+    ("fixture", "line", "location"),
+    [
+        ("scheme_small.toml", 'tier3 = "Q"', "questions.tier3"),
+        ("scheme_small.toml", 'tier0 = "Q"', "questions.tier0"),
+        ("scheme_small.toml", 'colour = "Q"', "questions.colour"),
+        ("scheme_small.toml", 'flat = ""', "questions.flat"),
+        ("scheme_1tier.toml", 'tier2 = "Q"', "questions.tier2"),
+    ],
+)
+def test_a_bad_question_is_refused_with_its_location(tmp_path, fixture, line, location):
+    text = (FIXTURES / fixture).read_text()
+    marker = "[[domains]]" if "[[domains]]" in text else "[[categories]]"
+    path = tmp_path / "s.toml"
+    path.write_text(text.replace(marker, f"[questions]\n{line}\n\n{marker}", 1))
+    with pytest.raises(SchemeError) as err:
+        load_scheme(path)
+    assert location in {p.location for p in err.value.problems}
+
+
+def test_every_tier_up_to_the_depth_may_have_a_question(tmp_path):
+    text = (FIXTURES / "scheme_3tier.toml").read_text()
+    questions = '[questions]\nflat = "F"\ntier1 = "A"\ntier2 = "B"\ntier3 = "C"\n\n'
+    path = tmp_path / "s.toml"
+    path.write_text(text.replace("[[categories]]", questions + "[[categories]]", 1))
+    assert set(load_scheme(path).questions) == {"flat", "tier1", "tier2", "tier3"}

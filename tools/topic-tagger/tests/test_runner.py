@@ -259,3 +259,56 @@ def test_a_flat_run_keeps_topics_from_several_areas(tmp_path, small_scheme, vari
     records = [json.loads(x) for x in (tmp_path / "tags.jsonl").read_text().splitlines()]
     assert result.tagged == 60
     assert all(r["topics"] == [["smoking", 0.9], ["age", 0.6]] for r in records)
+
+
+# --- One and three tiers (feature 005, US1) ---------------------------------------------
+
+
+def scheme_at(name):
+    from conftest import FIXTURES
+    from topic_tagger.scheme import load_scheme
+
+    return load_scheme(FIXTURES / name)
+
+
+def records_in(folder):
+    return [json.loads(x) for x in (folder / "tags.jsonl").read_text().splitlines()]
+
+
+def test_a_one_tier_taxonomy_tags_flat(tmp_path, variables_path, clock):
+    scheme = scheme_at("scheme_1tier.toml")
+    result, records, _ = run(
+        tmp_path,
+        scheme,
+        StubProvider(answer("housing", 0.7)),
+        read_variables(variables_path),
+        clock,
+    )
+    assert result.tagged == 60
+    assert all(r["topics"] == [["housing", 0.7]] for r in records)
+
+
+def test_a_three_tier_taxonomy_tags_flat_with_leaves(tmp_path, variables_path, clock):
+    scheme = scheme_at("scheme_3tier.toml")
+    result, records, _ = run(
+        tmp_path,
+        scheme,
+        StubProvider(answer("cardiac", 0.6)),
+        read_variables(variables_path),
+        clock,
+    )
+    assert result.tagged == 60 and all(r["topics"][0][0] == "cardiac" for r in records)
+
+
+def test_a_three_tier_taxonomy_tags_tiered_down_to_its_leaves(tmp_path, variables_path, clock):
+    scheme = scheme_at("scheme_3tier.toml")
+    variables = read_variables(variables_path)
+    settings = Settings(batch_size=20, workers=2, retries=1, model="stub:test", method="tiered")
+    runner = Runner(scheme, StubProvider(tiered_answer), TagStore(tmp_path), settings, clock)
+    result = runner.run(variables)
+    batches = -(-len(variables) // 20)
+    assert result.tagged == 60 and result.failed == []
+    assert result.requests_by_tier == [batches, batches, batches]
+    for r in records_in(tmp_path):
+        assert r["method"] == "tiered" and r["topics"] == [["respiratory", 0.8]]
+        assert r["path"] == [["health", 0.8], ["physical_health", 0.8]]

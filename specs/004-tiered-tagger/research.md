@@ -117,6 +117,8 @@
 
 ## R10. Calling `/v1/systemone`
 
+> Superseded by 005 research R1/R6: the option limit is the model's, and decision models can tag flat.
+
 - **Decision**: A small `OllamaDecisionProvider` uses `urllib.request` to send
   `POST {base}/v1/systemone` with
   `{"model", "state", "questions": {"option": {"type": "choice", "instructions": …,
@@ -171,6 +173,8 @@
   exact.
 
 ## R14. Flat with Clef
+
+> Superseded by 005 research R1/R6: the option limit is the model's, and decision models can tag flat.
 
 - **Decision** *(revised after review)*: Clef tags tiered only. `--method flat` with the
   decision provider exits 2, and without `--method` it tags tiered. A scheme with more than

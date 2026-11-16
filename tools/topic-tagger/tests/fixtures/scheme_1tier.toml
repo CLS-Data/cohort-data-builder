@@ -1,0 +1,32 @@
+# A one-tier taxonomy for tests (feature 005): five leaves, no groups, nested form.
+name = "One tier"
+version = 1
+fallback_topic = "other"
+guidance = """
+Tag each variable with the categories it measures.
+"""
+
+[[categories]]
+id = "age"
+label = "Age"
+description = "Age or date of birth."
+
+[[categories]]
+id = "smoking"
+label = "Smoking"
+description = "Tobacco use."
+
+[[categories]]
+id = "housing"
+label = "Housing"
+description = "Where people live."
+
+[[categories]]
+id = "income"
+label = "Income"
+description = "Earnings and benefits."
+
+[[categories]]
+id = "other"
+label = "Other"
+description = "Nothing else fits."

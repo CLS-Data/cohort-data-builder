@@ -1,5 +1,6 @@
 """The Ollama decision provider: Clef through POST /v1/systemone (feature 004)."""
 
+import contextlib
 import json
 import threading
 import time
@@ -8,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 
 from topic_tagger.providers import ProviderError, get_provider
-from topic_tagger.providers.ollama_decision import MAX_OPTIONS, OllamaDecisionProvider
+from topic_tagger.providers.ollama_decision import OllamaDecisionProvider
 
 
 class FakeDecisionHost:
@@ -38,7 +39,9 @@ class FakeDecisionHost:
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
-                self.wfile.write(data)
+                # The client may have given up first (the timeout tests).
+                with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+                    self.wfile.write(data)
 
             def do_GET(self):
                 fake.requests.append({"path": self.path})
@@ -68,6 +71,8 @@ class FakeDecisionHost:
                 self._send({"model": body["model"], "answers": answers, "usage": {}})
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        # Request threads are joined on close, so none is left writing at exit.
+        self.server.daemon_threads = False
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}/v1"
         threading.Thread(target=self.server.serve_forever, args=(0.05,), daemon=True).start()
 
@@ -108,15 +113,6 @@ def test_decide_asks_one_choice_question_and_returns_its_probabilities(host):
             }
         },
     }
-
-
-@pytest.mark.parametrize("n", [1, 27])
-def test_a_choice_needs_2_to_26_options(host, n):
-    assert MAX_OPTIONS == 26
-    options = {f"t{i}": f"T{i}" for i in range(n)}
-    with pytest.raises(ProviderError, match="2 to 26"):
-        provider(host.url).decide(STATE, "Which?", options)
-    assert not [r for r in host.requests if r["path"] == "/v1/systemone"]
 
 
 def test_check_names_a_missing_model_and_how_to_get_it(host):
@@ -163,3 +159,92 @@ def test_it_is_registered_as_ollama_decision():
         "ollama-decision", base_url="http://localhost:11434/v1", model="clef", timeout=5
     )
     assert isinstance(p, OllamaDecisionProvider)
+
+
+# --- No built-in option limit; a model's refusal is recognised (feature 005, US2) -------
+# These patch urlopen rather than serving HTTP, so they run anywhere.
+
+import io  # noqa: E402
+import urllib.error  # noqa: E402
+
+from topic_tagger.providers import OptionLimitError  # noqa: E402
+
+
+class Reply:
+    """What urlopen returns: a context manager with ``read()``."""
+
+    def __init__(self, body):
+        self.body = json.dumps(body).encode()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        return self.body
+
+
+def answering(monkeypatch):
+    sent = []
+
+    def urlopen(request, timeout):
+        body = json.loads(request.data)
+        sent.append(body)
+        criteria = body["questions"]["option"]["criteria"]
+        return Reply({"answers": {"option": {"probabilities": dict.fromkeys(criteria, 0.01)}}})
+
+    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    return sent
+
+
+def refusing(monkeypatch, status, error):
+    def urlopen(request, timeout):
+        body = io.BytesIO(json.dumps({"error": error}).encode())
+        raise urllib.error.HTTPError(request.full_url, status, "Bad Request", {}, body)
+
+    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+
+
+OPTIONS_27 = {f"t{i}": f"T{i}" for i in range(27)}
+
+
+def test_any_number_of_options_is_sent(monkeypatch):
+    sent = answering(monkeypatch)
+    got = provider("http://localhost:11434/v1").decide(STATE, "Which?", OPTIONS_27)
+    assert len(got) == 27 and len(sent[0]["questions"]["option"]["criteria"]) == 27
+
+
+@pytest.mark.parametrize(
+    ("status", "error"),
+    [
+        (400, "too many options for choice question"),
+        (413, "criteria exceed the maximum for this model"),
+        (400, "choice questions take at most 26 options"),
+    ],
+)
+def test_a_refusal_for_too_many_options_is_an_option_limit_error(monkeypatch, status, error):
+    refusing(monkeypatch, status, error)
+    with pytest.raises(OptionLimitError) as err:
+        provider("http://localhost:11434/v1").decide(STATE, "Which?", OPTIONS_27)
+    e = err.value
+    assert (e.status, e.host_message, e.options) == (status, error, 27)
+    assert isinstance(e, ProviderError) and error in str(e)
+
+
+@pytest.mark.parametrize(
+    ("status", "error"),
+    [
+        (400, "prompt exceeds context window"),
+        (400, "prompt for choice question exceeds the model's context window"),
+        (400, "token limit exceeded for options"),
+        (500, "too many options"),
+    ],
+)
+def test_other_errors_stay_plain_provider_errors(monkeypatch, status, error):
+    refusing(monkeypatch, status, error)
+    with pytest.raises(ProviderError) as err:
+        provider("http://localhost:11434/v1").decide(STATE, "Which?", OPTIONS_27)
+    assert not isinstance(err.value, OptionLimitError)
+    assert error in str(err.value) and str(status) in str(err.value)

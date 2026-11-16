@@ -1,0 +1,107 @@
+# A worked example: a three-tier taxonomy, uneven, with questions and run settings.
+#
+# Copy it and edit the copy. Check it with:  topic-tagger check-scheme my-scheme.toml
+# It shows the size of the largest question at each tier, to compare with your model.
+#
+# Categories nest as [[categories]] (tier 1), [[categories.categories]] (tier 2) and
+# [[categories.categories.categories]] (tier 3). A category with children is a group; one
+# without is a leaf, something a variable can be tagged with. Leaves may sit at any tier,
+# beside groups ("smoking" below). Ids are unique across the whole file; descriptions are
+# optional but help the model.
+
+name = "Example: three tiers"
+version = 1
+fallback_topic = "other"          # must be a leaf; offered at tier 1 as a way out
+guidance = '''
+You are classifying variables from a UK cohort study by what they measure. Read each
+variable's name, label and value labels, and choose the categories it is about.
+'''
+
+# Optional: the wording of each question. {group} is the label of the group asked about
+# (the scheme's name at tier 1). A tier left out uses the built-in wording. Changing a
+# question changes the scheme's hash, so the next run redoes the tags.
+[questions]
+flat  = "Which topic is this variable about?"
+tier1 = "Which domain of a survey is this variable about?"
+tier2 = "Which topic within {group} is this variable about?"
+tier3 = "Which subtopic within {group} is this variable about?"
+
+# Optional: how to run. Command-line options override these for one run. Changing them
+# does not change the hash.
+[run]
+provider   = "ollama-decision"    # or "ollama" for chat models
+model      = "clef:cloud"
+method     = "tiered"             # or "flat"
+descend_at = 0.3                  # follow a group at this probability or above
+max_follow = 3                    # most groups followed per question; 0 for no cap
+keep_at    = 0.3                  # decision models: keep a leaf at this probability or above
+
+[[categories]]
+id = "health"
+label = "Health"
+description = "Physical and mental health, and health behaviour."
+
+  [[categories.categories]]
+  id = "physical_health"
+  label = "Physical health"
+  description = "Conditions, symptoms and measurements of the body."
+
+    [[categories.categories.categories]]
+    id = "respiratory"
+    label = "Respiratory conditions"
+    description = "Asthma, bronchitis, wheeze."
+
+    [[categories.categories.categories]]
+    id = "cardiovascular"
+    label = "Heart and circulation"
+    description = "Heart disease, blood pressure, stroke."
+
+    [[categories.categories.categories]]
+    id = "anthropometry"
+    label = "Height and weight"
+    description = "Height, weight, BMI, waist."
+
+  [[categories.categories]]
+  id = "mental_health"
+  label = "Mental health"
+  description = "Wellbeing and mental health conditions."
+
+    [[categories.categories.categories]]
+    id = "depression_anxiety"
+    label = "Depression and anxiety"
+    description = "Low mood, worry, diagnosed depression or anxiety."
+
+    [[categories.categories.categories]]
+    id = "wellbeing"
+    label = "Wellbeing"
+    description = "Life satisfaction, happiness, self-esteem."
+
+  [[categories.categories]]        # a tier-2 leaf beside two tier-2 groups
+  id = "smoking"
+  label = "Smoking"
+  description = "Tobacco and e-cigarette use."
+
+[[categories]]
+id = "socioeconomic"
+label = "Socioeconomic position"
+description = "Education, work and money."
+
+  [[categories.categories]]
+  id = "education"
+  label = "Education"
+  description = "Schooling, qualifications, attainment."
+
+  [[categories.categories]]
+  id = "employment"
+  label = "Employment"
+  description = "Work, occupation, hours, unemployment."
+
+  [[categories.categories]]
+  id = "income"
+  label = "Income"
+  description = "Earnings, benefits, household income."
+
+[[categories]]                    # a tier-1 leaf: the fallback
+id = "other"
+label = "Other"
+description = "Nothing above fits, or the variable is administrative."

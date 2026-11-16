@@ -122,3 +122,76 @@ def test_a_tier_2_prompt_lists_one_area_topics(small_scheme):
     text = system["content"]
     assert "- smoking: Smoking — Tobacco use." in text
     assert "age:" not in text and "Includes:" not in text
+
+
+# --- Flat prompts for one and three tiers (feature 005, US1) ----------------------------
+
+
+def test_a_three_tier_flat_prompt_lists_each_leaf_under_its_path():
+    from conftest import FIXTURES
+    from topic_tagger.scheme import load_scheme
+
+    scheme = load_scheme(FIXTURES / "scheme_3tier.toml")
+    text = build_messages(scheme, batch())[0]["content"]
+    topics = text.split("Rules:")[0]
+    lines = topics.splitlines()
+    first_heading = next(i for i, x in enumerate(lines) if x.startswith("## "))
+    # a tier-1 leaf comes before the headings, so it is not read as part of a group
+    assert lines.index("- other: Other — Nothing else fits.") < first_heading
+    physical = lines.index("## Health › Physical health")
+    assert (
+        lines[physical + 1] == "- respiratory: Respiratory conditions — Asthma, bronchitis, wheeze."
+    )
+    assert lines[physical + 2] == "- cardiac: Heart conditions"
+    assert lines[lines.index("## Health") + 1] == "- smoking: Smoking — Tobacco use."
+    for leaf in scheme.topic_ids:
+        assert sum(x.startswith(f"- {leaf}:") for x in lines) == 1
+
+
+def test_a_one_tier_flat_prompt_has_no_headings():
+    from conftest import FIXTURES
+    from topic_tagger.scheme import load_scheme
+
+    scheme = load_scheme(FIXTURES / "scheme_1tier.toml")
+    topics = build_messages(scheme, batch())[0]["content"].split("Rules:")[0]
+    assert "## " not in topics
+    assert "- housing: Housing — Where people live." in topics
+
+
+# --- Questions in chat prompts (feature 005, US4) ---------------------------------------
+
+from conftest import FIXTURES  # noqa: E402
+from topic_tagger.prompt import build_option_messages  # noqa: E402
+from topic_tagger.tiered import build_tree  # noqa: E402
+
+TIER2_004 = (
+    "Tag each variable with the topics it measures.\n\nOptions. Use only these ids:\n"
+    "- smoking: Smoking — Tobacco use.\n- alcohol: Alcohol — Drinking alcohol.\n"
+    "- physical_health: Physical health — Conditions, height, weight.\n\n"
+)
+
+
+def health(scheme):
+    return next(c for c in build_tree(scheme).children if c.id == "health")
+
+
+def test_a_tier_prompt_without_a_question_is_as_in_004(small_scheme):
+    text = build_option_messages(small_scheme.guidance, health(small_scheme), [])[0]["content"]
+    assert text.startswith(TIER2_004)
+
+
+def test_a_tier_question_is_a_line_before_the_options():
+    scheme = load_scheme(FIXTURES / "scheme_run.toml")
+    text = build_option_messages(scheme.guidance, health(scheme), [])[0]["content"]
+    assert "Question: Which topic within Health?\n\nOptions. Use only these ids:" in text
+    assert text.index(scheme.guidance.strip()) < text.index("Question:")
+
+
+def test_the_flat_question_is_a_line_in_the_flat_prompt(small_scheme, tmp_path):
+    text = (FIXTURES / "scheme_small.toml").read_text()
+    path = tmp_path / "s.toml"
+    path.write_text(text.replace("[[domains]]", '[questions]\nflat = "Which?"\n\n[[domains]]', 1))
+    system, _ = build_messages(load_scheme(path), batch())
+    assert "Question: Which?\n\nTopics, grouped by area." in system["content"]
+    plain, _ = build_messages(small_scheme, batch())
+    assert "Question:" not in plain["content"]
