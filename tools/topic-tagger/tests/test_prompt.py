@@ -122,3 +122,37 @@ def test_a_tier_2_prompt_lists_one_area_topics(small_scheme):
     text = system["content"]
     assert "- smoking: Smoking — Tobacco use." in text
     assert "age:" not in text and "Includes:" not in text
+
+
+# --- Flat prompts for one and three tiers (feature 005, US1) ----------------------------
+
+
+def test_a_three_tier_flat_prompt_lists_each_leaf_under_its_path():
+    from conftest import FIXTURES
+    from topic_tagger.scheme import load_scheme
+
+    scheme = load_scheme(FIXTURES / "scheme_3tier.toml")
+    text = build_messages(scheme, batch())[0]["content"]
+    topics = text.split("Rules:")[0]
+    lines = topics.splitlines()
+    first_heading = next(i for i, x in enumerate(lines) if x.startswith("## "))
+    # a tier-1 leaf comes before the headings, so it is not read as part of a group
+    assert lines.index("- other: Other — Nothing else fits.") < first_heading
+    physical = lines.index("## Health › Physical health")
+    assert (
+        lines[physical + 1] == "- respiratory: Respiratory conditions — Asthma, bronchitis, wheeze."
+    )
+    assert lines[physical + 2] == "- cardiac: Heart conditions"
+    assert lines[lines.index("## Health") + 1] == "- smoking: Smoking — Tobacco use."
+    for leaf in scheme.topic_ids:
+        assert sum(x.startswith(f"- {leaf}:") for x in lines) == 1
+
+
+def test_a_one_tier_flat_prompt_has_no_headings():
+    from conftest import FIXTURES
+    from topic_tagger.scheme import load_scheme
+
+    scheme = load_scheme(FIXTURES / "scheme_1tier.toml")
+    topics = build_messages(scheme, batch())[0]["content"].split("Rules:")[0]
+    assert "## " not in topics
+    assert "- housing: Housing — Where people live." in topics

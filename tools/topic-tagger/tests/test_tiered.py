@@ -385,3 +385,61 @@ def test_clefs_questions_ask_for_every_option_that_applies(small_scheme):
     assert tier2.startswith("Which topics of a survey is this variable about?")
     for text in (tier1, tier2):
         assert "If more than one applies, share the probability between them" in text
+
+
+# --- Any depth, uneven taxonomies (feature 005, US1) ------------------------------------
+
+
+def three_tier():
+    from conftest import FIXTURES
+    from topic_tagger.scheme import load_scheme
+
+    return load_scheme(FIXTURES / "scheme_3tier.toml")
+
+
+def test_the_tree_keeps_three_tiers_and_offers_the_fallback_at_tier_1():
+    from topic_tagger.tiered import _height
+
+    root = build_tree(three_tier())
+    assert [c.id for c in root.children] == ["health", "demographics", "other"]
+    physical = root.find("physical_health")
+    assert [c.id for c in physical.children] == ["respiratory", "cardiac", "diabetes"]
+    assert root.find("smoking").is_leaf and root.find("other").is_leaf
+    assert _height(root) == 3
+
+
+def test_moving_the_fallback_prunes_groups_left_empty_up_the_tree(tmp_path):
+    from topic_tagger.scheme import load_scheme
+
+    path = tmp_path / "s.toml"
+    path.write_text(
+        'name = "S"\nversion = 1\nfallback_topic = "other"\nguidance = "G"\n'
+        '[[categories]]\nid = "a"\nlabel = "A"\n'
+        '  [[categories.categories]]\n  id = "x"\n  label = "X"\n'
+        '  [[categories.categories]]\n  id = "y"\n  label = "Y"\n'
+        '[[categories]]\nid = "misc"\nlabel = "Misc"\n'
+        '  [[categories.categories]]\n  id = "rest"\n  label = "Rest"\n'
+        '    [[categories.categories.categories]]\n    id = "other"\n    label = "Other"\n'
+    )
+    root = build_tree(load_scheme(path))
+    assert [c.id for c in root.children] == ["a", "other"]
+    assert root.find("misc") is None and root.find("rest") is None
+
+
+THREE = {
+    "asthma": {"health": 0.9, "physical_health": 0.8, "smoking": 0.7, "respiratory": 0.9},
+    "heart": {"other": 0.6, "health": 0.7, "physical_health": 0.9, "cardiac": 0.8},
+}
+
+
+def test_a_three_tier_walk_keeps_a_leaf_chosen_beside_groups():
+    result, _ = do_walk(three_tier(), THREE, ["asthma"])
+    # smoking is a real tier-2 leaf, not an exit: it is kept beside respiratory
+    assert result.tags[0] == [("respiratory", 0.9), ("smoking", 0.7)]
+    assert result.paths[0] == [("health", 0.9), ("physical_health", 0.8)]
+    assert len(result.requests_by_tier) == 3
+
+
+def test_in_three_tiers_the_fallback_is_still_dropped_when_a_group_gives_tags():
+    result, _ = do_walk(three_tier(), THREE, ["heart"])
+    assert result.tags[0] == [("cardiac", 0.8)]

@@ -632,3 +632,23 @@ def test_switching_method_redoes_every_variable(tmp_path, variables_path, capsys
     stub = StubProvider(tiered_answer)
     tag(variables_path, out, stub, "--method", "tiered")
     assert "60 already tagged, 0 to do" in capsys.readouterr().err and not stub.calls
+
+
+# --- Reports and statistics for one and three tiers (feature 005, US1) ------------------
+
+
+@pytest.mark.parametrize(
+    ("name", "method", "expect"),
+    [("scheme_1tier.toml", "flat", "Housing"), ("scheme_3tier.toml", "tiered", "Health")],
+)
+def test_a_run_with_one_or_three_tiers_writes_its_report(
+    tmp_path, variables_path, name, method, expect
+):
+    from test_runner import tiered_answer
+
+    out = tmp_path / "o"
+    stub = StubProvider(answer("housing", 0.7) if method == "flat" else tiered_answer)
+    code = tag(variables_path, out, stub, "--scheme", str(FIXTURES / name), "--method", method)
+    assert code == 0
+    assert expect in (out / "report.html").read_text()
+    assert main(["report", str(out)]) == 0
