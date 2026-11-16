@@ -244,6 +244,9 @@ label = "Other"
   uses `categories` or `domains`, not both.
 - In the report and statistics, an **area** is a tier-1 category, with every leaf beneath
   it; a tier-1 leaf is an area of its own.
+- Two worked examples come with the tool, in `src/topic_tagger/schemes/`:
+  `example-1-tier.toml` (a flat list) and `example-3-tier.toml` (uneven, with
+  `[questions]` and `[run]`). Copy one to start from.
 
 **Exit codes**
 
@@ -279,11 +282,16 @@ An area is followed when its confidence is at least `--descend-at` (0.5), at mos
 `--max-follow` of them (3; 0 for no cap; `--max-areas` is its older name and still
 works). The strongest area is always followed, so no variable stops at the first tier.
 
+In a three-tier taxonomy the same happens once more: within each tier-2 group followed,
+one request asks which of its children apply, by the same rules. A leaf can sit beside
+groups at any tier; it is chosen like a group and kept as a tag. A one-tier taxonomy is
+always tagged flat (the tool says so), since the two would ask the same question.
+
 The scheme's fallback topic (`other` in the bundled scheme) is not inside an area when
 tagging tiered. It is offered at the first tier, beside the areas, as a way out for a
 variable the model cannot place. It is chosen like an area (at `--descend-at`, or if it is
-the strongest option), and it is kept only if no followed area gives the variable a topic. A stored tag keeps its topic-level confidence, so it
-means the same as a flat tag.
+the strongest option), and it is kept only if no followed area gives the variable a
+topic. A stored tag keeps its topic-level confidence, so it means the same as a flat tag.
 
 A batch takes 1 + (the number of different areas followed) requests instead of 1, but each
 request is short. Failed requests are retried as in flat runs, per area. A variable keeps

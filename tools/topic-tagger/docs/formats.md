@@ -139,7 +139,9 @@ The questions are part of the hash: rewording one makes existing tags out of dat
 The scheme's **hash** is the first 12 hex characters of SHA-256 over its parsed content,
 leaving out `[run]`, so any change to content (not comments, layout or `[run]`) changes it
 and makes existing tags out of date. Changing a model or a threshold in `[run]` does not:
-it is how a run is made, not what the tags mean. Each topic's **number** is its position across the whole scheme, counting from 0.
+it is how a run is made, not what the tags mean.
+
+Each topic's **number** is its position across the whole scheme, counting from 0.
 
 `topic-tagger init-scheme PATH` copies the bundled example to start from;
 `topic-tagger check-scheme PATH` lists every mistake with its location.

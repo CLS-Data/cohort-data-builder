@@ -329,13 +329,13 @@ and the largest question per tier, without a model.
 
 ## Phase 8: Polish and cross-cutting
 
-- [ ] T028 [P] Add `src/topic_tagger/schemes/example-1-tier.toml` and `src/topic_tagger/schemes/example-3-tier.toml`. Each is commented as a worked example, and the 3-tier one is uneven, with `[questions]` and `[run]`. Add a test in `tests/test_package.py` that both are packaged and load.
-- [ ] T029 [P] Read `README.md` through as a whole, after T011b–T027b:
+- [x] T028 [P] Add `src/topic_tagger/schemes/example-1-tier.toml` and `src/topic_tagger/schemes/example-3-tier.toml`. Each is commented as a worked example, and the 3-tier one is uneven, with `[questions]` and `[run]`. Add a test in `tests/test_package.py` that both are packaged and load.
+- [x] T029 [P] Read `README.md` through as a whole, after T011b–T027b:
   - one consistent vocabulary: category, group, leaf, tier, and "area = tier-1 category";
   - the bundled examples (T028) are referred to;
   - no "tiered only", "26" or `--max-areas` left except as the alias.
-- [ ] T030 [P] Read `docs/formats.md` through as a whole against contracts/formats.md. Fix any gaps left by the story PRs.
-- [ ] T031 [P] Fix `specs/004-tiered-tagger/research.md` R10 and R14 with a one-line note each: "Superseded by 005 research R1/R6: the option limit is the model's, and decision models can tag flat."
+- [x] T030 [P] Read `docs/formats.md` through as a whole against contracts/formats.md. Fix any gaps left by the story PRs.
+- [x] T031 [P] Fix `specs/004-tiered-tagger/research.md` R10 and R14 with a one-line note each: "Superseded by 005 research R1/R6: the option limit is the model's, and decision models can tag flat."
 - [ ] T032 Maintainer, outside the sandbox: run quickstart.md step 8.
   - Record Clef's exact status and error text for a 107-option `choice` in `specs/005-configurable-classifier/research.md` R1.
   - If the text does not match `option|choice|criteri`, open a `fix(tagger)` change. Its test, in `tests/test_decision_provider.py`, uses the real text.
