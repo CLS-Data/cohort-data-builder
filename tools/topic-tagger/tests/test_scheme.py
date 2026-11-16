@@ -68,6 +68,8 @@ def test_to_json_has_the_documented_shape(small_scheme):
         "guidance",
         "fallback_topic",
         "domains",
+        "tiers",
+        "categories",
     }
     assert data["hash"] == small_scheme.hash
     first = data["domains"][0]

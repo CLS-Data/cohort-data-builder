@@ -34,8 +34,8 @@ checks the docs read as one whole.
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Add `tests/fixtures/scheme_1tier.toml`. It uses the nested form (contracts/formats.md): 5 tier-1 leaves, `age`, `smoking`, `housing`, `income` and `other`, with `fallback_topic = "other"`. There is no `[run]` and no `[questions]`. Add a header comment saying what it is for.
-- [ ] T002 [P] Add `tests/fixtures/scheme_3tier.toml`, an uneven three-tier taxonomy in the nested form:
+- [x] T001 [P] Add `tests/fixtures/scheme_1tier.toml`. It uses the nested form (contracts/formats.md): 5 tier-1 leaves, `age`, `smoking`, `housing`, `income` and `other`, with `fallback_topic = "other"`. There is no `[run]` and no `[questions]`. Add a header comment saying what it is for.
+- [x] T002 [P] Add `tests/fixtures/scheme_3tier.toml`, an uneven three-tier taxonomy in the nested form:
   - `health`, with:
     - `physical_health`, a group of the leaves `respiratory`, `cardiac` and `diabetes`;
     - `mental_health`, a group of `depression` and `anxiety`;
@@ -44,7 +44,7 @@ checks the docs read as one whole.
   - `other`, a tier-1 leaf and the fallback.
 
   `fallback_topic = "other"`. Some categories have no description.
-- [ ] T003 [P] Add `tests/fixtures/scheme_run.toml`. It is `scheme_small.toml` (004 form) plus:
+- [x] T003 [P] Add `tests/fixtures/scheme_run.toml`. It is `scheme_small.toml` (004 form) plus:
   - `[run]`: `provider = "ollama-decision"`, `model = "fake-decision"`, `method = "tiered"`, `descend_at = 0.3`, `max_follow = 2`, `keep_at = 0.2`;
   - `[questions]`: `tier2 = "Which topic within {group}?"`.
 
@@ -56,7 +56,7 @@ checks the docs read as one whole.
 views the rest of the code already uses (research R3, R4; data-model "Category" and
 "Taxonomy").
 
-- [ ] T004 Write failing tests in `tests/test_scheme.py`:
+- [x] T004 Write failing tests in `tests/test_scheme.py`:
   1. `closer.toml` and `scheme_small.toml` load with **the same `hash` as before**. Pin today's values as literals, copied from `uv run topic-tagger check-scheme` on `main`. They have `tiers == 2`, and unchanged `topics`, `topic_ids`, `domains` and `domain_of`.
   2. `scheme_1tier.toml` has `tiers == 1` and 5 leaves. Each `domains` entry is a one-topic domain of itself, and `domain_of("age").id == "age"`.
   3. `scheme_3tier.toml` has:
@@ -76,7 +76,7 @@ views the rest of the code already uses (research R3, R4; data-model "Category" 
 
      Every problem is listed, not only the first.
   5. `to_json()` adds `tiers` and the `categories` tree, and keeps `domains` (data-model). `scheme_from_json(to_json())` round-trips for the 1-, 2- and 3-tier fixtures, and still reads a 004 `scheme.json` that has only `domains`.
-- [ ] T005 Implement in `src/topic_tagger/scheme.py`:
+- [x] T005 Implement in `src/topic_tagger/scheme.py`:
   - a frozen `Category(id, label, description, children)`;
   - `Scheme.root` and `Scheme.tiers`;
   - `topics`, `topic_ids`, `topic_number`, `domains`, `domain_of` and the new `path_of`, all derived from `root`;

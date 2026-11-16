@@ -1,6 +1,9 @@
-"""The topic scheme: topic areas (domains), their topics, and the model's guidance.
+"""The scheme: a taxonomy of one to three tiers, and the model's guidance.
 
-It is read from a TOML file the maintainer edits (see docs/formats.md). Everything the model
+It is read from a TOML file the maintainer edits (see docs/formats.md), in either of two
+forms: nested ``[[categories]]`` (feature 005), or ``[[domains]]`` holding
+``[[domains.topics]]`` (002/004), which is a two-tier taxonomy. Both load into one
+``Category`` tree. Everything the model
 is told about topics comes from that file; the code depends on no particular scheme. An
 example scheme is bundled (``schemes/closer.toml``) and used when no file is given.
 """
@@ -51,7 +54,7 @@ class SchemeError(Exception):
 
 @dataclass(frozen=True)
 class Topic:
-    """One topic: what a variable can be tagged with."""
+    """One topic: what a variable can be tagged with (a leaf of the taxonomy)."""
 
     id: str
     label: str
@@ -60,7 +63,11 @@ class Topic:
 
 @dataclass(frozen=True)
 class Domain:
-    """A topic area holding related topics."""
+    """A topic area: a tier-1 category and every leaf beneath it.
+
+    The taxonomy itself is the ``Category`` tree; domains are a view of it, kept for the
+    statistics, the report and ``scheme.json``. A tier-1 leaf is a domain of itself.
+    """
 
     id: str
     label: str
@@ -69,15 +76,37 @@ class Domain:
 
 
 @dataclass(frozen=True)
+class Category:
+    """One entry in the taxonomy: a group (with children) or a leaf (without).
+
+    Attributes:
+        id: Unique across the whole taxonomy; ``""`` for the root.
+        label: Its label.
+        description: Its description; may be empty.
+        children: The categories one tier down, in file order; empty for a leaf.
+    """
+
+    id: str
+    label: str
+    description: str = ""
+    children: tuple[Category, ...] = ()
+
+    @property
+    def is_leaf(self) -> bool:
+        """True for a category a variable can be tagged with."""
+        return not self.children
+
+
+@dataclass(frozen=True)
 class Scheme:
-    """A loaded topic scheme.
+    """A loaded taxonomy of one to three tiers.
 
     Attributes:
         name: The scheme's name.
         version: The maintainer's own version number.
         guidance: The instructions given to the model.
-        fallback_topic: The topic for variables that fit nothing else.
-        domains: The topic areas, in order.
+        fallback_topic: The leaf for variables that fit nothing else.
+        root: The taxonomy: a nameless root whose children are the tier-1 categories.
         hash: 12 hex characters identifying the content; any edit changes it.
     """
 
@@ -85,44 +114,81 @@ class Scheme:
     version: int
     guidance: str
     fallback_topic: str
-    domains: tuple[Domain, ...]
+    root: Category
     hash: str
+    _leaves: dict[str, Topic] = field(default_factory=dict, repr=False, compare=False)
     _number: dict[str, int] = field(default_factory=dict, repr=False, compare=False)
     _domain: dict[str, Domain] = field(default_factory=dict, repr=False, compare=False)
+    _path: dict[str, list[str]] = field(default_factory=dict, repr=False, compare=False)
+    _domains: list[Domain] = field(default_factory=list, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        """Index the topics by id."""
-        for d in self.domains:
-            for t in d.topics:
-                self._number[t.id] = len(self._number)
-                self._domain[t.id] = d
+        """Index the leaves, their paths and their tier-1 categories."""
+
+        def visit(c: Category, path: list[str]) -> None:
+            if c.is_leaf:
+                self._leaves[c.id] = Topic(c.id, c.label, c.description)
+                self._number[c.id] = len(self._number)
+                self._path[c.id] = path
+                return
+            for child in c.children:
+                visit(child, [*path, c.id])
+
+        for top in self.root.children:
+            before = len(self._leaves)
+            visit(top, [])
+            leaves = tuple(list(self._leaves.values())[before:])
+            domain = Domain(top.id, top.label, top.description, leaves)
+            self._domains.append(domain)
+            for t in leaves:
+                self._domain[t.id] = domain
+
+    @property
+    def tiers(self) -> int:
+        """How many tiers deep the taxonomy is: 1 to 3."""
+        return _height(self.root)
 
     @property
     def topic_ids(self) -> list[str]:
-        """Every topic id, in scheme order."""
+        """Every leaf id, in file order."""
         return list(self._number)
 
     @property
     def topics(self) -> list[Topic]:
-        """Every topic, in scheme order."""
-        return [t for d in self.domains for t in d.topics]
+        """Every leaf, in file order."""
+        return list(self._leaves.values())
+
+    @property
+    def domains(self) -> list[Domain]:
+        """One per tier-1 category, holding every leaf beneath it."""
+        return list(self._domains)
 
     def topic_number(self, topic_id: str) -> int:
-        """The topic's position across the whole scheme, counting from 0."""
+        """The leaf's position across the whole taxonomy, counting from 0."""
         return self._number[topic_id]
 
     def domain_of(self, topic_id: str) -> Domain:
-        """The domain a topic belongs to."""
+        """The domain (tier-1 category) a leaf belongs to."""
         return self._domain[topic_id]
 
+    def path_of(self, topic_id: str) -> list[str]:
+        """The groups above a leaf, from tier 1 down to its parent; empty at tier 1."""
+        return list(self._path[topic_id])
+
     def to_json(self) -> dict:
-        """The scheme as written to ``scheme.json``."""
+        """The scheme as written to ``scheme.json``.
+
+        ``domains`` is kept, as written by 004, for readers that know only two levels;
+        ``categories`` is the taxonomy itself.
+        """
         return {
             "name": self.name,
             "version": self.version,
             "hash": self.hash,
             "guidance": self.guidance,
             "fallback_topic": self.fallback_topic,
+            "tiers": self.tiers,
+            "categories": [_category_json(c) for c in self.root.children],
             "domains": [
                 {
                     "id": d.id,
@@ -138,8 +204,48 @@ class Scheme:
         }
 
 
+def _height(c: Category) -> int:
+    return 0 if c.is_leaf else 1 + max(_height(x) for x in c.children)
+
+
+def _category_json(c: Category) -> dict:
+    out = {"id": c.id, "label": c.label, "description": c.description}
+    if c.children:
+        out["categories"] = [_category_json(x) for x in c.children]
+    return out
+
+
+def _category_from(raw: dict) -> Category:
+    """A category, and those under it, from parsed TOML or ``scheme.json``."""
+    return Category(
+        raw["id"],
+        raw["label"],
+        raw.get("description", "") or "",
+        tuple(_category_from(x) for x in raw.get("categories", [])),
+    )
+
+
+def _root(raw: dict) -> Category:
+    """The taxonomy from either form: nested ``categories``, or 004 ``domains``/``topics``."""
+    if "categories" in raw:
+        children = tuple(_category_from(c) for c in raw["categories"])
+    else:
+        children = tuple(
+            Category(
+                d["id"],
+                d["label"],
+                d.get("description", ""),
+                tuple(Category(t["id"], t["label"], t["description"]) for t in d["topics"]),
+            )
+            for d in raw["domains"]
+        )
+    return Category("", raw["name"], "", children)
+
+
 def scheme_from_json(data: dict) -> Scheme:
     """Rebuild a scheme from the ``scheme.json`` written beside the tags.
+
+    Reads ``categories`` when present, and ``domains`` otherwise (folders written by 004).
 
     Args:
         data: The parsed ``scheme.json``.
@@ -152,15 +258,7 @@ def scheme_from_json(data: dict) -> Scheme:
         version=data["version"],
         guidance=data["guidance"],
         fallback_topic=data["fallback_topic"],
-        domains=tuple(
-            Domain(
-                id=d["id"],
-                label=d["label"],
-                description=d["description"],
-                topics=tuple(Topic(t["id"], t["label"], t["description"]) for t in d["topics"]),
-            )
-            for d in data["domains"]
-        ),
+        root=_root(data),
         hash=data["hash"],
     )
 
@@ -200,15 +298,7 @@ def load_scheme(path: Path) -> Scheme:
         version=raw["version"],
         guidance=raw["guidance"].strip(),
         fallback_topic=raw["fallback_topic"],
-        domains=tuple(
-            Domain(
-                id=d["id"],
-                label=d["label"],
-                description=d.get("description", ""),
-                topics=tuple(Topic(t["id"], t["label"], t["description"]) for t in d["topics"]),
-            )
-            for d in raw["domains"]
-        ),
+        root=_root(raw),
         hash=hashlib.sha256(canonical.encode()).hexdigest()[:12],
     )
 
@@ -256,6 +346,12 @@ def validate(raw: dict) -> list[SchemeProblem]:
             seen[value] = f"{at}id"
         return value
 
+    if "categories" in raw:
+        if "domains" in raw:
+            problem("categories", "use categories (nested) or domains (004 form), not both")
+        _validate_nested(raw, problem, text, ident)
+        return problems
+
     domains = raw.get("domains")
     if not isinstance(domains, list) or not domains:
         problem("domains", "there are no domains")
@@ -280,3 +376,54 @@ def validate(raw: dict) -> list[SchemeProblem]:
     if raw.get("fallback_topic") not in topic_ids:
         problem("fallback_topic", f"{raw.get('fallback_topic')!r} is not a topic in this scheme")
     return problems
+
+
+#: The deepest a taxonomy may be.
+MAX_TIERS = 3
+
+
+def _validate_nested(raw: dict, problem, text, ident) -> None:
+    """Check the nested form: ids, labels, groups, depth, leaves and the fallback."""
+    leaves: list[str] = []
+    groups: set[str] = set()
+
+    def visit(items, at: str, tier: int) -> None:
+        for i, c in enumerate(items):
+            here = f"{at}[{i}]"
+            if not isinstance(c, dict):
+                problem(here, "must be a table")
+                continue
+            if tier > MAX_TIERS:
+                problem(here, f"too deep: a taxonomy has at most {MAX_TIERS} tiers")
+                continue
+            cid = ident(c, f"{here}.")
+            text(c, "label", f"{here}.")
+            if "description" in c and not isinstance(c["description"], str):
+                problem(f"{here}.description", "must be text")
+            if "categories" not in c:
+                if cid:
+                    leaves.append(cid)
+                continue
+            children = c["categories"]
+            if not isinstance(children, list) or not children:
+                problem(f"{here}.categories", "this group has no categories")
+                continue
+            if cid:
+                groups.add(cid)
+            visit(children, f"{here}.categories", tier + 1)
+
+    top = raw["categories"]
+    if not isinstance(top, list) or not top:
+        problem("categories", "there are no categories")
+        return
+    visit(top, "categories", 1)
+    if len(leaves) < 2:
+        problem(
+            "categories",
+            "a taxonomy needs at least two leaves (categories with no others under them)",
+        )
+    fallback = raw.get("fallback_topic")
+    if fallback in groups:
+        problem("fallback_topic", f"{fallback!r} is a group, not a leaf")
+    elif fallback not in leaves:
+        problem("fallback_topic", f"{fallback!r} is not a leaf in this scheme")
