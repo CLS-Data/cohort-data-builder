@@ -12,8 +12,8 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from topic_tagger.prompt import MAX_VALUES, build_option_messages
-from topic_tagger.providers import DecisionProvider, Provider, ProviderError
-from topic_tagger.providers.ollama_decision import MAX_OPTIONS, choice_body
+from topic_tagger.providers import DecisionProvider, OptionLimitError, Provider, ProviderError
+from topic_tagger.providers.ollama_decision import choice_body
 from topic_tagger.reply import ReplyError, options_schema, parse_options_reply
 from topic_tagger.scheme import Scheme
 from topic_tagger.variables import Variable
@@ -76,6 +76,17 @@ def build_tree(scheme: Scheme) -> Node:
     return Node("", scheme.name, "", (*tier1, exit_))
 
 
+def flat_tree(scheme: Scheme) -> Node:
+    """Every leaf as an option of one question: flat tagging with a decision model.
+
+    The fallback is one of the leaves, as in a flat prompt. Walking this tree asks one
+    question per variable and keeps leaves as at any all-leaf tier (``keep_at``).
+    """
+    return Node(
+        "", scheme.name, "", tuple(Node(t.id, t.label, t.description) for t in scheme.topics)
+    )
+
+
 Tags = list[tuple[str, float]]
 
 
@@ -125,8 +136,9 @@ class DecisionDecider:
     Each request is one ``choice`` question over the tier's options ("Which area of a survey
     is this variable about?"), each described by its label, description and, for an area,
     its topics. Clef gives every option a probability, summing to about 1, which is used as
-    the confidence. Choice questions take 2 to 26 options, so Clef tags tiered only (see
-    ``choice_problems``).
+    the confidence. Walked over ``flat_tree`` it tags flat, over ``build_tree`` tiered. How
+    many options a question may offer is the model's limit; a refusal is raised, not
+    skipped, so the run stops (``OptionLimitError``).
 
     Args:
         provider: The decision-model host.
@@ -153,6 +165,8 @@ class DecisionDecider:
         for i, v in enumerate(variables):
             try:
                 probs = self.provider.decide(_state(v), instructions, options)
+            except OptionLimitError:
+                raise  # the same question would be refused for every variable
             except ProviderError as e:
                 error = e
                 continue
@@ -169,26 +183,6 @@ class DecisionDecider:
         if not got and error is not None:
             raise error  # nothing answered: let the walk retry the whole group
         return got, len(variables)
-
-
-def choice_problems(root: Node) -> list[str]:
-    """Tiers too big for one ``choice`` question (more than 26 options), as messages.
-
-    A tier with a single option needs no question: the walk routes straight through it.
-    """
-    problems = []
-    if len(root.children) > MAX_OPTIONS:
-        problems.append(
-            f"the scheme has {len(root.children)} areas; Clef can choose among at most "
-            f"{MAX_OPTIONS}"
-        )
-    for area in root.children:
-        if len(area.children) > MAX_OPTIONS:
-            problems.append(
-                f"area {area.id} has {len(area.children)} topics; Clef can choose among at "
-                f"most {MAX_OPTIONS}"
-            )
-    return problems
 
 
 def decision_request(model: str, node: Node, variable: Variable) -> dict:
@@ -340,13 +334,19 @@ def walk(
 
 
 def _ask(decider, node, positions, batch, tier, retries, result) -> dict[int, Tags]:
-    """Ask one group, with the same ladder as flat batches: retries, then each one alone."""
+    """Ask one group, with the same ladder as flat batches: retries, then each one alone.
+
+    A refusal for too many options is not retried: it is named and raised, to stop the run.
+    """
     got = None
     for attempt in range(retries + 1):
         try:
             got, sent = decider.decide(node, [batch[i] for i in positions])
             result.requests_by_tier[tier] += sent
             break
+        except OptionLimitError as e:
+            _name_refusal(e, node, tier)
+            raise
         except (ReplyError, ProviderError) as e:
             result.requests_by_tier[tier] += 1
             result.last_error = str(e)
@@ -358,6 +358,9 @@ def _ask(decider, node, positions, batch, tier, retries, result) -> dict[int, Ta
         try:
             one, sent = decider.decide(node, [batch[i]])
             result.requests_by_tier[tier] += sent
+        except OptionLimitError as e:
+            _name_refusal(e, node, tier)
+            raise
         except (ReplyError, ProviderError) as e:
             result.requests_by_tier[tier] += 1
             result.last_error = str(e)
@@ -365,6 +368,34 @@ def _ask(decider, node, positions, batch, tier, retries, result) -> dict[int, Ta
         if 0 in one:
             answers[i] = one[0]
     return answers
+
+
+def _name_refusal(error: OptionLimitError, node: Node, tier: int) -> None:
+    """Say which question was refused, and what the user can change, on the error."""
+    more = "or use a model that takes more options."
+    if node.id and tier:
+        error.question = f'the categories in group {node.id}, "{node.label}", tier {tier}'
+        error.advice = f"Split {node.id} into smaller groups, {more}"
+    elif any(c.is_exit for c in node.children):
+        error.question = "the tier-1 categories and the fallback exit"
+        error.advice = f"Put the tier-1 categories into fewer, larger groups, {more}"
+    else:
+        error.question = "every topic, asked flat"
+        error.advice = f"Tag tiered (--method tiered) so each question offers fewer options, {more}"
+
+
+def refusal_message(model: str, error: OptionLimitError) -> str:
+    """What to tell the user when a model refused a question: which, why, and what next.
+
+    Args:
+        model: The model's name as the user gave it.
+        error: The refusal, named by the walk.
+    """
+    return (
+        f"The model {model} refused a question with {error.options} options "
+        f"({error.question}):\n  HTTP {error.status}: {error.host_message}\n{error.advice} "
+        "Tags made so far are saved; a run with the same scheme and method carries on from them."
+    )
 
 
 def _child(node: Node, child_id: str) -> Node:

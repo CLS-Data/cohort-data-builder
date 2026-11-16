@@ -126,7 +126,7 @@ date. Each topic's **number** is its position across the whole scheme, counting 
 | `model` | `provider:model`. |
 | `tagged` | ISO 8601 UTC time. |
 | `method` | `flat` or `tiered`: how the tags were made. A line without it was made by the flat method. |
-| `path` | Tiered only: the areas followed, in order, as `[area id, confidence]`. |
+| `path` | Tiered only: the groups followed, top down, as `[group id, confidence]` (two entries per branch in a three-tier taxonomy). A flat record, from a chat or a decision model, has none. |
 
 `topics` means the same for both methods: each topic with its own confidence. In a tiered
 line it is the topic-level confidence, merged across areas (highest per topic).
@@ -164,7 +164,8 @@ written before `categories` existed are read from `domains`.
 
 | Field | Meaning |
 |---|---|
-| `status` | `finished` or `stopped` (Ctrl-C). |
+| `status` | `finished` or `stopped` (Ctrl-C, or a refusal). |
+| `stop_reason` | Only when a model refused a question for its number of options (exit 5): the message shown, naming the question. |
 | `settings` | Provider, base URL, model, `method` (`flat` or `tiered`), for tiered runs `descend_at` and `max_areas`, for decision models (`ollama-decision`) `keep_at`, batch size, workers, timeout, retries, files, limit, retag, grouping field, variables path, scheme path and hash. Never an API key. |
 | `counts` | `total`, `todo`, `tagged`, `skipped` (already current), `failed`, `requests`, `requests_by_tier` (index 0 is tier 1; a flat run has one entry), `retries`, `singles` (variables retried one at a time). |
 | `failed` | `file/variable` of each variable that could not be tagged. |

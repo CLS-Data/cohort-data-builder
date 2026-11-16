@@ -493,7 +493,14 @@ def test_a_refusal_at_tier_1_names_it(small_scheme):
 def test_a_refusal_at_a_group_names_the_group_and_its_tier():
     scheme = three_tier()
     probs = {"health": 0.9, "physical_health": 0.9}
-    stub = Refusing(limit=2, probability=lambda n, o: probs.get(o, 0.01))
+
+    class BelowTier1(Refusing):  # tier 1 is answered; any group with 3 options is refused
+        def decide(self, state, instructions, options):
+            if "health" in options:
+                return StubDecision.decide(self, state, instructions, options)
+            return super().decide(state, instructions, options)
+
+    stub = BelowTier1(limit=2, probability=lambda n, o: probs.get(o, 0.01))
     with pytest.raises(OptionLimitError) as err:
         walk(build_tree(scheme), [var("a")], DecisionDecider(stub), 0.5, 3)
     assert err.value.question == 'the categories in group health, "Health", tier 1'

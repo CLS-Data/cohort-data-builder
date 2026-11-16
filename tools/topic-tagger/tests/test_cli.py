@@ -659,13 +659,17 @@ class RefusingStub(DecisionStub):
         self.limit = limit
         self.hold = set(hold)
         self.refused = threading.Event()
+        self.held = threading.Event()
 
     def decide(self, state, instructions, options):
         if len(options) > self.limit:
+            if self.hold:
+                self.held.wait(5)  # refuse only once the held batch is really in flight
             self.calls.append((state, options))
             self.refused.set()
             raise OptionLimitError(400, "too many options for choice question", len(options))
         if state["name"] in self.hold:
+            self.held.set()
             self.refused.wait(5)
         return super().decide(state, instructions, options)
 

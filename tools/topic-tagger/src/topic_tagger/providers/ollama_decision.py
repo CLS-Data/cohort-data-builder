@@ -6,22 +6,30 @@ question per request: which of a tier's options the variable is about. The answe
 every option a probability, summing to about 1. See
 https://docs.ollama.com/capabilities/decision.
 
+How many options a question may offer depends on the model, and the API offers no way to
+ask. So nothing is checked here: a host that refuses a question for having too many options
+raises ``OptionLimitError`` (see ``_refusal``), and the run stops.
+
 The call is a single JSON POST, so it uses the standard library rather than a client package.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import socket
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
-from topic_tagger.providers import ProviderError
+from topic_tagger.providers import OptionLimitError, ProviderError
 from topic_tagger.providers.openai_compat import LOCAL_HOSTS, is_cloud_model
 
-#: Fewest and most options a ``choice`` question may have.
-MIN_OPTIONS, MAX_OPTIONS = 2, 26
+# A refusal for too many options names the options and a size, and is not about the
+# context window (a prompt too long for the model is a different 400). Research R1.
+_OPTIONS = re.compile(r"option|choice|criteri", re.IGNORECASE)
+_SIZE = re.compile(r"too many|exceed|limit|at most|maximum", re.IGNORECASE)
+_NOT_OPTIONS = re.compile(r"context|token", re.IGNORECASE)
 
 #: The name of the one question in each request.
 QUESTION = "option"
@@ -34,7 +42,7 @@ def choice_body(model: str, state: dict, instructions: str, options: dict[str, s
         model: The decision model, e.g. ``clef:cloud``.
         state: What is being judged, as JSON (here, one variable).
         instructions: The question.
-        options: ``{option id: description}``, 2 to 26 of them.
+        options: ``{option id: description}``; how many a model takes is up to the model.
     """
     return {
         "model": model,
@@ -86,21 +94,25 @@ class OllamaDecisionProvider:
         Args:
             state: What is being judged, as JSON (here, one variable).
             instructions: The question.
-            options: ``{option id: description}``, 2 to 26 of them.
+            options: ``{option id: description}``.
 
         Returns:
             ``{option id: probability}``, summing to about 1.
 
         Raises:
-            ProviderError: If there are too few or too many options, or a request fails,
-                times out, or leaves an option without a probability.
+            OptionLimitError: If the model refused the question for its number of options.
+            ProviderError: If a request fails, times out, or leaves an option without a
+                probability.
         """
-        if not MIN_OPTIONS <= len(options) <= MAX_OPTIONS:
-            raise ProviderError(
-                f"a choice needs {MIN_OPTIONS} to {MAX_OPTIONS} options, not {len(options)}"
-            )
         body = choice_body(self.model, state, instructions, options)
-        answer = self._call("POST", "/systemone", body).get("answers", {}).get(QUESTION, {})
+        try:
+            reply = self._call("POST", "/systemone", body)
+        except ProviderError as e:
+            refusal = _refusal(e, len(options))
+            if refusal is not None:
+                raise refusal from e
+            raise
+        answer = reply.get("answers", {}).get(QUESTION, {})
         probabilities = answer.get("probabilities") or {}
         got = {}
         for option in options:
@@ -121,7 +133,9 @@ class OllamaDecisionProvider:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 return json.loads(response.read() or b"{}")
         except urllib.error.HTTPError as e:
-            raise ProviderError(f"the host answered with an error: HTTP {e.code}") from e
+            text = _error_text(e)
+            detail = f"HTTP {e.code}: {text}" if text else f"HTTP {e.code}"
+            raise ProviderError(f"the host answered with an error: {detail}") from e
         except TimeoutError as e:
             raise ProviderError("the request timed out") from e
         except urllib.error.URLError as e:
@@ -130,3 +144,26 @@ class OllamaDecisionProvider:
             raise ProviderError(f"Ollama is not reachable at {self.base_url}") from e
         except json.JSONDecodeError as e:
             raise ProviderError("the host did not answer with JSON") from e
+
+
+def _error_text(e: urllib.error.HTTPError) -> str:
+    """The ``error`` field of an error reply, or its text, or ``""``."""
+    try:
+        raw = e.read().decode("utf-8", "replace")
+    except Exception:  # an error body that cannot be read is no reason to fail differently
+        return ""
+    try:
+        return str(json.loads(raw).get("error", "")) or raw.strip()
+    except (json.JSONDecodeError, AttributeError):
+        return raw.strip()
+
+
+def _refusal(error: ProviderError, options: int) -> OptionLimitError | None:
+    """An ``OptionLimitError`` when ``error`` is a refusal for too many options, else None."""
+    cause = error.__cause__
+    if not isinstance(cause, urllib.error.HTTPError) or cause.code not in (400, 413):
+        return None
+    text = str(error).split(f"HTTP {cause.code}: ", 1)[-1]
+    if _OPTIONS.search(text) and _SIZE.search(text) and not _NOT_OPTIONS.search(text):
+        return OptionLimitError(cause.code, text, options)
+    return None

@@ -20,6 +20,31 @@ class ProviderError(Exception):
     """The host could not be reached, or did not answer usefully."""
 
 
+class OptionLimitError(ProviderError):
+    """The model refused a question because it offers too many options.
+
+    The limit is the model's, not the tagger's, and differs between models. Asking the same
+    question again cannot succeed, so the run stops (see ``runner``) instead of retrying.
+
+    Attributes:
+        status: The HTTP status the host answered with.
+        host_message: The host's own error text.
+        options: How many options the refused question offered.
+        question: Which question it was, in words; filled in by the tier walk.
+        advice: What the user can change; filled in by the tier walk.
+    """
+
+    def __init__(self, status: int, host_message: str, options: int):
+        self.status = status
+        self.host_message = host_message
+        self.options = options
+        self.question = ""
+        self.advice = ""
+        super().__init__(
+            f"the model refused a question with {options} options: HTTP {status}: {host_message}"
+        )
+
+
 class Provider(Protocol):
     """What the tool needs from a model host."""
 

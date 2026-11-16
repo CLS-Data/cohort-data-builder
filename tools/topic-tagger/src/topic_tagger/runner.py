@@ -15,11 +15,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
 from topic_tagger.prompt import build_messages, reply_schema
-from topic_tagger.providers import Provider, ProviderError
+from topic_tagger.providers import OptionLimitError, Provider, ProviderError
 from topic_tagger.reply import ReplyError, parse_reply
 from topic_tagger.scheme import Scheme
 from topic_tagger.store import TagStore, make_record
-from topic_tagger.tiered import ChatDecider, Decider, build_tree, walk
+from topic_tagger.tiered import ChatDecider, Decider, build_tree, flat_tree, walk
 from topic_tagger.variables import Variable
 
 Tags = list[tuple[str, float]]
@@ -61,6 +61,7 @@ class RunResult:
     stopped: bool = False
     requests_by_tier: list[int] = field(default_factory=list)
     areas_followed: int = 0
+    refusal: OptionLimitError | None = None
 
 
 @dataclass
@@ -73,6 +74,7 @@ class _Outcome:
     last_error: str = ""
     requests_by_tier: list[int] = field(default_factory=list)
     paths: dict[str, list[tuple[str, float]]] = field(default_factory=dict)
+    refusal: OptionLimitError | None = None
 
 
 class Runner:
@@ -86,8 +88,9 @@ class Runner:
         clock: Gives the time stored with each record.
         on_event: Called in the main thread as ``on_event(kind, data)`` with ``retry``,
             ``batch_done`` (``n`` and each variable's ``tags``) and ``failed`` (``key``).
-        decider: Tiered: what answers each tier; a ``ChatDecider`` on ``provider`` if not
-            given. A decision model can only tag tiered.
+        decider: What answers each question when walking: a ``ChatDecider`` on
+            ``provider`` if not given. Given (a decision model), a flat run walks a
+            one-question tree of every leaf.
     """
 
     def __init__(
@@ -107,10 +110,10 @@ class Runner:
         self.clock = clock
         self.on_event = on_event
         self._schema = reply_schema(scheme)
-        if decider is not None and settings.method != "tiered":
-            raise ValueError("a decision model tags tiered only")
-        self._walks = settings.method == "tiered"
-        self._tree = build_tree(scheme)
+        tiered = settings.method == "tiered"
+        # Chat models tag flat with the flat prompt; everything else walks a tree.
+        self._walks = tiered or decider is not None
+        self._tree = build_tree(scheme) if tiered else flat_tree(scheme)
         self.decider = decider or ChatDecider(provider, scheme.guidance)
         self._stop = threading.Event()
 
@@ -148,6 +151,8 @@ class Runner:
                 for v, tags in out.tagged
             ]
         )
+        if out.refusal is not None and result.refusal is None:
+            result.refusal = out.refusal
         result.areas_followed += sum(len(out.paths.get(v.key, [])) for v, _ in out.tagged)
         for _ in range(out.retries):
             self.on_event("retry", {})
@@ -202,7 +207,13 @@ class Runner:
 
     def _tiered(self, batch: list[Variable], out: _Outcome) -> _Outcome:
         s = self.settings
-        walked = walk(self._tree, batch, self.decider, s.descend_at, s.max_areas, s.retries)
+        try:
+            walked = walk(self._tree, batch, self.decider, s.descend_at, s.max_areas, s.retries)
+        except OptionLimitError as e:
+            # Every variable reaching that question would be refused: stop, keep what is done.
+            self._stop.set()
+            out.refusal = e
+            return out
         out.tagged = [(batch[i], tags) for i, tags in sorted(walked.tags.items())]
         out.failed = [batch[i] for i in walked.failed]
         out.paths = {batch[i].key: path for i, path in walked.paths.items()}

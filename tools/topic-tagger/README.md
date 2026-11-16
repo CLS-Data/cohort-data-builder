@@ -236,6 +236,7 @@ label = "Other"
 | 2 | Bad input, scheme or options; nothing was sent. |
 | 3 | The host could not be reached or the model is not installed; nothing was sent. |
 | 4 | Another run is using the output folder, or one left its lock (see `--force`). |
+| 5 | The model refused a question because it offers too many options; what was tagged is saved. |
 | 130 | Stopped with Ctrl-C; what was tagged is saved. |
 
 **Privacy.** Only variable metadata (names, labels, value labels) is sent, never study
@@ -295,10 +296,26 @@ strongest is always kept. Because the probabilities are shared out between the o
 a variable rarely has two areas or topics above 0.5. Lower `--descend-at` and `--keep-at`
 (0.3 lets up to three through) so a variable can be tagged from several areas.
 
-Clef tags tiered only: a choice question takes at most 26 options, too few for every
-topic at once, so `--method flat` is refused. For the same reason the tool refuses a scheme
-with more than 26 areas, or an area with more than 26 topics, before sending anything. The
-bundled scheme has 15 areas and at most 23 topics in one.
+A decision model tags tiered by default. With `--method flat` it is asked one choice
+question per variable, offering every leaf at once.
+
+**Option limits are the model's.** How many options one question may offer depends on the
+model, and the tool does not check it: Clef, for example, takes at most 26, so the bundled
+scheme (107 topics) cannot be tagged flat with Clef, but can be tiered (at most 23 options
+at once). When a model refuses a question for having too many options, the run stops at
+once, exit code 5, with a message naming the question, its number of options and the
+model's own words:
+
+```text
+The model clef:cloud refused a question with 107 options (every topic, asked flat):
+  HTTP 400: <the host's message>
+Tag tiered (--method tiered) so each question offers fewer options, or use a model that
+takes more options. Tags made so far are saved; a run with the same scheme and method
+carries on from them.
+```
+
+Nothing is retried and no variable is marked failed for it, because the same question would
+be refused again. Other errors (a timeout, a bad reply) are retried as usual.
 
 Clef is asked one variable at a time: 1 request, plus 1 per area followed. A cohort of
 30,000 variables is therefore 60,000 requests or more. Clef's cloud tag is

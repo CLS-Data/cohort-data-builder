@@ -140,14 +140,14 @@ too-many-options refusal stops the run with exit 5 (research R1, R2, R6, R7).
 **Independent test**: Run fake decision hosts flat and tiered on the fixture taxonomies. A
 host that refuses questions with more than 5 options stops the run, naming the question.
 
-- [ ] T012 [P] [US2] Write failing tests in `tests/test_decision_provider.py`, against the fake decision host:
+- [x] T012 [P] [US2] Write failing tests in `tests/test_decision_provider.py`, against the fake decision host:
   1. A `choice` with 27 or more options is **sent**, so there is no client-side 2–26 check.
   2. An HTTP 400 with body `{"error": "too many options for choice question"}` raises `OptionLimitError`, with `status == 400`, the `host_message` and `options == 27`.
   3. A 413 whose text mentions criteria does the same.
   4. A 400 with `{"error": "prompt exceeds context window"}` raises a plain `ProviderError`, **not** `OptionLimitError`, and includes the host's text.
   5. A 500 stays a plain `ProviderError`.
   6. A 400 with `{"error": "prompt for choice question exceeds the model's context window"}` stays a plain `ProviderError`, so mentioning "choice" alone is not enough. The match needs an options word together with a size word: `too many`, `exceed`, `limit`, `at most` or `maximum`, and no `context` or `token`. Record the rule in research.md R1.
-- [ ] T013 [P] [US2] Write failing tests in `tests/test_tiered.py`:
+- [x] T013 [P] [US2] Write failing tests in `tests/test_tiered.py`:
   1. `flat_tree(scheme)` has every leaf as a direct child of the root, including the fallback, in file order.
   2. `walk(flat_tree, …)` with a `DecisionDecider` over a scripted decision provider keeps leaves at `keep_at`, and the strongest leaf if none passes. It stores no path, and sends 1 request per variable.
   3. When the decision provider raises `OptionLimitError` for a node, `walk` re-raises it, and the error names the question:
@@ -157,7 +157,7 @@ host that refuses questions with more than 5 options stops the run, naming the q
 
      The decider is called once only: no retries and no single requests.
   4. `choice_problems` no longer exists.
-- [ ] T014 [US2] Write failing tests in `tests/test_runner.py` and `tests/test_cli.py`:
+- [x] T014 [US2] Write failing tests in `tests/test_runner.py` and `tests/test_cli.py`:
   1. Decision **flat** with `scheme_small.toml` tags every variable. Records have `method: "flat"` and no `path`, and `requests == variables`.
   2. `--provider ollama-decision --method flat` is accepted (it was exit 2 in 004).
   3. With a fake host that refuses questions over 5 options:
@@ -171,20 +171,20 @@ host that refuses questions with more than 5 options stops the run, naming the q
      - the message names that group;
      - after splitting the group in the scheme and running again, the stored variables are not redone.
   5. **Tiered with `scheme_1tier.toml`** prints "This taxonomy has one tier: tagging flat." and records `method: "flat"`.
-- [ ] T015 [US2] Implement in `src/topic_tagger/providers/__init__.py` and `src/topic_tagger/providers/ollama_decision.py`:
+- [x] T015 [US2] Implement in `src/topic_tagger/providers/__init__.py` and `src/topic_tagger/providers/ollama_decision.py`:
   - `class OptionLimitError(ProviderError)` with `status`, `host_message` and `options`;
   - remove `MIN_OPTIONS`/`MAX_OPTIONS` and the check in `decide()`;
   - in `_call`, read the HTTP error body's `error` text and include it in messages;
   - raise `OptionLimitError` for 400 or 413 when the text matches `option|choice|criteri` (case-insensitive), as in research R1.
 
   Update the module docstrings, which mention 2 to 26.
-- [ ] T016 [US2] Implement in `src/topic_tagger/tiered.py`:
+- [x] T016 [US2] Implement in `src/topic_tagger/tiered.py`:
   - `flat_tree(scheme)`;
   - `DecisionDecider.decide` re-raises `OptionLimitError` instead of skipping the variable;
   - `_ask` re-raises it at once, with the question named, with no retry and no singles;
   - delete `choice_problems` and its `MAX_OPTIONS` import;
   - update the `DecisionDecider` docstring ("tags tiered only" is no longer true).
-- [ ] T017 [US2] Implement in `src/topic_tagger/runner.py` and `src/topic_tagger/cli.py`:
+- [x] T017 [US2] Implement in `src/topic_tagger/runner.py` and `src/topic_tagger/cli.py`:
   - **Runner**:
     - decision-flat goes through `walk(flat_tree(…))`, storing method `flat` with no path;
     - `Runner(..., decider=…)` accepts any method;
@@ -196,7 +196,7 @@ host that refuses questions with more than 5 options stops the run, naming the q
     - write `stop_reason` to `run.json`;
     - a one-tier taxonomy turns tiered into flat, with the notice.
 
-- [ ] T017b [US2] Document in the same PR:
+- [x] T017b [US2] Document in the same PR:
   - **`README.md`**:
     - decision models tag flat or tiered;
     - option limits are the model's, with no built-in check;

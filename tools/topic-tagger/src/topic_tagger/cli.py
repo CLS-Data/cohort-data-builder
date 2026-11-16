@@ -21,10 +21,10 @@ from topic_tagger.runner import Runner, Settings, install_stop_handler
 from topic_tagger.scheme import SchemeError, bundled_scheme_text, load_scheme, scheme_from_json
 from topic_tagger.stats import compute_stats
 from topic_tagger.store import LockedError, StaleLockError, TagStore
-from topic_tagger.tiered import DecisionDecider, build_tree, choice_problems, decision_request
+from topic_tagger.tiered import DecisionDecider, build_tree, decision_request, refusal_message
 from topic_tagger.variables import InputError, read_variables
 
-OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED, STOPPED = 0, 1, 2, 3, 4, 130
+OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED, REFUSED, STOPPED = 0, 1, 2, 3, 4, 5, 130
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 SUMMARY_TOP = 10  # files or groups listed in the end-of-run summary
 
@@ -98,7 +98,7 @@ def _parser() -> argparse.ArgumentParser:
         "--method",
         choices=["flat", "tiered"],
         help="flat: every topic in one request; tiered: areas first, then topics within them "
-        "(default flat; tiered for ollama-decision, which can only tag tiered)",
+        "(default flat; tiered for ollama-decision)",
     )
     tag.add_argument(
         "--descend-at",
@@ -169,11 +169,10 @@ def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
     except (InputError, SchemeError, ProviderError) as e:
         _err(str(e))
         return BAD_INPUT
-    if args.provider == "ollama-decision":
-        problems = choice_problems(build_tree(scheme))
-        if problems:
-            _err("This scheme does not fit a decision model: " + "; ".join(problems) + ".")
-            return BAD_INPUT
+    if args.method == "tiered" and scheme.tiers == 1:
+        _err("This taxonomy has one tier: tagging flat.")
+        args.method = "flat"
+        args.descend_at = args.max_areas = None
 
     if args.dry_run:
         batch = variables[: args.batch_size]
@@ -204,12 +203,7 @@ def _check_method(args: argparse.Namespace) -> str | None:
     if args.provider != "ollama-decision" and args.keep_at is not None:
         return "--keep-at needs --provider ollama-decision"
     if args.provider == "ollama-decision":
-        if args.method == "flat":
-            return (
-                "--provider ollama-decision tags tiered only: a decision model chooses among "
-                "at most 26 options, so it cannot be asked every topic at once"
-            )
-        args.method = "tiered"
+        args.method = args.method or "tiered"
         args.keep_at = 0.3 if args.keep_at is None else args.keep_at
         if not 0 <= args.keep_at <= 1:
             return "--keep-at must be between 0 and 1"
@@ -319,12 +313,16 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
     print(_summary(run, stats, scheme, store.folder))
     if args.method == "tiered":
         print(_tier_lines(result))
-    if result.stopped:
+    if result.refusal is not None:
+        _err(refusal_message(args.model, result.refusal))
+    elif result.stopped:
         _err("Stopped. Run the same command again to carry on.")
     if result.failed:
         _err("Could not tag:\n  " + "\n  ".join(result.failed))
         if result.last_error:
             _err(f"Last error: {result.last_error}")
+    if result.refusal is not None:
+        return REFUSED
     if result.stopped:
         return STOPPED
     return SOME_FAILED if result.failed else OK
@@ -376,6 +374,11 @@ def _run_record(args, scheme, started, ended, result, total, todo, skipped) -> d
             "singles": result.singles,
         },
         "failed": result.failed,
+        **(
+            {"stop_reason": refusal_message(args.model, result.refusal)}
+            if result.refusal is not None
+            else {}
+        ),
     }
 
 
