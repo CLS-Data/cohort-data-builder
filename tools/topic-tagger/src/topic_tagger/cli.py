@@ -543,7 +543,9 @@ def _scheme_lines(scheme) -> list[str]:
     leaves = len(scheme.topic_ids)
     lines.append(f"  {count(leaves, 'leaf', 'leaves')}; fallback: {scheme.fallback_topic}")
     lines.append(f"  largest question, flat: {leaves} options (every leaf)")
-    for tier, (n, node) in sorted(question_sizes(build_tree(scheme)).items()):
+    # A one-tier taxonomy is always tagged flat, so only the flat question is asked.
+    sizes = question_sizes(build_tree(scheme)) if scheme.tiers > 1 else {}
+    for tier, (n, node) in sorted(sizes.items()):
         if tier == 1:
             groups = sum(not c.is_leaf for c in node.children)
             leaves = len(node.children) - groups - 1
