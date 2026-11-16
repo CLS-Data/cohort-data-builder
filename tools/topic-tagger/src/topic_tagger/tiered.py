@@ -30,6 +30,8 @@ class Node:
         children: Its children, in scheme order; empty for a leaf.
         is_exit: True for the fallback offered at tier 1: kept only when nothing else is
             found.
+        question: For a group, the scheme's question for its children, with ``{group}``
+            filled in; ``""`` for the built-in wording.
     """
 
     id: str
@@ -37,6 +39,7 @@ class Node:
     description: str
     children: tuple[Node, ...] = ()
     is_exit: bool = False
+    question: str = ""
 
     @property
     def is_leaf(self) -> bool:
@@ -64,16 +67,25 @@ def build_tree(scheme: Scheme) -> Node:
     """
     fallback = scheme.fallback_topic
 
-    def convert(c) -> Node | None:
+    def convert(c, tier: int) -> Node | None:
         if c.is_leaf:
             return None if c.id == fallback else Node(c.id, c.label, c.description)
-        children = tuple(n for n in map(convert, c.children) if n is not None)
-        return Node(c.id, c.label, c.description, children) if children else None
+        children = tuple(n for n in (convert(k, tier + 1) for k in c.children) if n)
+        if not children:
+            return None
+        question = _question(scheme, f"tier{tier + 1}", c.label)
+        return Node(c.id, c.label, c.description, children, question=question)
 
-    tier1 = [n for n in map(convert, scheme.root.children) if n is not None]
+    tier1 = [n for n in (convert(c, 1) for c in scheme.root.children) if n is not None]
     leaf = next(t for t in scheme.topics if t.id == fallback)
     exit_ = Node(leaf.id, leaf.label, leaf.description, is_exit=True)
-    return Node("", scheme.name, "", (*tier1, exit_))
+    question = _question(scheme, "tier1", scheme.name)
+    return Node("", scheme.name, "", (*tier1, exit_), question=question)
+
+
+def _question(scheme: Scheme, key: str, group: str) -> str:
+    """The scheme's question for ``key`` with ``{group}`` filled in, or ``""``."""
+    return scheme.questions.get(key, "").replace("{group}", group).strip()
 
 
 def flat_tree(scheme: Scheme) -> Node:
@@ -82,9 +94,8 @@ def flat_tree(scheme: Scheme) -> Node:
     The fallback is one of the leaves, as in a flat prompt. Walking this tree asks one
     question per variable and keeps leaves as at any all-leaf tier (``keep_at``).
     """
-    return Node(
-        "", scheme.name, "", tuple(Node(t.id, t.label, t.description) for t in scheme.topics)
-    )
+    leaves = tuple(Node(t.id, t.label, t.description) for t in scheme.topics)
+    return Node("", scheme.name, "", leaves, question=_question(scheme, "flat", scheme.name))
 
 
 Tags = list[tuple[str, float]]
@@ -140,16 +151,21 @@ class DecisionDecider:
     many options a question may offer is the model's limit; a refusal is raised, not
     skipped, so the run stops (``OptionLimitError``).
 
+    The request has no field for background, so each question's instructions are the
+    scheme's guidance, a blank line, then the question (the scheme's, or the built-in one).
+
     Args:
         provider: The decision-model host.
         keep_at: Topics below this probability are dropped, but the strongest is always kept.
             Areas, and a topic offered among them (the exit), are all returned; the walk decides
             which to follow.
+        guidance: The scheme's instructions, put before every question.
     """
 
-    def __init__(self, provider: DecisionProvider, keep_at: float = 0.3):
+    def __init__(self, provider: DecisionProvider, keep_at: float = 0.3, guidance: str = ""):
         self.provider = provider
         self.keep_at = keep_at
+        self.guidance = guidance
 
     def decide(self, node: Node, variables: list[Variable]) -> tuple[dict[int, Tags], int]:
         """Ask each variable which of ``node``'s children fits, one request per variable.
@@ -157,7 +173,7 @@ class DecisionDecider:
         A variable whose request fails is left out, so the walk asks it again alone; the
         others keep their answers.
         """
-        instructions, options = _choice(node)
+        instructions, options = _choice(node, self.guidance)
         leaf = {c.id: c.is_leaf for c in node.children}
         position = {c.id: i for i, c in enumerate(node.children)}
         got: dict[int, Tags] = {}
@@ -185,25 +201,26 @@ class DecisionDecider:
         return got, len(variables)
 
 
-def decision_request(model: str, node: Node, variable: Variable) -> dict:
+def decision_request(model: str, node: Node, variable: Variable, guidance: str = "") -> dict:
     """The ``/v1/systemone`` body the decision decider sends for one variable at ``node``.
 
     Used by ``--dry-run``; the provider sends the same body.
     """
-    instructions, options = _choice(node)
+    instructions, options = _choice(node, guidance)
     return choice_body(model, _state(variable), instructions, options)
 
 
-def _choice(node: Node) -> tuple[str, dict[str, str]]:
-    """The question and described options for ``node``'s children."""
+def _choice(node: Node, guidance: str = "") -> tuple[str, dict[str, str]]:
+    """The instructions (guidance, then question) and described options for ``node``."""
     kind = "topics" if all(c.is_leaf for c in node.children) else "areas"
     # A choice question gives one answer; asking it to share the probability lets a variable
     # with two true areas or topics reach the thresholds with both.
-    question = (
+    question = node.question or (
         f"Which {kind} of a survey is this variable about? If more than one applies, share "
         "the probability between them."
     )
-    return question, {c.id: _criterion(c) for c in node.children}
+    instructions = f"{guidance.strip()}\n\n{question}" if guidance.strip() else question
+    return instructions, {c.id: _criterion(c) for c in node.children}
 
 
 def _state(v: Variable) -> dict:

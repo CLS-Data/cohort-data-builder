@@ -112,6 +112,8 @@ class Scheme:
         hash: 12 hex characters identifying the content; any edit changes it, except to
             the ``[run]`` table.
         run: The ``[run]`` table: how to classify, unless the command line says otherwise.
+        questions: The ``[questions]`` table: ``{"flat" | "tier1".. : question}``, where
+            ``{group}`` stands for the label of the group whose children are offered.
     """
 
     name: str
@@ -121,6 +123,7 @@ class Scheme:
     root: Category
     hash: str
     run: RunSettings | None = None
+    questions: dict[str, str] = field(default_factory=dict)
     _leaves: dict[str, Topic] = field(default_factory=dict, repr=False, compare=False)
     _number: dict[str, int] = field(default_factory=dict, repr=False, compare=False)
     _domain: dict[str, Domain] = field(default_factory=dict, repr=False, compare=False)
@@ -193,6 +196,7 @@ class Scheme:
             "guidance": self.guidance,
             "fallback_topic": self.fallback_topic,
             "tiers": self.tiers,
+            "questions": self.questions,
             "categories": [_category_json(c) for c in self.root.children],
             "domains": [
                 {
@@ -265,6 +269,7 @@ def scheme_from_json(data: dict) -> Scheme:
         fallback_topic=data["fallback_topic"],
         root=_root(data),
         hash=data["hash"],
+        questions=data.get("questions", {}),
     )
 
 
@@ -309,6 +314,7 @@ def load_scheme(path: Path) -> Scheme:
         root=_root(raw),
         hash=hashlib.sha256(canonical.encode()).hexdigest()[:12],
         run=RunSettings(**raw["run"]) if "run" in raw else None,
+        questions=dict(raw.get("questions", {})),
     )
 
 
@@ -340,6 +346,8 @@ def validate(raw: dict) -> list[SchemeProblem]:
 
     if "run" in raw:
         validate_run(raw["run"], problem)
+    if "questions" in raw:
+        _validate_questions(raw, problem)
 
     seen: dict[str, str] = {}
     topic_ids: set[str] = set()
@@ -392,6 +400,31 @@ def validate(raw: dict) -> list[SchemeProblem]:
 
 #: The deepest a taxonomy may be.
 MAX_TIERS = 3
+
+
+def _validate_questions(raw: dict, problem) -> None:
+    """Check ``[questions]``: ``flat``, and ``tier1`` up to the taxonomy's depth."""
+    questions = raw["questions"]
+    if not isinstance(questions, dict):
+        problem("questions", "must be a table")
+        return
+    depth = min(_raw_depth(raw["categories"]), MAX_TIERS) if "categories" in raw else 2
+    known = ["flat"] + [f"tier{i}" for i in range(1, depth + 1)]
+    for key, value in questions.items():
+        if key not in known:
+            problem(f"questions.{key}", f"unknown; this taxonomy takes: {', '.join(known)}")
+        elif not isinstance(value, str) or not value.strip():
+            problem(f"questions.{key}", "missing or empty")
+
+
+def _raw_depth(items) -> int:
+    """How many tiers a nested ``categories`` list has, as parsed (before it is checked)."""
+    if not isinstance(items, list) or not items:
+        return 1
+    below = [
+        _raw_depth(c["categories"]) for c in items if isinstance(c, dict) and "categories" in c
+    ]
+    return 1 + max(below, default=0)
 
 
 def _validate_nested(raw: dict, problem, text, ident) -> None:

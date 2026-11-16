@@ -275,7 +275,7 @@ and each tier's question (research R8).
 **Independent test**: A dry run with `scheme_run.toml` shows the tier-2 question, with
 `{group}` filled in, in the decision body's `instructions` and in the chat prompt.
 
-- [ ] T024 [P] [US4] Write failing tests:
+- [x] T024 [P] [US4] Write failing tests:
   1. **`tests/test_scheme.py`**: `[questions]` accepts `flat`, and `tier1` up to `tier<tiers>`. It refuses `tier3` in a two-tier scheme, and refuses unknown keys, with their locations.
   2. **`tests/test_tiered.py`**:
      - `decision_request` at a tier-2 node of `scheme_run.toml` has `instructions == guidance + "\n\n" + "Which topic within Health?"` (research R8);
@@ -286,11 +286,11 @@ and each tier's question (research R8).
      - without one, the output is byte-for-byte as in 004 (pin it with a literal);
      - the flat chat prompt adds `Question: …` when `questions.flat` is set.
   4. **Guidance reaches the decision model**: every `/v1/systemone` body, at every tier and flat, has `instructions` starting with the scheme's guidance (stripped), then a blank line, then the question. The `state` is unchanged: the variable only (research R8).
-- [ ] T025 [US4] Implement `[questions]` in `src/topic_tagger/scheme.py`, and pass questions and guidance to the deciders and prompts in `src/topic_tagger/tiered.py` and `src/topic_tagger/prompt.py`:
+- [x] T025 [US4] Implement `[questions]` in `src/topic_tagger/scheme.py`, and pass questions and guidance to the deciders and prompts in `src/topic_tagger/tiered.py` and `src/topic_tagger/prompt.py`:
   - `{group}` is the label of the node being asked about, which is the scheme's name at the root;
   - the questions are part of the hash. They already are, being outside `[run]`; T018 tests this.
 
-- [ ] T025b [US4] Document in the same PR. In `docs/formats.md` and `README.md`, cover:
+- [x] T025b [US4] Document in the same PR. In `docs/formats.md` and `README.md`, cover:
   - `[questions]` keys and `{group}`;
   - the hash including the questions;
   - the guidance going to decision models before each question.

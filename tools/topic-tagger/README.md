@@ -285,10 +285,12 @@ uv run topic-tagger tag variables.jsonl --out tags/ --scheme my-scheme.toml \
   --provider ollama-decision --model clef:cloud
 ```
 
-For each variable and tier, Clef is asked one choice question: "Which areas of a survey
-is this variable about? If more than one applies, share the probability between them.",
-then "Which topics…" within each area followed. Each option is
-described by its label and description, and an area also by its topics. Clef gives every
+For each variable and tier, Clef is asked one choice question. Its instructions are the
+scheme's guidance, then the question: by default "Which areas of a survey is this variable
+about? If more than one applies, share the probability between them.", then "Which
+topics…" within each area followed, or your own (see
+[Wording each question](#wording-each-question)). Each option is described by its label
+and description, and an area also by its topics. Clef gives every
 option a probability, and these sum to about 1. The probability is the confidence.
 
 Areas are followed as above. Topics are kept at `--keep-at` (0.3) or above, and the
@@ -352,6 +354,24 @@ summary names what was used, for example
   Changing the method does, because each tag records the method that made it.
 - The host's address, keys, workers, batch size, retries and timeout stay on the command
   line: they belong to one machine, or are secret.
+
+## Wording each question
+
+A `[questions]` table words the question asked at each tier, and the flat one:
+
+```toml
+[questions]
+tier1 = "Which domain of a survey is this variable about?"
+tier2 = "Which topic within {group} is this variable about?"
+```
+
+`{group}` is replaced by the label of the group being asked about (the scheme's name at
+tier 1). Keys are `flat` and `tier1` up to the scheme's depth; a tier with no question uses
+the built-in wording. This matters most for decision models, which see only the question
+and the options: their `instructions` are the scheme's guidance, a blank line, then the
+question. Chat models get the question as a `Question: …` line before the options. The
+questions are part of the scheme's hash, so changing one redoes the tags; see
+[docs/formats.md](docs/formats.md).
 
 ## Every option
 

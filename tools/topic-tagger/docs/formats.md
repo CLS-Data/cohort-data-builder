@@ -112,6 +112,30 @@ when the file is loaded, as `run.<key>`. A `keep_at` here is ignored, with a not
 run uses a chat model. The host's address, keys, workers, batch size, retries, timeout and
 output folder are not in `[run]`: they belong to one machine, or are secret.
 
+### `[questions]`: the wording of each question (optional)
+
+```toml
+[questions]
+flat  = "Which topic is this variable about?"
+tier1 = "Which domain of a survey is this variable about?"
+tier2 = "Which topic within {group} is this variable about?"
+tier3 = "Which subtopic within {group} is this variable about?"
+```
+
+`flat` is asked when tagging flat; `tier1` to `tier3` at each tier when tagging tiered.
+`{group}` is replaced by the label of the group whose children are offered: the scheme's
+`name` at tier 1. Keys beyond the taxonomy's depth (`tier3` in a two-tier scheme), unknown
+keys and empty questions are refused when the file is loaded. A tier with no question uses
+the built-in wording.
+
+- **Decision models** see the guidance, a blank line, then the question, as each question's
+  `instructions`. The request has no other place for background, so this is how the
+  guidance reaches them. The variable alone is the `state`.
+- **Chat models** see the line `Question: …` after the guidance, before the options. With
+  no `[questions]`, chat prompts are exactly as before.
+
+The questions are part of the hash: rewording one makes existing tags out of date.
+
 The scheme's **hash** is the first 12 hex characters of SHA-256 over its parsed content,
 leaving out `[run]`, so any change to content (not comments, layout or `[run]`) changes it
 and makes existing tags out of date. Changing a model or a threshold in `[run]` does not:
@@ -163,7 +187,7 @@ The scheme as used, with its hash:
 
 ```json
 {"name": "My topics", "version": 1, "hash": "c87a35ec8bc2", "guidance": "...",
- "fallback_topic": "other", "tiers": 2,
+ "fallback_topic": "other", "tiers": 2, "questions": {"tier2": "Which topic within {group}?"},
  "categories": [{"id": "health", "label": "Health", "description": "...",
                  "categories": [{"id": "smoking", "label": "Smoking", "description": "..."}]}],
  "domains": [{"id": "health", "label": "Health", "description": "...",
@@ -171,7 +195,8 @@ The scheme as used, with its hash:
 ```
 
 `categories` is the taxonomy, nested as in the scheme file (a leaf has no `categories`);
-`tiers` is its depth. `domains` is a two-level view kept for older readers: one entry per
+`tiers` is its depth; `questions` is the `[questions]` table (`{}` when there is none).
+`domains` is a two-level view kept for older readers: one entry per
 tier-1 category, with every leaf beneath it (a tier-1 leaf is a domain of itself). Folders
 written before `categories` existed are read from `domains`.
 

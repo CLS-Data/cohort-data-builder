@@ -253,10 +253,10 @@ def _print_tiered_requests(scheme, batch) -> None:
 def _print_decision_requests(args, scheme, variable) -> None:
     """Print the first variable's first request to the decision model, and a tier-2 example."""
     root = build_tree(scheme)
-    print(json.dumps(decision_request(args.model, root, variable), indent=1))
+    print(json.dumps(decision_request(args.model, root, variable, scheme.guidance), indent=1))
     area = root.children[0]
     print(f"\n--- tier 2 example ({area.label}) ---\n")
-    print(json.dumps(decision_request(args.model, area, variable), indent=1))
+    print(json.dumps(decision_request(args.model, area, variable, scheme.guidance), indent=1))
 
 
 def _run(args, variables, scheme, provider, store, clock, runner_created) -> int:
@@ -298,7 +298,7 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
     view = RunView(len(variables), len(todo), scheme, clock)
     decider = None
     if args.provider == "ollama-decision":
-        decider = DecisionDecider(provider, keep_at=args.keep_at)
+        decider = DecisionDecider(provider, keep_at=args.keep_at, guidance=scheme.guidance)
     runner = Runner(
         scheme, provider, store, settings, clock, on_event=view.on_event, decider=decider
     )

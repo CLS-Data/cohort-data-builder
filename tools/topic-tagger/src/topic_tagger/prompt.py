@@ -53,7 +53,10 @@ def build_option_messages(
         ``[system message, user message]``; the user message is the same as the flat one.
     """
     ids = [c.id for c in node.children]
-    lines = [guidance, "", "Options. Use only these ids:"]
+    lines = [guidance, ""]
+    if node.question:  # with no question set, the prompt is as it was in 004
+        lines += [f"Question: {node.question}", ""]
+    lines += ["Options. Use only these ids:"]
     for c in node.children:
         lines.append(f"- {c.id}: {c.label} — {c.description}")
         if show_children_of_options and c.children:
@@ -82,7 +85,11 @@ def reply_schema(scheme: Scheme) -> dict:
 
 def _system(scheme: Scheme) -> str:
     heading = "Topics, grouped by area." if scheme.tiers > 1 else "Topics."
-    lines = [scheme.guidance, "", f"{heading} Use only these ids:"]
+    lines = [scheme.guidance, ""]
+    question = scheme.questions.get("flat", "").replace("{group}", scheme.name).strip()
+    if question:  # with no question set, the prompt is as it was in 004
+        lines += [f"Question: {question}", ""]
+    lines += [f"{heading} Use only these ids:"]
     lines += _leaf_sections(scheme)
     lines += [
         "",

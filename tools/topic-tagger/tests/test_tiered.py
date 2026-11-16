@@ -533,7 +533,7 @@ def test_a_tier_question_follows_the_guidance_with_the_group_filled_in():
     body = decision_request("m", health, var("x"), scheme.guidance)
     instructions = body["questions"]["option"]["instructions"]
     assert instructions == scheme.guidance.strip() + "\n\nWhich topic within Health?"
-    assert body["state"] == {"name": "x", "label": "", "values": []}
+    assert body["state"] == {"name": "x", "label": "x", "values": []}
 
 
 def test_with_no_question_for_a_tier_the_built_in_wording_is_used(small_scheme):
@@ -573,4 +573,4 @@ def test_the_guidance_reaches_every_decision_question_flat_and_tiered():
         stub = StubDecision(lambda n, o: 0.9 if o in ("health", "smoking") else 0.01)
         walk(tree, [var("a")], DecisionDecider(stub, guidance=scheme.guidance), 0.5, 3)
         assert stub.calls and all(i.startswith(start) for _, i, _ in stub.calls)
-        assert all(s == {"name": "a", "label": "", "values": []} for s, _, _ in stub.calls)
+        assert all(s == {"name": "a", "label": "a", "values": []} for s, _, _ in stub.calls)
