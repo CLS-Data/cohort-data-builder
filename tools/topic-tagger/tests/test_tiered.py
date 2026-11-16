@@ -505,3 +505,72 @@ def test_a_refusal_at_a_group_names_the_group_and_its_tier():
         walk(build_tree(scheme), [var("a")], DecisionDecider(stub), 0.5, 3)
     assert err.value.question == 'the categories in group health, "Health", tier 1'
     assert "Split health" in err.value.advice
+
+
+# --- Questions and guidance (feature 005, US4) ------------------------------------------
+
+from conftest import FIXTURES  # noqa: E402
+from topic_tagger.scheme import load_scheme  # noqa: E402
+from topic_tagger.tiered import decision_request  # noqa: E402
+
+BUILT_IN_TOPICS = (
+    "Which topics of a survey is this variable about? If more than one applies, share the "
+    "probability between them."
+)
+
+
+def run_scheme():
+    return load_scheme(FIXTURES / "scheme_run.toml")
+
+
+def group(tree, id_):
+    return next(c for c in tree.children if c.id == id_)
+
+
+def test_a_tier_question_follows_the_guidance_with_the_group_filled_in():
+    scheme = run_scheme()
+    health = group(build_tree(scheme), "health")
+    body = decision_request("m", health, var("x"), scheme.guidance)
+    instructions = body["questions"]["option"]["instructions"]
+    assert instructions == scheme.guidance.strip() + "\n\nWhich topic within Health?"
+    assert body["state"] == {"name": "x", "label": "", "values": []}
+
+
+def test_with_no_question_for_a_tier_the_built_in_wording_is_used(small_scheme):
+    health = group(build_tree(small_scheme), "health")
+    body = decision_request("m", health, var("x"), small_scheme.guidance)
+    expected = small_scheme.guidance.strip() + "\n\n" + BUILT_IN_TOPICS
+    assert body["questions"]["option"]["instructions"] == expected
+
+
+def test_the_flat_question_is_used_flat(tmp_path):
+    from topic_tagger.tiered import flat_tree
+
+    text = (FIXTURES / "scheme_small.toml").read_text()
+    path = tmp_path / "s.toml"
+    path.write_text(text.replace("[[domains]]", '[questions]\nflat = "Which?"\n\n[[domains]]', 1))
+    scheme = load_scheme(path)
+    body = decision_request("m", flat_tree(scheme), var("x"), scheme.guidance)
+    assert body["questions"]["option"]["instructions"].endswith("\n\nWhich?")
+
+
+def test_the_tier1_question_names_the_taxonomy(tmp_path):
+    text = (FIXTURES / "scheme_small.toml").read_text()
+    path = tmp_path / "s.toml"
+    path.write_text(
+        text.replace("[[domains]]", '[questions]\ntier1 = "In {group}?"\n\n[[domains]]', 1)
+    )
+    scheme = load_scheme(path)
+    assert build_tree(scheme).question == f"In {scheme.name}?"
+
+
+def test_the_guidance_reaches_every_decision_question_flat_and_tiered():
+    from topic_tagger.tiered import flat_tree
+
+    scheme = run_scheme()
+    start = scheme.guidance.strip() + "\n\n"
+    for tree in (build_tree(scheme), flat_tree(scheme)):
+        stub = StubDecision(lambda n, o: 0.9 if o in ("health", "smoking") else 0.01)
+        walk(tree, [var("a")], DecisionDecider(stub, guidance=scheme.guidance), 0.5, 3)
+        assert stub.calls and all(i.startswith(start) for _, i, _ in stub.calls)
+        assert all(s == {"name": "a", "label": "", "values": []} for s, _, _ in stub.calls)

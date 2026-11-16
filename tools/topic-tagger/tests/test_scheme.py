@@ -404,3 +404,41 @@ def test_the_hash_leaves_out_the_run_table_but_not_the_questions(tmp_path):
     small = (FIXTURES / "scheme_small.toml").read_text()
     path.write_text(small.replace("[[domains]]", '[run]\nmodel = "m"\n\n[[domains]]', 1))
     assert load_scheme(path).hash == load_scheme(FIXTURES / "scheme_small.toml").hash
+
+
+# --- The [questions] table (feature 005, US4) -------------------------------------------
+
+
+def test_the_questions_are_read():
+    assert load_scheme(FIXTURES / "scheme_run.toml").questions == {
+        "tier2": "Which topic within {group}?"
+    }
+    assert load_scheme(FIXTURES / "scheme_small.toml").questions == {}
+
+
+@pytest.mark.parametrize(
+    ("fixture", "line", "location"),
+    [
+        ("scheme_small.toml", 'tier3 = "Q"', "questions.tier3"),
+        ("scheme_small.toml", 'tier0 = "Q"', "questions.tier0"),
+        ("scheme_small.toml", 'colour = "Q"', "questions.colour"),
+        ("scheme_small.toml", 'flat = ""', "questions.flat"),
+        ("scheme_1tier.toml", 'tier2 = "Q"', "questions.tier2"),
+    ],
+)
+def test_a_bad_question_is_refused_with_its_location(tmp_path, fixture, line, location):
+    text = (FIXTURES / fixture).read_text()
+    marker = "[[domains]]" if "[[domains]]" in text else "[[categories]]"
+    path = tmp_path / "s.toml"
+    path.write_text(text.replace(marker, f"[questions]\n{line}\n\n{marker}", 1))
+    with pytest.raises(SchemeError) as err:
+        load_scheme(path)
+    assert location in {p.location for p in err.value.problems}
+
+
+def test_every_tier_up_to_the_depth_may_have_a_question(tmp_path):
+    text = (FIXTURES / "scheme_3tier.toml").read_text()
+    questions = '[questions]\nflat = "F"\ntier1 = "A"\ntier2 = "B"\ntier3 = "C"\n\n'
+    path = tmp_path / "s.toml"
+    path.write_text(text.replace("[[categories]]", questions + "[[categories]]", 1))
+    assert set(load_scheme(path).questions) == {"flat", "tier1", "tier2", "tier3"}

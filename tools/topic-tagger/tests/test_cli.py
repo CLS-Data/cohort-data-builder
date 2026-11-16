@@ -803,3 +803,26 @@ def test_a_bad_run_value_exits_2_naming_it(tmp_path, variables_path, capsys):
 def test_a_flat_chat_run_says_what_it_used(tmp_path, variables_path, capsys):
     assert tag(variables_path, tmp_path / "o", StubProvider(answer("smoking", 0.7))) == 0
     assert "Method: flat with ollama:gpt-oss:20b, 2 tiers" in capsys.readouterr().out
+
+
+# --- The guidance and questions reach the model (feature 005, US4) ----------------------
+
+
+class InstructionStub(DecisionStub):
+    def __init__(self):
+        super().__init__()
+        self.instructions = []
+
+    def decide(self, state, instructions, options):
+        self.instructions.append(instructions)
+        return super().decide(state, instructions, options)
+
+
+def test_a_decision_run_sends_the_guidance_and_the_files_questions(tmp_path, variables_path):
+    stub = InstructionStub()
+    assert tag(variables_path, tmp_path / "o", stub, "--scheme", RUN, "--limit", "3") == 0
+    assert all(
+        i.startswith("Tag each variable with the topics it measures.\n\n")
+        for i in stub.instructions
+    )
+    assert any(i.endswith("Which topic within Health?") for i in stub.instructions)
