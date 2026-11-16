@@ -22,7 +22,14 @@ from topic_tagger.runner import Runner, Settings, install_stop_handler
 from topic_tagger.scheme import SchemeError, bundled_scheme_text, load_scheme, scheme_from_json
 from topic_tagger.stats import compute_stats
 from topic_tagger.store import LockedError, StaleLockError, TagStore
-from topic_tagger.tiered import DecisionDecider, build_tree, decision_request, refusal_message
+from topic_tagger.tiered import (
+    DecisionDecider,
+    build_tree,
+    decision_request,
+    flat_tree,
+    question_sizes,
+    refusal_message,
+)
 from topic_tagger.variables import InputError, read_variables
 
 OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED, REFUSED, STOPPED = 0, 1, 2, 3, 4, 5, 130
@@ -180,15 +187,7 @@ def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
         return BAD_INPUT
 
     if args.dry_run:
-        batch = variables[: args.batch_size]
-        if args.provider == "ollama-decision":
-            _print_decision_requests(args, scheme, variables[0])
-            return OK
-        if args.method == "tiered":
-            _print_tiered_requests(scheme, batch)
-            return OK
-        system, user = build_messages(scheme, batch)
-        print(system["content"], user["content"], sep="\n\n---\n\n")
+        _print_requests(args, scheme, variables)
         return OK
 
     store = TagStore(args.out)
@@ -239,24 +238,41 @@ def _settle(args: argparse.Namespace, scheme) -> str | None:
     return None
 
 
-def _print_tiered_requests(scheme, batch) -> None:
-    """Print the tier-1 request and, as an example, the first area's tier-2 request."""
-    root = build_tree(scheme)
-    system, user = build_option_messages(scheme.guidance, root, batch)
-    print(system["content"], user["content"], sep="\n\n---\n\n")
-    area = root.children[0]
-    print(f"\n--- tier 2 example ({area.label}) ---\n")
-    system, user = build_option_messages(scheme.guidance, area, batch)
-    print(system["content"], user["content"], sep="\n\n---\n\n")
+def _print_requests(args, scheme, variables) -> None:
+    """Print what the run would send first, at every tier, without sending anything.
 
+    Flat: one request. Tiered: the tier-1 request, then one example at each tier below,
+    following the first group down to the leaves. A decision model's requests are
+    ``/v1/systemone`` bodies for the first variable; a chat model's are the messages for the
+    first batch.
+    """
+    decision = args.provider == DECISION
+    batch = variables[: args.batch_size]
 
-def _print_decision_requests(args, scheme, variable) -> None:
-    """Print the first variable's first request to the decision model, and a tier-2 example."""
-    root = build_tree(scheme)
-    print(json.dumps(decision_request(args.model, root, variable, scheme.guidance), indent=1))
-    area = root.children[0]
-    print(f"\n--- tier 2 example ({area.label}) ---\n")
-    print(json.dumps(decision_request(args.model, area, variable, scheme.guidance), indent=1))
+    def show(node) -> None:
+        if decision:
+            body = decision_request(args.model, node, variables[0], scheme.guidance)
+            print(json.dumps(body, indent=1))
+        else:
+            system, user = build_option_messages(scheme.guidance, node, batch)
+            print(system["content"], user["content"], sep="\n\n---\n\n")
+
+    if args.method == "flat":
+        if decision:
+            show(flat_tree(scheme))
+        else:
+            system, user = build_messages(scheme, batch)
+            print(system["content"], user["content"], sep="\n\n---\n\n")
+        return
+    node, tier = build_tree(scheme), 1
+    print("--- tier 1 ---")
+    while True:
+        show(node)
+        node = next((c for c in node.children if not c.is_leaf), None)
+        if node is None:
+            return
+        tier += 1
+        print(f"\n--- tier {tier} example ({node.label}) ---")
 
 
 def _run(args, variables, scheme, provider, store, clock, runner_created) -> int:
@@ -501,11 +517,48 @@ def _check_scheme(path: Path) -> int:
     except SchemeError as e:
         _err(str(e))
         return BAD_INPUT
-    print(
-        f"{scheme.name} (version {scheme.version}): {len(scheme.domains)} domains, "
-        f"{len(scheme.topic_ids)} topics, hash {scheme.hash}"
-    )
+    for line in _scheme_lines(scheme):
+        print(line)
     return OK
+
+
+def _scheme_lines(scheme) -> list[str]:
+    """What ``check-scheme`` prints: tiers, sizes and the largest question at each tier."""
+
+    def count(n: int, one: str, many: str) -> str:
+        return f"{n} {one if n == 1 else many}"
+
+    tiers = count(scheme.tiers, "tier", "tiers")
+    lines = [f"{scheme.name} (version {scheme.version}): {tiers}, hash {scheme.hash}"]
+    level = list(scheme.root.children)
+    for tier in range(1, scheme.tiers + 1):
+        groups = sum(not c.is_leaf for c in level)
+        leaves = len(level) - groups
+        parts = [count(groups, "group", "groups")] if groups else []
+        parts += [count(leaves, "leaf", "leaves")] if leaves else []
+        lines.append(
+            f"  tier {tier}: {count(len(level), 'category', 'categories')} ({', '.join(parts)})"
+        )
+        level = [k for c in level for k in c.children]
+    leaves = len(scheme.topic_ids)
+    lines.append(f"  {count(leaves, 'leaf', 'leaves')}; fallback: {scheme.fallback_topic}")
+    lines.append(f"  largest question, flat: {leaves} options (every leaf)")
+    for tier, (n, node) in sorted(question_sizes(build_tree(scheme)).items()):
+        if tier == 1:
+            groups = sum(not c.is_leaf for c in node.children)
+            leaves = len(node.children) - groups - 1
+            parts = [count(groups, "group", "groups")] if groups else []
+            parts += [count(leaves, "leaf", "leaves")] if leaves else []
+            where = f"{', '.join(parts)} and the fallback exit" if parts else "the fallback exit"
+        else:
+            where = f'in {node.id}, "{node.label}"'
+        lines.append(f"  largest question, tier {tier}: {n} options ({where})")
+    if scheme.run is not None:
+        given = {k: v for k, v in vars(scheme.run).items() if v is not None}
+        if given:
+            settings = ", ".join(f"{k} {v}" for k, v in given.items())
+            lines.append(f"  run settings: {settings} (from the file)")
+    return lines
 
 
 def _init_scheme(path: Path) -> int:

@@ -160,6 +160,24 @@ uv run topic-tagger check-scheme my-scheme.toml     # lists every mistake, with 
 uv run topic-tagger tag variables.jsonl --out tags/ --scheme my-scheme.toml --dry-run
 ```
 
+A valid scheme is summarised with the size of every question it leads to:
+
+```text
+CLOSER topics (version 1): 2 tiers, hash 3c9f6b4b4ef9
+  tier 1: 15 categories (15 groups)
+  tier 2: 107 categories (107 leaves)
+  107 leaves; fallback: other
+  largest question, flat: 107 options (every leaf)
+  largest question, tier 1: 16 options (15 groups and the fallback exit)
+  largest question, tier 2: 23 options (in physical_health, "Physical health")
+```
+
+Compare the largest question with what your model accepts. A decision model has its own
+limit on options per question (Clef's is 26), which the tool cannot look up: this scheme
+can be tagged tiered with Clef, but not flat. If a model does refuse a question, the run
+stops with exit 5 and says which one (see [With a decision model](#with-a-decision-model-clef)).
+A scheme with a `[run]` table also shows its settings.
+
 The file looks like this:
 
 ```toml
@@ -270,7 +288,8 @@ means the same as a flat tag.
 A batch takes 1 + (the number of different areas followed) requests instead of 1, but each
 request is short. Failed requests are retried as in flat runs, per area. A variable keeps
 the tags from the areas that answered, and fails only if it ends with none.
-`--dry-run --method tiered` prints the first tier's request and one area's.
+`--dry-run --method tiered` prints the tier-1 request, then one example at each tier below,
+following the first group down (`--- tier 2 example (Health) ---`).
 
 ### With a decision model (Clef)
 
@@ -323,7 +342,7 @@ Clef is asked one variable at a time: 1 request, plus 1 per area followed. A coh
 30,000 variables is therefore 60,000 requests or more. Clef's cloud tag is
 billed per input token, so try `--limit` first. A model ending `:cloud` (or `-cloud`) runs
 off this machine, so the tool asks before sending unless you pass `--yes`.
-`--dry-run` prints the first variable's request bodies.
+`--dry-run` prints the first variable's request bodies: one flat, or one per tier.
 
 ## Settings in the scheme file
 
@@ -403,7 +422,7 @@ options, with their defaults.
 | `--files A,B` | all | Tag only these data files. |
 | `--limit N` | all | Tag at most N variables. |
 | `--retag` | off | Redo variables that already have current tags. |
-| `--dry-run` | off | Print the instructions and the first batch; send nothing. |
+| `--dry-run` | off | Print the first request at every tier (one when flat); send nothing. |
 | `--yes` | off | Do not ask before sending to a remote model. |
 | `--plain` | off | Plain progress lines instead of the live view (automatic without a terminal). |
 | `--force` | off | Clear a lock left by a run that ended without cleaning up. |

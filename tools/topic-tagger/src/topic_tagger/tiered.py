@@ -98,6 +98,27 @@ def flat_tree(scheme: Scheme) -> Node:
     return Node("", scheme.name, "", leaves, question=_question(scheme, "flat", scheme.name))
 
 
+def question_sizes(tree: Node) -> dict[int, tuple[int, Node]]:
+    """The largest question asked at each tier of ``tree``: ``{tier: (options, group)}``.
+
+    A group's question offers its children, so it is asked at the tier below it: the root's
+    at tier 1. Ties go to the group first in scheme order. Used by ``check-scheme`` so the
+    user can compare a taxonomy with a model's option limit, which the tool cannot know.
+    """
+    sizes: dict[int, tuple[int, Node]] = {}
+
+    def visit(node: Node, tier: int) -> None:
+        if node.is_leaf:
+            return
+        if tier not in sizes or len(node.children) > sizes[tier][0]:
+            sizes[tier] = (len(node.children), node)
+        for child in node.children:
+            visit(child, tier + 1)
+
+    visit(tree, 1)
+    return sizes
+
+
 Tags = list[tuple[str, float]]
 
 

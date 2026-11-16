@@ -307,7 +307,7 @@ contracts/cli.md).
 **Independent test**: `check-scheme tests/fixtures/scheme_3tier.toml` prints tiers, counts
 and the largest question per tier, without a model.
 
-- [ ] T026 [P] [US5] Write failing tests in `tests/test_cli.py`:
+- [x] T026 [P] [US5] Write failing tests in `tests/test_cli.py`:
   1. **`check-scheme`**:
      - on `scheme_3tier.toml` it prints the lines of contracts/cli.md, with these counts: tier 1: 3 categories; leaves 9; flat 9 options; tier 1: 3 options, counting the exit; tier 2: 3 options in `health`; tier 3: 3 options in `physical_health`;
      - on `closer.toml` it prints `2 tiers` and its unchanged hash;
@@ -317,9 +317,9 @@ and the largest question per tier, without a model.
      - with a chat provider, it prints three chat requests;
      - flat prints one;
      - nothing is sent: the fake host sees no request.
-- [ ] T027 [US5] Implement `_check_scheme` and the dry-run printing in `src/topic_tagger/cli.py`. Replace `_print_tiered_requests` and `_print_decision_requests` with one function that follows the first group down to the leaves. Put a helper `question_sizes(tree)` in `src/topic_tagger/tiered.py`, with a docstring.
+- [x] T027 [US5] Implement `_check_scheme` and the dry-run printing in `src/topic_tagger/cli.py`. Replace `_print_tiered_requests` and `_print_decision_requests` with one function that follows the first group down to the leaves. Put a helper `question_sizes(tree)` in `src/topic_tagger/tiered.py`, with a docstring.
 
-- [ ] T027b [US5] Document in the same PR. In `README.md`, cover:
+- [x] T027b [US5] Document in the same PR. In `README.md`, cover:
   - the new `check-scheme` output, and how to compare its largest question with a model's limit;
   - the dry run showing every tier.
 
