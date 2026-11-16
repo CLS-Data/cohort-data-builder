@@ -355,3 +355,52 @@ def test_a_004_scheme_json_with_only_domains_still_reads(small_scheme):
     data.pop("tiers")
     back = scheme_from_json(data)
     assert back.topic_ids == small_scheme.topic_ids and back.tiers == 2
+
+
+# --- The [run] table (feature 005, US3) -------------------------------------------------
+
+
+def test_the_run_table_is_read():
+    s = load_scheme(FIXTURES / "scheme_run.toml")
+    assert s.run.provider == "ollama-decision" and s.run.model == "fake-decision"
+    assert s.run.method == "tiered" and s.run.descend_at == 0.3
+    assert s.run.max_follow == 2 and s.run.keep_at == 0.2
+    assert load_scheme(FIXTURES / "scheme_small.toml").run is None
+
+
+@pytest.mark.parametrize(
+    ("line", "location", "words"),
+    [
+        ("colour = 1", "run.colour", "unknown setting"),
+        ('method = "deep"', "run.method", "flat or tiered"),
+        ('provider = "x"', "run.provider", "ollama or ollama-decision"),
+        ("descend_at = 1.5", "run.descend_at", "between 0 and 1"),
+        ("keep_at = -0.1", "run.keep_at", "between 0 and 1"),
+        ("max_follow = -1", "run.max_follow", "0 (no cap) or more"),
+        ("max_follow = 1.5", "run.max_follow", "0 (no cap) or more"),
+        ('model = ""', "run.model", "missing or empty"),
+    ],
+)
+def test_a_bad_run_setting_is_refused_with_its_location(tmp_path, line, location, words):
+    text = (FIXTURES / "scheme_small.toml").read_text()
+    path = tmp_path / "s.toml"
+    path.write_text(text.replace("[[domains]]", f"[run]\n{line}\n\n[[domains]]", 1))
+    with pytest.raises(SchemeError) as err:
+        load_scheme(path)
+    found = {p.location: p.message for p in err.value.problems}
+    assert location in found, found
+    assert words in found[location]
+
+
+def test_the_hash_leaves_out_the_run_table_but_not_the_questions(tmp_path):
+    original = load_scheme(FIXTURES / "scheme_run.toml")
+    text = (FIXTURES / "scheme_run.toml").read_text()
+    path = tmp_path / "s.toml"
+    path.write_text(text.replace("descend_at = 0.3", "descend_at = 0.6"))
+    assert load_scheme(path).hash == original.hash
+    path.write_text(text.replace("Which topic within", "Which subject within"))
+    assert load_scheme(path).hash != original.hash
+    # and a 004 file with a [run] table added keeps the hash it had without one
+    small = (FIXTURES / "scheme_small.toml").read_text()
+    path.write_text(small.replace("[[domains]]", '[run]\nmodel = "m"\n\n[[domains]]', 1))
+    assert load_scheme(path).hash == load_scheme(FIXTURES / "scheme_small.toml").hash

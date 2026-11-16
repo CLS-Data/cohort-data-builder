@@ -745,3 +745,61 @@ def test_tiered_with_one_tier_tags_flat_and_says_so(tmp_path, variables_path, ca
     assert "This taxonomy has one tier: tagging flat." in capsys.readouterr().err
     assert all(r["method"] == "flat" for r in records(out))
     assert run_json(out)["settings"]["method"] == "flat"
+
+
+# --- The scheme's [run] table controls the run (feature 005, US3) -----------------------
+
+RUN = str(FIXTURES / "scheme_run.toml")
+
+
+def test_the_run_table_sets_the_run_and_its_sources_are_recorded(tmp_path, variables_path, capsys):
+    out = tmp_path / "o"
+    assert tag(variables_path, out, DecisionStub(), "--scheme", RUN) == 0
+    run = run_json(out)
+    s = run["settings"]
+    assert s["provider"] == "ollama-decision" and s["model"] == "fake-decision"
+    assert s["method"] == "tiered" and s["descend_at"] == 0.3
+    assert s["max_follow"] == 2 and s["max_areas"] == 2 and s["keep_at"] == 0.2
+    assert run["settings_source"] == {
+        "provider": "file",
+        "model": "file",
+        "method": "file",
+        "descend_at": "file",
+        "max_follow": "file",
+        "keep_at": "file",
+    }
+    assert run["tiers"] == 2
+    text = capsys.readouterr().out
+    assert "Method: tiered with ollama-decision:fake-decision, 2 tiers" in text
+    assert "Requests by tier: 1: " in text
+
+
+def test_the_command_line_overrides_the_run_table(tmp_path, variables_path):
+    out = tmp_path / "o"
+    assert tag(variables_path, out, DecisionStub(), "--scheme", RUN, "--method", "flat") == 0
+    run = run_json(out)
+    assert run["settings"]["method"] == "flat" and run["settings_source"]["method"] == "cli"
+    assert run["settings_source"]["model"] == "file"
+
+
+def test_max_areas_is_still_accepted_for_max_follow(tmp_path, variables_path):
+    out = tmp_path / "o"
+    assert tag(variables_path, out, DecisionStub(), "--scheme", RUN, "--max-areas", "1") == 0
+    assert run_json(out)["settings"]["max_follow"] == 1
+    assert run_json(out)["settings_source"]["max_follow"] == "cli"
+
+
+def test_a_bad_run_value_exits_2_naming_it(tmp_path, variables_path, capsys):
+    path = tmp_path / "bad.toml"
+    path.write_text(
+        (FIXTURES / "scheme_run.toml").read_text().replace("descend_at = 0.3", "descend_at = 1.5")
+    )
+    stub = DecisionStub()
+    assert tag(variables_path, tmp_path / "o", stub, "--scheme", str(path)) == 2
+    err = capsys.readouterr().err
+    assert "run.descend_at" in err and "bad.toml" in err and stub.calls == []
+
+
+def test_a_flat_chat_run_says_what_it_used(tmp_path, variables_path, capsys):
+    assert tag(variables_path, tmp_path / "o", StubProvider(answer("smoking", 0.7))) == 0
+    assert "Method: flat with ollama:gpt-oss:20b, 2 tiers" in capsys.readouterr().out
