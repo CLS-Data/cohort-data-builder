@@ -339,7 +339,7 @@ and the largest question per tier, without a model.
 - [ ] T032 Maintainer, outside the sandbox: run quickstart.md step 8.
   - Record Clef's exact status and error text for a 107-option `choice` in `specs/005-configurable-classifier/research.md` R1.
   - If the text does not match `option|choice|criteri`, open a `fix(tagger)` change. Its test, in `tests/test_decision_provider.py`, uses the real text.
-- [ ] T033 Run the full quickstart.md steps 1–7, `uv run pytest`, ruff, and at the repository root `uv run pytest tests/python` (checking `scripts/topics.py` still merges). Tick the tasks here.
+- [x] T033 Run the full quickstart.md steps 1–7, `uv run pytest`, ruff, and at the repository root `uv run pytest tests/python` (checking `scripts/topics.py` still merges). Tick the tasks here.
 
 ---
 
