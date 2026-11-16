@@ -11,7 +11,6 @@ from topic_tagger.tiered import (
     DecisionDecider,
     Node,
     build_tree,
-    choice_problems,
     walk,
 )
 from topic_tagger.variables import Variable
@@ -294,21 +293,6 @@ def test_a_clef_failure_for_one_variable_leaves_the_others(small_scheme):
     assert 1 in result.failed and result.singles == 1
 
 
-def test_the_bundled_scheme_fits_clefs_choice_limit(bundled_scheme_path):
-    from topic_tagger.scheme import load_scheme
-
-    assert choice_problems(build_tree(load_scheme(bundled_scheme_path))) == []
-
-
-def test_a_tier_with_more_than_26_options_is_named():
-    big = Node("big", "Big", "", tuple(Node(f"t{i}", f"T{i}", "") for i in range(27)))
-    root = Node("", "S", "", (big, Node("small", "Small", "", (Node("x", "X", ""),))))
-    assert choice_problems(root) == ["area big has 27 topics; Clef can choose among at most 26"]
-    areas = tuple(Node(f"a{i}", f"A{i}", "", (Node(f"x{i}", "X", ""),)) for i in range(30))
-    many = Node("", "S", "", areas)
-    assert choice_problems(many) == ["the scheme has 30 areas; Clef can choose among at most 26"]
-
-
 # --- The fallback topic is an exit at tier 1 -----------------------------------------
 
 
@@ -443,3 +427,74 @@ def test_a_three_tier_walk_keeps_a_leaf_chosen_beside_groups():
 def test_in_three_tiers_the_fallback_is_still_dropped_when_a_group_gives_tags():
     result, _ = do_walk(three_tier(), THREE, ["heart"])
     assert result.tags[0] == [("cardiac", 0.8)]
+
+
+# --- Flat with a decision model, and refusals (feature 005, US2) ------------------------
+
+from topic_tagger.providers import OptionLimitError  # noqa: E402
+
+
+def test_the_flat_tree_offers_every_leaf_at_once(small_scheme):
+    from topic_tagger.tiered import flat_tree
+
+    root = flat_tree(small_scheme)
+    assert [c.id for c in root.children] == small_scheme.topic_ids
+    assert all(c.is_leaf for c in root.children)
+
+
+def test_a_decision_model_tags_flat_with_one_request_per_variable(small_scheme):
+    from topic_tagger.tiered import flat_tree
+
+    probs = {"smoking": 0.6, "alcohol": 0.25, "age": 0.15}
+    stub = StubDecision(lambda n, o: probs.get(o, 0.0))
+    result = walk(
+        flat_tree(small_scheme), [var("a"), var("b")], DecisionDecider(stub, keep_at=0.2), 0.5, 3
+    )
+    assert result.tags[0] == [("smoking", 0.6), ("alcohol", 0.25)]
+    assert result.paths == {} and result.requests_by_tier == [2] and len(stub.calls) == 2
+    weak = StubDecision(lambda n, o: 0.1 if o == "age" else 0.05)
+    result = walk(flat_tree(small_scheme), [var("a")], DecisionDecider(weak), 0.5, 3)
+    assert result.tags[0] == [("age", 0.1)]  # the strongest, though below keep_at
+
+
+class Refusing(StubDecision):
+    """Refuses any question with more than ``limit`` options, as a model's host would."""
+
+    def __init__(self, limit, probability=lambda n, o: 0.5):
+        super().__init__(probability)
+        self.limit = limit
+
+    def decide(self, state, instructions, options):
+        if len(options) > self.limit:
+            self.calls.append((state, instructions, options))
+            raise OptionLimitError(400, "too many options", len(options))
+        return super().decide(state, instructions, options)
+
+
+def test_a_refusal_at_the_flat_question_names_it_and_is_not_retried(small_scheme):
+    from topic_tagger.tiered import flat_tree
+
+    stub = Refusing(limit=5)
+    with pytest.raises(OptionLimitError) as err:
+        walk(flat_tree(small_scheme), [var("a"), var("b")], DecisionDecider(stub), 0.5, 3)
+    assert err.value.question == "every topic, asked flat"
+    assert "tiered" in err.value.advice
+    assert len(stub.calls) == 1  # no retry, no other variable, no single request
+
+
+def test_a_refusal_at_tier_1_names_it(small_scheme):
+    stub = Refusing(limit=3)  # tier 1 offers 3 areas and the exit
+    with pytest.raises(OptionLimitError) as err:
+        walk(build_tree(small_scheme), [var("a")], DecisionDecider(stub), 0.5, 3)
+    assert err.value.question == "the tier-1 categories and the fallback exit"
+    assert len(stub.calls) == 1
+
+
+def test_a_refusal_at_a_group_names_the_group_and_its_tier():
+    scheme = three_tier()
+    probs = {"health": 0.9, "physical_health": 0.9}
+    stub = Refusing(limit=2, probability=lambda n, o: probs.get(o, 0.01))
+    with pytest.raises(OptionLimitError) as err:
+        walk(build_tree(scheme), [var("a")], DecisionDecider(stub), 0.5, 3)
+    assert err.value.question == 'the categories in group health, "Health", tier 1'
+    assert "Split health" in err.value.advice

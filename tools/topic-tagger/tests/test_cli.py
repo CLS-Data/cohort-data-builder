@@ -510,30 +510,6 @@ def test_clef_tags_tiered_by_default(tmp_path, variables_path):
     assert run_json(tmp_path / "o")["settings"]["method"] == "tiered"
 
 
-def test_clef_cannot_tag_flat(tmp_path, variables_path, capsys):
-    stub = DecisionStub()
-    assert tag(variables_path, tmp_path / "o", stub, *clef("--method", "flat")) == 2
-    assert "tiered" in capsys.readouterr().err and stub.calls == []
-
-
-def test_a_scheme_too_big_for_clef_is_refused_before_any_request(tmp_path, variables_path, capsys):
-    topics = "".join(
-        f'\n  [[domains.topics]]\n  id = "t{i}"\n  label = "T{i}"\n  description = "D{i}."\n'
-        for i in range(27)
-    )
-    path = tmp_path / "big.toml"
-    path.write_text(
-        'name = "Big"\nversion = 1\nfallback_topic = "x"\nguidance = "G"\n\n'
-        '[[domains]]\nid = "big"\nlabel = "Big"\ndescription = "Many."\n'
-        + topics
-        + '\n[[domains]]\nid = "two"\nlabel = "Two"\ndescription = "One."\n'
-        '\n  [[domains.topics]]\n  id = "x"\n  label = "X"\n  description = "X."\n'
-    )
-    stub = DecisionStub()
-    assert tag(variables_path, tmp_path / "o", stub, "--scheme", str(path), *clef()) == 2
-    assert "area big has 27 topics" in capsys.readouterr().err and stub.calls == []
-
-
 def test_a_chat_model_flat_still_uses_the_flat_prompt(tmp_path, variables_path):
     stub = StubProvider(answer("smoking", 0.7))
     assert tag(variables_path, tmp_path / "o", stub, "--method", "flat") == 0
@@ -652,3 +628,116 @@ def test_a_run_with_one_or_three_tiers_writes_its_report(
     assert code == 0
     assert expect in (out / "report.html").read_text()
     assert main(["report", str(out)]) == 0
+
+
+# --- Decision models flat; refusals stop the run (feature 005, US2) ---------------------
+
+import threading  # noqa: E402
+
+from topic_tagger.providers import OptionLimitError  # noqa: E402
+
+
+def test_a_decision_model_tags_flat(tmp_path, variables_path):
+    stub = DecisionStub(lambda state, o: 0.9 if o == "smoking" else 0.01)
+    out = tmp_path / "o"
+    assert tag(variables_path, out, stub, *clef("--method", "flat")) == 0
+    recs = records(out)
+    assert len(recs) == 60
+    assert all(r["method"] == "flat" and "path" not in r for r in recs)
+    assert all(r["topics"] == [["smoking", 0.9]] for r in recs)
+    assert len(stub.calls) == 60 and all(len(o) == 8 for _, o in stub.calls)
+    run = run_json(out)
+    assert run["settings"]["method"] == "flat" and run["counts"]["requests"] == 60
+
+
+class RefusingStub(DecisionStub):
+    """Refuses questions with more than ``limit`` options; ``hold`` names variables whose
+    answers wait until a refusal has been sent, so they are in flight beside it."""
+
+    def __init__(self, limit, probability=lambda state, o: 0.6, hold=()):
+        super().__init__(probability)
+        self.limit = limit
+        self.hold = set(hold)
+        self.refused = threading.Event()
+
+    def decide(self, state, instructions, options):
+        if len(options) > self.limit:
+            self.calls.append((state, options))
+            self.refused.set()
+            raise OptionLimitError(400, "too many options for choice question", len(options))
+        if state["name"] in self.hold:
+            self.refused.wait(5)
+        return super().decide(state, instructions, options)
+
+
+def test_a_refusal_stops_a_flat_run_with_exit_5(tmp_path, variables_path, capsys):
+    out = tmp_path / "o"
+    stub = RefusingStub(limit=5)
+    assert tag(variables_path, out, stub, *clef("--method", "flat", "--workers", "1")) == 5
+    err = capsys.readouterr().err
+    assert "The model clef:cloud refused a question with 8 options" in err
+    assert "(every topic, asked flat)" in err
+    assert "HTTP 400: too many options for choice question" in err
+    assert "Tag tiered" in err
+    run = run_json(out)
+    assert "refused a question with 8 options" in run["stop_reason"]
+    assert run["counts"]["failed"] == 0 and run["counts"]["retries"] == 0
+    assert len(stub.calls) == 1
+
+
+def six_in_health(tmp_path):
+    topics = "".join(
+        f'\n  [[domains.topics]]\n  id = "h{i}"\n  label = "H{i}"\n  description = "H{i}."\n'
+        for i in range(6)
+    )
+    path = tmp_path / "six.toml"
+    path.write_text(
+        'name = "Six"\nversion = 1\nfallback_topic = "other"\nguidance = "G"\n\n'
+        '[[domains]]\nid = "demographics"\nlabel = "Demographics"\ndescription = "Who."\n'
+        '\n  [[domains.topics]]\n  id = "age"\n  label = "Age"\n  description = "Age."\n'
+        '\n  [[domains.topics]]\n  id = "gender"\n  label = "Gender"\n  description = "Sex."\n'
+        '\n[[domains]]\nid = "health"\nlabel = "Health"\ndescription = "Health."\n'
+        + topics
+        + '\n[[domains]]\nid = "misc"\nlabel = "Misc"\ndescription = "Misc."\n'
+        '\n  [[domains.topics]]\n  id = "other"\n  label = "Other"\n  description = "None."\n'
+    )
+    return path
+
+
+def test_a_refusal_at_a_group_stops_the_run_and_keeps_what_was_tagged(
+    tmp_path, variables_path, capsys
+):
+    from topic_tagger.variables import read_variables
+
+    names = [v.variable for v in read_variables(variables_path)]
+    first, second = names[:2], names[2:4]  # batches 1 and 2, sent together
+
+    def prob(state, option):
+        if state["name"] in first:  # the first batch goes to health: 6 options, refused
+            return 0.9 if option in ("health", "h0") else 0.01
+        return 0.9 if option in ("demographics", "age") else 0.01
+
+    out = tmp_path / "o"
+    scheme = str(six_in_health(tmp_path))
+    stub = RefusingStub(limit=5, probability=prob, hold=second)
+    opts = ("--scheme", scheme, "--workers", "2", "--batch-size", "2")
+    assert tag(variables_path, out, stub, *clef(*opts)) == 5
+    assert 'the categories in group health, "Health", tier 1' in capsys.readouterr().err
+    stored = {r["variable"] for r in records(out)}
+    assert stored == set(second)  # in flight beside the refusal: kept; nothing new started
+
+    # The same scheme with a model that takes more options carries on from there.
+    more = DecisionStub(prob)
+    assert tag(variables_path, out, more, *clef(*opts)) == 0
+    assert {s["name"] for s, _ in more.calls}.isdisjoint(second)
+    assert len(records(out)) == 60
+
+
+def test_tiered_with_one_tier_tags_flat_and_says_so(tmp_path, variables_path, capsys):
+    out = tmp_path / "o"
+    scheme = str(FIXTURES / "scheme_1tier.toml")
+    stub = StubProvider(answer("housing", 0.7))
+    assert tag(variables_path, out, stub, "--scheme", scheme, "--method", "tiered") == 0
+    assert "This taxonomy has one tier: tagging flat." in capsys.readouterr().err
+    assert all(r["method"] == "flat" for r in records(out))
+    assert run_json(out)["settings"]["method"] == "flat"
