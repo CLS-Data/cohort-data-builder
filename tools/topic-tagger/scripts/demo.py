@@ -11,8 +11,9 @@ What it covers:
   dry runs printing every tier, with the scheme's questions and guidance, for both kinds
   of model.
 - **With models**: one, two and three tiers × chat and decision model × flat and tiered
-  (twelve runs); a decision model refusing a question with too many options, flat and at a
-  group (exit 5); a scheme's ``[run]`` table driving a run on its own; carrying on from
+  (twelve runs); a decision model given a large question, flat and at a group: refused
+  with the question named (exit 5), or, for a model with no such limit, answered; a
+  scheme's ``[run]`` table driving a run on its own; carrying on from
   where a run stopped; editing ``[run]`` keeping the tags, editing ``[questions]`` or the
   method redoing them.
 
@@ -360,18 +361,39 @@ def combination(
 # --- With models: refusals --------------------------------------------------------------
 
 
+def answered_instead(ctx: Context, folder: str, options: int) -> list[Check]:
+    """Checks for a model that answered a large question instead of refusing it.
+
+    Option limits differ between models and no limit is built in, so a model that takes
+    every option is correct too: the run finishes, and every tag is one of the options.
+    """
+    leaves, _ = ctx.taxonomy(folder)
+    tags = [t for rec in ctx.records(folder) for t, _ in rec["topics"]]
+    run_ = ctx.run_json(folder)
+    return [
+        Check(
+            f"no limit reached: the model answered all {options} options",
+            True,
+            f"{ctx.args.decision_model} accepted the question; the refusal path is "
+            "covered by the test suite",
+        ),
+        Check("every variable tagged, none failed", run_["counts"]["failed"] == 0),
+        Check("every tag is one of the options", bool(tags) and set(tags) <= leaves),
+        Check("run.json has no stop_reason", "stop_reason" not in run_),
+    ]
+
+
 def refusal_flat(ctx: Context) -> list[Check]:
-    """Every topic of the bundled scheme, flat, is too many options for Clef: exit 5."""
+    """Every topic of the bundled scheme flat: 107 options to a decision model.
+
+    A model with a lower limit refuses: exit 5, with the question named. A model without
+    one answers, and the run finishes normally. Either is correct.
+    """
     r = ctx.tag("refusal-flat", "--scheme", CLOSER, *ctx.model("decision"), "--method", "flat")
-    checks = [exit_is(r, 5)]
+    checks = [exit_is(r, 0, 5)]
+    if r.code == 0:
+        return checks + answered_instead(ctx, "refusal-flat", 107)
     if r.code != 5:
-        checks.append(
-            Check(
-                "the model refused 107 options (if not, its refusal text may not match)",
-                False,
-                tail(r.err + r.out),
-            )
-        )
         return checks
     run_ = ctx.run_json("refusal-flat")
     return [
@@ -391,7 +413,7 @@ def refusal_flat(ctx: Context) -> list[Check]:
 
 
 def big_group_scheme(ctx: Context) -> Path:
-    """A two-tier scheme with one group of 30 topics, too many for a model such as Clef."""
+    """A two-tier scheme with one group of 30 topics, more than some decision models take."""
     topics = "".join(
         f'\n  [[domains.topics]]\n  id = "b{i}"\n  label = "Topic {i}"\n'
         f'  description = "Fictional topic {i}."\n'
@@ -412,12 +434,14 @@ def big_group_scheme(ctx: Context) -> Path:
 
 
 def refusal_group(ctx: Context) -> list[Check]:
-    """A group of 30 topics is too many options for Clef at tier 2: exit 5."""
+    """A group of 30 topics at tier 2: refused with the group named (exit 5), or answered."""
     # Following every group (descend at 0, no cap) sends every variable into "big".
     scheme = big_group_scheme(ctx)
     opts = ("--method", "tiered", "--descend-at", "0", "--max-follow", "0")
     r = ctx.tag("refusal-group", "--scheme", scheme, *ctx.model("decision"), *opts)
-    checks = [exit_is(r, 5)]
+    checks = [exit_is(r, 0, 5)]
+    if r.code == 0:
+        return checks + answered_instead(ctx, "refusal-group", 30)
     if r.code == 5:
         checks += [
             Check("names the group", 'group big, "Big topics"' in r.err, tail(r.err, 4)),

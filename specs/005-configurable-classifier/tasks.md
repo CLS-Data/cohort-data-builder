@@ -336,7 +336,7 @@ and the largest question per tier, without a model.
   - no "tiered only", "26" or `--max-areas` left except as the alias.
 - [x] T030 [P] Read `docs/formats.md` through as a whole against contracts/formats.md. Fix any gaps left by the story PRs.
 - [x] T031 [P] Fix `specs/004-tiered-tagger/research.md` R10 and R14 with a one-line note each: "Superseded by 005 research R1/R6: the option limit is the model's, and decision models can tag flat."
-- [ ] T032 Maintainer, outside the sandbox: run quickstart.md step 8.
+- [x] T032 Maintainer, outside the sandbox: run quickstart.md step 8. (Done with `scripts/demo.py`: Clef answered 107 options without refusing; see research.md R1.)
   - Record Clef's exact status and error text for a 107-option `choice` in `specs/005-configurable-classifier/research.md` R1.
   - If the text does not match `option|choice|criteri`, open a `fix(tagger)` change. Its test, in `tests/test_decision_provider.py`, uses the real text.
 - [x] T033 Run the full quickstart.md steps 1–7, `uv run pytest`, ruff, and at the repository root `uv run pytest tests/python` (checking `scripts/topics.py` still merges). Tick the tasks here.

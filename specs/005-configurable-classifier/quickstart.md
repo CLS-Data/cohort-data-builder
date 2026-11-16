@@ -105,5 +105,7 @@ uv run topic-tagger tag tests/fixtures/variables.jsonl --out /tmp/clef-big \
   --model clef:cloud --method flat --yes
 ```
 
-Expected: exit 5 after the first request, with Clef's own message. Record that message's
-status and text in `research.md` R1, and make the fake host's refusal match it.
+Expected: either exit 5 after the first request, with the model's own message (record its
+status and text in `research.md` R1 and make the fake host's refusal match it), or, for a
+model with no limit that low, a normal finish. `clef:cloud` finished normally when tested in
+November 2026 (see R1).

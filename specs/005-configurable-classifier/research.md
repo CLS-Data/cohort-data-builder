@@ -13,6 +13,12 @@ It builds on `specs/004-tiered-tagger/research.md`.
     for a prompt over the context window) and 413 for size limits.
   - No message text is documented for too many options, and the API offers no way to look
     up a model's limit.
+- **Measured** (T032, 16 November 2026, `scripts/demo.py` against the local Ollama):
+  `clef:cloud` answered a flat question with all 107 leaves of the bundled scheme, and one
+  with a 30-topic group, without error. It picked sensible topics well past option 26 (for
+  example `identifiers`, option 104 of 107). Clef has no limit at or below 107, so there is no
+  refusal text to record. The text match stays as designed, for models that do refuse, and
+  is covered by the stubbed tests in `tests/test_decision_provider.py`.
 - **Decision**:
   - The provider no longer checks the number of options.
   - On an HTTP error it reads the body's `error` text.

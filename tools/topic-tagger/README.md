@@ -173,8 +173,8 @@ CLOSER topics (version 1): 2 tiers, hash 3c9f6b4b4ef9
 ```
 
 Compare the largest question with what your model accepts. A decision model has its own
-limit on options per question (Clef's is 26), which the tool cannot look up: this scheme
-can be tagged tiered with Clef, but not flat. If a model does refuse a question, the run
+limit on options per question, which the tool cannot look up (`clef:cloud` answered all
+107 topics of this scheme flat when tested). If a model does refuse a question, the run
 stops with exit 5 and says which one (see [With a decision model](#with-a-decision-model-clef)).
 A scheme with a `[run]` table also shows its settings.
 
@@ -329,11 +329,11 @@ A decision model tags tiered by default. With `--method flat` it is asked one ch
 question per variable, offering every leaf at once.
 
 **Option limits are the model's.** How many options one question may offer depends on the
-model, and the tool does not check it: Clef, for example, takes at most 26, so the bundled
-scheme (107 topics) cannot be tagged flat with Clef, but can be tiered (at most 23 options
-at once). When a model refuses a question for having too many options, the run stops at
-once, exit code 5, with a message naming the question, its number of options and the
-model's own words:
+model, and the tool does not check it. Ollama's documentation once gave 26, but
+`clef:cloud` answered all 107 topics of the bundled scheme in one flat question when tested
+(November 2026); tagged tiered, it is never asked more than 23 at once. When a model
+refuses a question for having too many options, the run stops at once, exit code 5, with
+a message naming the question, its number of options and the model's own words:
 
 ```text
 The model clef:cloud refused a question with 107 options (every topic, asked flat):
