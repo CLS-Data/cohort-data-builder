@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 
+from topic_tagger.run_settings import RunSettings, validate_run
+
 ID = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -107,7 +109,9 @@ class Scheme:
         guidance: The instructions given to the model.
         fallback_topic: The leaf for variables that fit nothing else.
         root: The taxonomy: a nameless root whose children are the tier-1 categories.
-        hash: 12 hex characters identifying the content; any edit changes it.
+        hash: 12 hex characters identifying the content; any edit changes it, except to
+            the ``[run]`` table.
+        run: The ``[run]`` table: how to classify, unless the command line says otherwise.
     """
 
     name: str
@@ -116,6 +120,7 @@ class Scheme:
     fallback_topic: str
     root: Category
     hash: str
+    run: RunSettings | None = None
     _leaves: dict[str, Topic] = field(default_factory=dict, repr=False, compare=False)
     _number: dict[str, int] = field(default_factory=dict, repr=False, compare=False)
     _domain: dict[str, Domain] = field(default_factory=dict, repr=False, compare=False)
@@ -291,8 +296,11 @@ def load_scheme(path: Path) -> Scheme:
     if problems:
         raise SchemeError(f"{path} has {len(problems)} problem(s):", problems)
 
-    # The hash is over the parsed content, so comments and layout do not change it.
-    canonical = json.dumps(raw, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    # The hash is over the parsed content, so comments and layout do not change it. It leaves
+    # out [run]: a model or threshold is how a run is made, not what the tags mean, so
+    # changing one should not redo every tag (the method is stored with each tag instead).
+    content = {k: v for k, v in raw.items() if k != "run"}
+    canonical = json.dumps(content, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return Scheme(
         name=raw["name"],
         version=raw["version"],
@@ -300,6 +308,7 @@ def load_scheme(path: Path) -> Scheme:
         fallback_topic=raw["fallback_topic"],
         root=_root(raw),
         hash=hashlib.sha256(canonical.encode()).hexdigest()[:12],
+        run=RunSettings(**raw["run"]) if "run" in raw else None,
     )
 
 
@@ -328,6 +337,9 @@ def validate(raw: dict) -> list[SchemeProblem]:
         problem("version", "missing or empty")
     elif not isinstance(raw["version"], int) or isinstance(raw["version"], bool):
         problem("version", "must be a whole number")
+
+    if "run" in raw:
+        validate_run(raw["run"], problem)
 
     seen: dict[str, str] = {}
     topic_ids: set[str] = set()

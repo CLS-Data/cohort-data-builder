@@ -220,7 +220,7 @@ line overrides it, and sources are recorded (research R9; data-model "RunSetting
 file's values with source `file`. Adding `--method flat` changes only `method`, with
 source `cli`.
 
-- [ ] T018 [P] [US3] Write failing tests in `tests/test_scheme.py`:
+- [x] T018 [P] [US3] Write failing tests in `tests/test_scheme.py`:
   1. `[run]` is parsed into `Scheme.run`.
   2. Each of these is refused, with its location:
      - `run.colour = 1` (unknown key);
@@ -233,7 +233,7 @@ source `cli`.
 
      The rules are "0–1" for thresholds, and "integer ≥ 0 (0 = no cap)" for `max_follow`.
   3. **The hash leaves out `[run]`**: `scheme_run.toml` with only `descend_at` changed has the same hash. With its `[questions]` changed, it has a different hash.
-- [ ] T019 [P] [US3] Write failing tests in a new `tests/test_run_settings.py` for `resolve(cli: dict, file: RunSettings | None) -> (values, sources)`:
+- [x] T019 [P] [US3] Write failing tests in a new `tests/test_run_settings.py` for `resolve(cli: dict, file: RunSettings | None) -> (values, sources)`:
   1. **Precedence**: CLI, then file, then default.
   2. **Defaults**:
      - `provider` `ollama`;
@@ -243,23 +243,23 @@ source `cli`.
   3. **The method default follows the resolved provider**: a file provider of `ollama-decision` gives tiered when `method` is unset.
   4. A file `keep_at` with a chat provider is dropped, with a note.
   5. Each `sources` entry is `cli`, `file` or `default`.
-- [ ] T020 [US3] Write failing tests in `tests/test_cli.py`:
+- [x] T020 [US3] Write failing tests in `tests/test_cli.py`:
   1. `tag --scheme scheme_run.toml` with a fake decision host and no options gives a `run.json` with `settings.method == "tiered"`, `descend_at == 0.3`, `max_follow == 2`, `max_areas == 2`, and `settings_source` all `file` except the unset ones (`default`).
   2. `--method flat` gives `method` from source `cli`.
   3. `--max-areas 1` still works, as an alias of `--max-follow`.
   4. A bad `[run]` value exits 2, naming `run.<key>` and the file.
   5. `--keep-at` with a chat provider on the command line is still exit 2.
   6. The end-of-run summary prints the method, the provider (model kind), the model and the number of tiers, for example `Method: tiered with ollama-decision:fake-decision, 2 tiers`. It still prints `Requests by tier: …` (spec FR-021).
-- [ ] T021 [US3] Implement `[run]` parsing and validation in `src/topic_tagger/scheme.py`. Leave `run` out of the hash's canonical JSON (research R3). Add a comment saying why.
-- [ ] T022 [US3] Create `src/topic_tagger/run_settings.py`, with `RunSettings` and `resolve()` as tested. Give the module, class and functions Google-style docstrings.
-- [ ] T023 [US3] Wire it into `src/topic_tagger/cli.py`:
+- [x] T021 [US3] Implement `[run]` parsing and validation in `src/topic_tagger/scheme.py`. Leave `run` out of the hash's canonical JSON (research R3). Add a comment saying why.
+- [x] T022 [US3] Create `src/topic_tagger/run_settings.py`, with `RunSettings` and `resolve()` as tested. Give the module, class and functions Google-style docstrings.
+- [x] T023 [US3] Wire it into `src/topic_tagger/cli.py`:
   - argparse defaults of `None` for `--provider`, `--model`, `--method`, `--descend-at`, `--max-follow` (with `--max-areas` as an alias, `dest="max_follow"`) and `--keep-at`;
   - load the scheme before making the provider;
   - `_check_method` uses the resolved values;
   - write `settings_source`, `tiers`, `max_follow` and `max_areas` to `run.json` (contracts/formats.md);
   - rename `Settings.max_areas` to `max_follow` in `src/topic_tagger/runner.py`, and update `RunResult.areas_followed` wording to "groups followed";
   - add the method, provider, model and tiers line to the summary (`_tier_lines` in `cli.py`), as T020 item 6 requires.
-- [ ] T023b [US3] Document in the same PR:
+- [x] T023b [US3] Document in the same PR:
   - **`README.md`**: the `[run]` table, precedence (command line, then file, then default), `--max-follow` with `--max-areas` as an alias, and a file `keep_at` being ignored by chat models;
   - **`docs/formats.md`**: `[run]` keys and values, the hash leaving out `[run]`, and `run.json` `settings_source`, `tiers` and `max_follow`.
 

@@ -17,6 +17,7 @@ from topic_tagger.display import RunView
 from topic_tagger.prompt import build_messages, build_option_messages
 from topic_tagger.providers import Provider, ProviderError, get_provider
 from topic_tagger.report import render_report
+from topic_tagger.run_settings import DECISION, KEYS, resolve
 from topic_tagger.runner import Runner, Settings, install_stop_handler
 from topic_tagger.scheme import SchemeError, bundled_scheme_text, load_scheme, scheme_from_json
 from topic_tagger.stats import compute_stats
@@ -84,26 +85,28 @@ def _parser() -> argparse.ArgumentParser:
     )
     tag.add_argument(
         "--provider",
-        default="ollama",
+        choices=["ollama", "ollama-decision"],
         help="the model host: ollama (chat models) or ollama-decision (decision models, "
-        "e.g. --model clef:cloud)",
+        "e.g. --model clef:cloud); default ollama, or the scheme's [run] provider",
     )
     tag.add_argument(
         "--base-url",
         default=os.environ.get("TOPIC_TAGGER_BASE_URL", DEFAULT_BASE_URL),
         help="where the host's API is (also TOPIC_TAGGER_BASE_URL)",
     )
-    tag.add_argument("--model", default="gpt-oss:20b", help="model name on the host")
+    tag.add_argument(
+        "--model", help="model name on the host (default gpt-oss:20b, or the scheme's [run])"
+    )
     tag.add_argument(
         "--method",
         choices=["flat", "tiered"],
-        help="flat: every topic in one request; tiered: areas first, then topics within them "
-        "(default flat; tiered for ollama-decision)",
+        help="flat: every topic in one request; tiered: one tier at a time, top down "
+        "(default flat; tiered for ollama-decision; or the scheme's [run])",
     )
     tag.add_argument(
         "--descend-at",
         type=float,
-        help="tiered: follow an area at this confidence or above (default 0.5)",
+        help="tiered: follow a group at this confidence or above (default 0.5)",
     )
     tag.add_argument(
         "--keep-at",
@@ -112,9 +115,11 @@ def _parser() -> argparse.ArgumentParser:
         "or above; 0 keeps every topic (default 0.3)",
     )
     tag.add_argument(
+        "--max-follow",
         "--max-areas",
+        dest="max_follow",
         type=int,
-        help="tiered: follow at most this many areas per variable; 0 for no cap (default 3)",
+        help="tiered: follow at most this many groups per question; 0 for no cap (default 3)",
     )
     tag.add_argument("--batch-size", type=int, default=20, help="variables per request")
     tag.add_argument("--workers", type=int, default=2, help="requests in flight at once")
@@ -158,21 +163,21 @@ def _err(message: str) -> None:
 
 
 def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
-    problem = _check_method(args)
+    try:
+        scheme = load_scheme(args.scheme)
+    except SchemeError as e:
+        _err(str(e))
+        return BAD_INPUT
+    problem = _settle(args, scheme)
     if problem:
         _err(problem)
         return BAD_INPUT
     try:
         variables = read_variables(args.variables)
-        scheme = load_scheme(args.scheme)
         provider = factory(args)
-    except (InputError, SchemeError, ProviderError) as e:
+    except (InputError, ProviderError) as e:
         _err(str(e))
         return BAD_INPUT
-    if args.method == "tiered" and scheme.tiers == 1:
-        _err("This taxonomy has one tier: tagging flat.")
-        args.method = "flat"
-        args.descend_at = args.max_areas = None
 
     if args.dry_run:
         batch = variables[: args.batch_size]
@@ -198,26 +203,39 @@ def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
         store.unlock()
 
 
-def _check_method(args: argparse.Namespace) -> str | None:
-    """Fill in the tiered and decision defaults, or say what is wrong with them."""
-    if args.provider != "ollama-decision" and args.keep_at is not None:
+def _settle(args: argparse.Namespace, scheme) -> str | None:
+    """Settle the run's settings: the command line, then the scheme's ``[run]``, then defaults.
+
+    Sets each setting on ``args``, with ``args.settings_source`` saying where it came from,
+    and prints any notes. The file's values were checked when it was loaded.
+
+    Returns:
+        What is wrong with the command-line values, or None.
+    """
+    given = {key: getattr(args, key) for key in KEYS}
+    for key in ("descend_at", "keep_at"):
+        if given[key] is not None and not 0 <= given[key] <= 1:
+            return f"--{key.replace('_', '-')} must be between 0 and 1"
+    if given["max_follow"] is not None and given["max_follow"] < 0:
+        return "--max-follow must be 0 (no cap) or more"
+    settled = resolve(given, scheme.run)
+    values, sources = settled.values, settled.sources
+    if given["keep_at"] is not None and values["provider"] != DECISION:
         return "--keep-at needs --provider ollama-decision"
-    if args.provider == "ollama-decision":
-        args.method = args.method or "tiered"
-        args.keep_at = 0.3 if args.keep_at is None else args.keep_at
-        if not 0 <= args.keep_at <= 1:
-            return "--keep-at must be between 0 and 1"
-    args.method = args.method or "flat"
-    if args.method != "tiered":
-        if args.descend_at is not None or args.max_areas is not None:
-            return "--descend-at and --max-areas need --method tiered"
-        return None
-    args.descend_at = 0.5 if args.descend_at is None else args.descend_at
-    args.max_areas = 3 if args.max_areas is None else args.max_areas
-    if not 0 <= args.descend_at <= 1:
-        return "--descend-at must be between 0 and 1"
-    if args.max_areas < 0:
-        return "--max-areas must be 0 (no cap) or more"
+    tiered_options = [k for k in ("descend_at", "max_follow") if sources[k] == "cli"]
+    if values["method"] == "flat" and tiered_options:
+        return "--descend-at and --max-follow need --method tiered"
+    for note in settled.notes:
+        _err(note)
+    if values["method"] == "tiered" and scheme.tiers == 1:
+        _err("This taxonomy has one tier: tagging flat.")
+        values["method"] = "flat"
+    if values["method"] == "flat":  # the tiered settings do not apply, so are not recorded
+        for key in ("descend_at", "max_follow"):
+            sources.pop(key)
+    for key, value in settled.values.items():
+        setattr(args, key, value)
+    args.settings_source = settled.sources
     return None
 
 
@@ -274,8 +292,8 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
         retries=args.retries,
         model=f"{args.provider}:{args.model}",
         method=args.method,
-        descend_at=args.descend_at if args.descend_at is not None else 0.5,
-        max_areas=args.max_areas if args.max_areas is not None else 3,
+        descend_at=args.descend_at,
+        max_follow=args.max_follow,
     )
     view = RunView(len(variables), len(todo), scheme, clock)
     decider = None
@@ -310,6 +328,8 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
         f"Tagged {result.tagged} of {len(todo)} variables in "
         f"{result.requests} requests; {len(result.failed)} failed."
     )
+    tiers = f"{scheme.tiers} tier" + ("s" if scheme.tiers > 1 else "")
+    print(f"Method: {args.method} with {args.provider}:{args.model}, {tiers}")
     print(_summary(run, stats, scheme, store.folder))
     if args.method == "tiered":
         print(_tier_lines(result))
@@ -345,7 +365,11 @@ def _run_record(args, scheme, started, ended, result, total, todo, skipped) -> d
             "model": args.model,
             "method": args.method,
             **(
-                {"descend_at": args.descend_at, "max_areas": args.max_areas}
+                {
+                    "descend_at": args.descend_at,
+                    "max_follow": args.max_follow,
+                    "max_areas": args.max_follow,  # its 004 name, for readers that know it
+                }
                 if args.method == "tiered"
                 else {}
             ),
@@ -373,6 +397,8 @@ def _run_record(args, scheme, started, ended, result, total, todo, skipped) -> d
             "retries": result.retries,
             "singles": result.singles,
         },
+        "settings_source": args.settings_source,
+        "tiers": scheme.tiers,
         "failed": result.failed,
         **(
             {"stop_reason": refusal_message(args.model, result.refusal)}
@@ -393,10 +419,10 @@ def _save(folder: Path, run: dict, records, variables, scheme, group_by: str) ->
 
 
 def _tier_lines(result) -> str:
-    """Requests per tier and areas followed per variable, for a tiered run's summary."""
+    """Requests per tier and groups followed per variable, for a tiered run's summary."""
     tiers = ", ".join(f"{i}: {n}" for i, n in enumerate(result.requests_by_tier, 1))
-    mean = result.areas_followed / result.tagged if result.tagged else 0
-    return f"Requests by tier: {tiers or 'none'}\nAreas followed per variable: {mean:.1f}"
+    mean = result.groups_followed / result.tagged if result.tagged else 0
+    return f"Requests by tier: {tiers or 'none'}\nGroups followed per variable: {mean:.1f}"
 
 
 def _summary(run: dict, stats: dict, scheme, folder: Path) -> str:

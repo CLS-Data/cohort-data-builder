@@ -93,9 +93,29 @@ Ids are lower-case letters, digits and `_`, start with a letter, and are unique 
 whole file, at every tier (domains and topics together, in the `domains` form). Other keys (for example a code from another
 vocabulary) are allowed but not used.
 
-The scheme's **hash** is the first 12 hex characters of SHA-256 over its parsed content, so
-any change to content (not comments or layout) changes it and makes existing tags out of
-date. Each topic's **number** is its position across the whole scheme, counting from 0.
+### `[run]`: how to classify (optional)
+
+```toml
+[run]
+provider   = "ollama-decision"   # or "ollama" (chat models)
+model      = "clef:cloud"
+method     = "tiered"            # or "flat"
+descend_at = 0.3                 # tiered: follow a group at this confidence or above
+max_follow = 3                   # tiered: most groups followed per question; 0 for no cap
+keep_at    = 0.3                 # decision models: keep a leaf at this probability or above
+```
+
+Every key is optional. Each setting comes from the command line if given, then from
+`[run]`, then from its default (`ollama`, `gpt-oss:20b`, flat for a chat model and tiered
+for a decision model, 0.5, 3, 0.3). An unknown key, or a value out of range, is refused
+when the file is loaded, as `run.<key>`. A `keep_at` here is ignored, with a note, when the
+run uses a chat model. The host's address, keys, workers, batch size, retries, timeout and
+output folder are not in `[run]`: they belong to one machine, or are secret.
+
+The scheme's **hash** is the first 12 hex characters of SHA-256 over its parsed content,
+leaving out `[run]`, so any change to content (not comments, layout or `[run]`) changes it
+and makes existing tags out of date. Changing a model or a threshold in `[run]` does not:
+it is how a run is made, not what the tags mean. Each topic's **number** is its position across the whole scheme, counting from 0.
 
 `topic-tagger init-scheme PATH` copies the bundled example to start from;
 `topic-tagger check-scheme PATH` lists every mistake with its location.
@@ -166,7 +186,9 @@ written before `categories` existed are read from `domains`.
 |---|---|
 | `status` | `finished` or `stopped` (Ctrl-C, or a refusal). |
 | `stop_reason` | Only when a model refused a question for its number of options (exit 5): the message shown, naming the question. |
-| `settings` | Provider, base URL, model, `method` (`flat` or `tiered`), for tiered runs `descend_at` and `max_areas`, for decision models (`ollama-decision`) `keep_at`, batch size, workers, timeout, retries, files, limit, retag, grouping field, variables path, scheme path and hash. Never an API key. |
+| `settings` | Provider, base URL, model, `method` (`flat` or `tiered`), for tiered runs `descend_at` and `max_follow` (also written as `max_areas`, its 004 name), for decision models (`ollama-decision`) `keep_at`, batch size, workers, timeout, retries, files, limit, retag, grouping field, variables path, scheme path and hash. Never an API key. |
+| `settings_source` | Where each of `provider`, `model`, `method`, `descend_at`, `max_follow` and `keep_at` came from: `cli`, `file` (the scheme's `[run]`) or `default`. Only the settings that apply to the run are listed. |
+| `tiers` | How many tiers the taxonomy has. |
 | `counts` | `total`, `todo`, `tagged`, `skipped` (already current), `failed`, `requests`, `requests_by_tier` (index 0 is tier 1; a flat run has one entry), `retries`, `singles` (variables retried one at a time). |
 | `failed` | `file/variable` of each variable that could not be tagged. |
 | `timeline` | `[seconds, variables]`: variables tagged in each 10-second step. |

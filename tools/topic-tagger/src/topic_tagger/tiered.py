@@ -250,14 +250,14 @@ def walk(
     batch: list[Variable],
     decider: Decider,
     descend_at: float,
-    max_areas: int,
+    max_follow: int,
     retries: int = 2,
 ) -> WalkResult:
     """Tag a batch by walking the tree from ``root``, one tier at a time.
 
     At each node, one request (through ``decider``) asks the node's variables which of its
     children apply. Children that are topics become tags. Children that are areas are
-    followed when their confidence is at least ``descend_at``, at most ``max_areas`` of them
+    followed when their confidence is at least ``descend_at``, at most ``max_follow`` of them
     (0 means no cap); the strongest is always followed, so no variable stalls. Each followed
     area is then asked once, for all the batch's variables routed to it. A topic offered
     among areas (the fallback, an exit) is chosen the same way, and kept only if no area
@@ -268,7 +268,7 @@ def walk(
         batch: The variables.
         decider: Answers each tier.
         descend_at: The confidence an area needs to be followed.
-        max_areas: Most areas followed per variable at each node; 0 for no cap.
+        max_follow: Most groups followed per variable at each question; 0 for no cap.
         retries: Retries of a failed group request before its variables are asked alone.
 
     Returns:
@@ -310,11 +310,11 @@ def walk(
                 continue
             # A tier with groups, perhaps with leaves beside them (the exit, or real leaves
             # in an uneven taxonomy): all are chosen alike, by descend_at, the strongest
-            # always, at most max_areas.
+            # always, at most max_follow.
             areas = sorted(chosen, key=lambda kv: (-kv[1], order[kv[0]]))
             follow = [(c, conf) for c, conf in areas if conf >= descend_at] or areas[:1]
-            if max_areas:
-                follow = follow[:max_areas]
+            if max_follow:
+                follow = follow[:max_follow]
             for child_id, conf in follow:
                 child = _child(node, child_id)
                 if child.is_exit:

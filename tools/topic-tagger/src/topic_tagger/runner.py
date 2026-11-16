@@ -36,7 +36,7 @@ class Settings:
         model: ``provider:model``, stored with each record.
         method: ``flat`` (one request per batch, every topic) or ``tiered`` (one per tier).
         descend_at: Tiered: the confidence an area needs to be followed.
-        max_areas: Tiered: most areas followed per variable; 0 for no cap.
+        max_follow: Tiered: most groups followed per question; 0 for no cap.
     """
 
     batch_size: int = 20
@@ -45,7 +45,7 @@ class Settings:
     model: str = "ollama:gpt-oss:20b"
     method: str = "flat"
     descend_at: float = 0.5
-    max_areas: int = 3
+    max_follow: int = 3
 
 
 @dataclass
@@ -60,7 +60,7 @@ class RunResult:
     last_error: str = ""
     stopped: bool = False
     requests_by_tier: list[int] = field(default_factory=list)
-    areas_followed: int = 0
+    groups_followed: int = 0
     refusal: OptionLimitError | None = None
 
 
@@ -153,7 +153,7 @@ class Runner:
         )
         if out.refusal is not None and result.refusal is None:
             result.refusal = out.refusal
-        result.areas_followed += sum(len(out.paths.get(v.key, [])) for v, _ in out.tagged)
+        result.groups_followed += sum(len(out.paths.get(v.key, [])) for v, _ in out.tagged)
         for _ in range(out.retries):
             self.on_event("retry", {})
         if out.tagged:
@@ -208,7 +208,7 @@ class Runner:
     def _tiered(self, batch: list[Variable], out: _Outcome) -> _Outcome:
         s = self.settings
         try:
-            walked = walk(self._tree, batch, self.decider, s.descend_at, s.max_areas, s.retries)
+            walked = walk(self._tree, batch, self.decider, s.descend_at, s.max_follow, s.retries)
         except OptionLimitError as e:
             # Every variable reaching that question would be refused: stop, keep what is done.
             self._stop.set()

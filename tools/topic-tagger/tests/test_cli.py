@@ -578,7 +578,7 @@ def test_a_tiered_run_records_its_method_paths_and_requests_by_tier(
         assert r["method"] == "tiered" and r["path"] == [["health", 0.8]]
     text = capsys.readouterr().out
     assert "Requests by tier: 1: 3, 2: 3" in text
-    assert "Areas followed per variable: 1.0" in text
+    assert "Groups followed per variable: 1.0" in text
 
 
 def test_a_flat_run_records_one_tier(tmp_path, variables_path, capsys):

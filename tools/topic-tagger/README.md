@@ -258,8 +258,8 @@ By default each request lists every topic in the scheme (`--method flat`). With
    listed.
 
 An area is followed when its confidence is at least `--descend-at` (0.5), at most
-`--max-areas` of them (3; 0 for no cap). The strongest area is always followed, so no
-variable stops at the first tier.
+`--max-follow` of them (3; 0 for no cap; `--max-areas` is its older name and still
+works). The strongest area is always followed, so no variable stops at the first tier.
 
 The scheme's fallback topic (`other` in the bundled scheme) is not inside an area when
 tagging tiered. It is offered at the first tier, beside the areas, as a way out for a
@@ -323,6 +323,36 @@ billed per input token, so try `--limit` first. A model ending `:cloud` (or `-cl
 off this machine, so the tool asks before sending unless you pass `--yes`.
 `--dry-run` prints the first variable's request bodies.
 
+## Settings in the scheme file
+
+A scheme file can say how it should be run, so that one file reproduces a classification:
+
+```toml
+[run]
+provider   = "ollama-decision"
+model      = "clef:cloud"
+method     = "tiered"
+descend_at = 0.3
+max_follow = 3
+keep_at    = 0.3
+```
+
+Every key is optional. For each setting, the command line wins, then `[run]`, then the
+default, so `--method flat` tries a different method for one run without editing the file.
+`run.json` records where each setting came from (`settings_source`), and the end-of-run
+summary names what was used, for example
+`Method: tiered with ollama-decision:clef:cloud, 2 tiers`.
+
+- A bad value is refused before anything is sent, naming it: `run.descend_at: must be
+  between 0 and 1`.
+- `keep_at` applies to decision models only. In the file, it is ignored with a note when
+  the run uses a chat model, so one file can serve both. `--keep-at` with a chat model is
+  still an error.
+- Changing `[run]` does not make existing tags out of date (the hash leaves it out).
+  Changing the method does, because each tag records the method that made it.
+- The host's address, keys, workers, batch size, retries and timeout stay on the command
+  line: they belong to one machine, or are secret.
+
 ## Every option
 
 `uv run topic-tagger --help` lists the commands and `uv run topic-tagger tag --help` the
@@ -339,13 +369,13 @@ options, with their defaults.
 |---|---|---|
 | `--scheme FILE` | required | The topics and instructions. |
 | `--group-by FIELD` | `sweep` | Input field the statistics are grouped by. |
-| `--provider NAME` | `ollama` | The model host: `ollama` for chat models, `ollama-decision` for decision models such as Clef. |
+| `--provider NAME` | `ollama`* | The model host: `ollama` for chat models, `ollama-decision` for decision models such as Clef. |
 | `--base-url URL` | `http://localhost:11434/v1` | Where the host's API is; also `TOPIC_TAGGER_BASE_URL`. |
-| `--model NAME` | `gpt-oss:20b` | Model name on the host. |
-| `--method flat\|tiered` | `flat` | `flat`: every topic in one request. `tiered`: areas first, then topics within them. See [Tiered tagging](#tiered-tagging). Always `tiered` with `ollama-decision`. |
-| `--descend-at X` | 0.5 | Tiered: follow an area at this confidence or above. |
-| `--max-areas N` | 3 | Tiered: follow at most N areas per variable; 0 for no cap. |
-| `--keep-at X` | 0.3 | Decision models: keep a topic at this probability or above; 0 keeps every topic. The strongest is always kept. |
+| `--model NAME` | `gpt-oss:20b`* | Model name on the host. |
+| `--method flat\|tiered` | `flat`* | `flat`: every topic in one request. `tiered`: one tier at a time, top down. See [Tiered tagging](#tiered-tagging). Defaults to `tiered` with `ollama-decision`. |
+| `--descend-at X` | 0.5* | Tiered: follow a group at this confidence or above. |
+| `--max-follow N` | 3* | Tiered: follow at most N groups per question; 0 for no cap. `--max-areas` still works. |
+| `--keep-at X` | 0.3* | Decision models: keep a topic at this probability or above; 0 keeps every topic. The strongest is always kept. |
 | `--batch-size N` | 20 | Variables per request. |
 | `--workers N` | 2 | Requests in flight at once. |
 | `--timeout S` | 120 | Seconds before a request is abandoned and retried. |
@@ -357,6 +387,8 @@ options, with their defaults.
 | `--yes` | off | Do not ask before sending to a remote model. |
 | `--plain` | off | Plain progress lines instead of the live view (automatic without a terminal). |
 | `--force` | off | Clear a lock left by a run that ended without cleaning up. |
+
+\* Or the scheme's `[run]` table: see [Settings in the scheme file](#settings-in-the-scheme-file).
 
 A host that needs an API key reads it from `TOPIC_TAGGER_API_KEY`, never from an option,
 so it is not in your shell history or in `run.json`.

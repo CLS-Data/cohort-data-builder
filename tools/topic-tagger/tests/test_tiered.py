@@ -82,7 +82,7 @@ def do_walk(scheme, answers, names, fail=(), **kw):
         [var(n) for n in names],
         decider,
         descend_at=kw.get("descend_at", 0.5),
-        max_areas=kw.get("max_areas", 3),
+        max_follow=kw.get("max_follow", 3),
         retries=kw.get("retries", 1),
     )
     return result, stub
@@ -115,10 +115,10 @@ def test_areas_are_followed_by_threshold_and_the_strongest_always(small_scheme):
     assert result.tags[3] == [("alcohol", 0.5)]
 
 
-def test_max_areas_caps_and_zero_means_no_cap(small_scheme):
-    result, _ = do_walk(small_scheme, ANSWERS, ["both"], descend_at=0.1, max_areas=1)
+def test_max_follow_caps_and_zero_means_no_cap(small_scheme):
+    result, _ = do_walk(small_scheme, ANSWERS, ["both"], descend_at=0.1, max_follow=1)
     assert result.paths[0] == [("health", 0.8)]
-    result, _ = do_walk(small_scheme, ANSWERS, ["both"], descend_at=0.1, max_areas=0)
+    result, _ = do_walk(small_scheme, ANSWERS, ["both"], descend_at=0.1, max_follow=0)
     assert [a for a, _ in result.paths[0]] == ["health", "demographics"]
 
 
@@ -134,7 +134,7 @@ def test_a_node_with_one_child_is_routed_without_asking():
     other = Node("misc", "Misc", "Other.", (Node("x", "X", "X."), Node("y", "Y", "Y.")))
     root = Node("", "T", "", (only, other))
     stub = StubProvider(scripted({"v": {"resp": 0.7}}))
-    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_areas=3)
+    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_follow=3)
     assert len(stub.calls) == 1  # tier 1 only
     assert result.tags[0] == [("asthma", 0.7)]
 
@@ -142,7 +142,7 @@ def test_a_node_with_one_child_is_routed_without_asking():
 def test_a_scheme_with_one_area_sends_no_tier_1_request():
     root = Node("", "T", "", (Node("a", "A", "A.", (Node("x", "X", "X."), Node("y", "Y", "Y."))),))
     stub = StubProvider(scripted({"v": {"y": 0.6}}))
-    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_areas=3)
+    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_follow=3)
     assert [options_in(m) for m, _ in stub.calls] == [["x", "y"]]
     assert result.tags[0] == [("y", 0.6)] and result.requests_by_tier == [0, 1]
 
@@ -158,7 +158,7 @@ def test_three_tiers_take_three_rounds_of_requests():
     misc = Node("misc", "Misc", "Other.", (Node("x", "X", "X."), Node("y", "Y", "Y.")))
     root = Node("", "T", "", (health, misc))
     stub = StubProvider(scripted({"v": {"health": 0.9, "resp": 0.8, "asthma": 0.7}}))
-    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_areas=3)
+    result = walk(root, [var("v")], ChatDecider(stub, "g"), descend_at=0.5, max_follow=3)
     assert result.requests_by_tier == [1, 1, 1]
     assert result.tags[0] == [("asthma", 0.7)]
     assert result.paths[0] == [("health", 0.9), ("resp", 0.8)]
@@ -237,7 +237,7 @@ def clef_walk(scheme, names, keep_at=0.3, fail_for=(), **kw):
         [var(n) for n in names],
         decider,
         descend_at=kw.get("descend_at", 0.5),
-        max_areas=kw.get("max_areas", 3),
+        max_follow=kw.get("max_follow", 3),
         retries=kw.get("retries", 1),
     )
     return result, stub
@@ -354,7 +354,7 @@ def test_clef_follows_every_area_at_the_threshold_and_tags_from_each(small_schem
              "smoking": 0.8, "alcohol": 0.15, "age": 0.7, "gender": 0.3}  # fmt: skip
     stub = StubDecision(lambda n, o: probs.get(o, 0.0))
     result = walk(build_tree(small_scheme), [var("pregsmk")], DecisionDecider(stub, 0.3),
-                  descend_at=0.3, max_areas=3)  # fmt: skip
+                  descend_at=0.3, max_follow=3)  # fmt: skip
     assert result.paths[0] == [("health", 0.5), ("demographics", 0.4)]
     assert result.tags[0] == [("smoking", 0.8), ("age", 0.7), ("gender", 0.3)]
 
