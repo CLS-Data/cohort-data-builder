@@ -440,6 +440,22 @@ options, with their defaults.
 A host that needs an API key reads it from `TOPIC_TAGGER_API_KEY`, never from an option,
 so it is not in your shell history or in `run.json`.
 
+## Demonstrating every feature
+
+`scripts/demo.py` runs the tool through every feature on a few of the fictional test
+variables, and checks what each run wrote. It covers one to three tiers, chat and decision
+models, flat and tiered tagging, refusals, `[run]`, `[questions]`, the hash, and carrying
+on after a stop:
+
+```sh
+uv run python scripts/demo.py --offline     # checks and dry runs only; no model needed
+uv run python scripts/demo.py --yes         # every step: 20 steps, through the local Ollama
+```
+
+Models default to `gpt-oss:20b-cloud` and `clef:cloud` (`--chat-model`,
+`--decision-model`). `--only TEXT` runs the matching steps, and `--variables N` sets how
+many variables each run tags (6). Each run's folder is kept, with `demo-summary.json`.
+
 ## Adding a model host
 
 The tool talks to Ollama through its OpenAI-compatible API, so a host with the same API
