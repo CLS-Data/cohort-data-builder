@@ -264,7 +264,8 @@ def test_check_scheme_needs_a_file(capsys):
 def test_check_scheme_summarises_a_scheme(bundled_scheme_path, capsys):
     assert main(["check-scheme", str(bundled_scheme_path)]) == 0
     out = capsys.readouterr().out
-    assert "15 domains, 107 topics" in out and "hash" in out
+    assert "2 tiers, hash 3c9f6b4b4ef9" in out  # unchanged from 004
+    assert "  tier 1: 15 categories (15 groups)" in out and "  107 leaves; fallback: other" in out
 
 
 def test_check_scheme_lists_every_mistake(tmp_path, small_scheme_path, capsys):
@@ -549,7 +550,10 @@ def test_decision_dry_run_prints_the_request_bodies(tmp_path, variables_path, ca
     stub = DecisionStub()
     assert tag(variables_path, tmp_path / "o", stub, *clef("--dry-run")) == 0
     out = capsys.readouterr().out
-    first, second = out.split("--- tier 2 example (Demographics) ---")
+    assert out.startswith("--- tier 1 ---\n")
+    first, second = out.removeprefix("--- tier 1 ---\n").split(
+        "--- tier 2 example (Demographics) ---"
+    )
     tier1, tier2 = json.loads(first), json.loads(second)
     assert tier1["model"] == "clef:cloud" and tier1["state"]["name"] == "PID"
     question = tier1["questions"]["option"]
@@ -826,3 +830,74 @@ def test_a_decision_run_sends_the_guidance_and_the_files_questions(tmp_path, var
         for i in stub.instructions
     )
     assert any(i.endswith("Which topic within Health?") for i in stub.instructions)
+
+
+# --- What each run will ask (feature 005, US5) ------------------------------------------
+
+THREE = str(FIXTURES / "scheme_3tier.toml")
+
+
+def test_check_scheme_reports_tiers_and_the_largest_question_at_each(capsys):
+    assert main(["check-scheme", THREE]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith("Three tiers (version 1): 3 tiers, hash ")
+    assert lines[1:] == [
+        "  tier 1: 3 categories (2 groups, 1 leaf)",
+        "  tier 2: 5 categories (2 groups, 3 leaves)",
+        "  tier 3: 5 categories (5 leaves)",
+        "  9 leaves; fallback: other",
+        "  largest question, flat: 9 options (every leaf)",
+        "  largest question, tier 1: 3 options (2 groups and the fallback exit)",
+        '  largest question, tier 2: 3 options (in health, "Health")',
+        '  largest question, tier 3: 3 options (in physical_health, "Physical health")',
+    ]
+
+
+def test_check_scheme_prints_the_files_run_settings(capsys):
+    assert main(["check-scheme", RUN]) == 0
+    out = capsys.readouterr().out
+    assert (
+        "  run settings: provider ollama-decision, model fake-decision, method tiered, "
+        "descend_at 0.3, max_follow 2, keep_at 0.2 (from the file)"
+    ) in out
+
+
+def test_a_decision_dry_run_prints_every_tier(tmp_path, variables_path, capsys):
+    stub = DecisionStub()
+    assert tag(variables_path, tmp_path / "o", stub, *clef("--scheme", THREE, "--dry-run")) == 0
+    out = capsys.readouterr().out
+    heads = [
+        "--- tier 1 ---",
+        "--- tier 2 example (Health) ---",
+        "--- tier 3 example (Physical health) ---",
+    ]
+    assert [line for line in out.splitlines() if line.startswith("---")] == heads
+    bodies = [json.loads(part) for part in re.split(r"^--- .* ---$", out, flags=re.M)[1:]]
+    criteria = [list(b["questions"]["option"]["criteria"]) for b in bodies]
+    assert criteria == [
+        ["health", "demographics", "other"],
+        ["physical_health", "mental_health", "smoking"],
+        ["respiratory", "cardiac", "diabetes"],
+    ]
+    assert stub.calls == []
+
+
+def test_a_chat_dry_run_prints_every_tier(tmp_path, variables_path, capsys):
+    stub = StubProvider(answer())
+    opts = ("--scheme", THREE, "--method", "tiered", "--dry-run")
+    assert tag(variables_path, tmp_path / "o", stub, *opts) == 0
+    out = capsys.readouterr().out
+    assert out.count("Options. Use only these ids:") == 3
+    assert "--- tier 3 example (Physical health) ---" in out and stub.calls == []
+
+
+@pytest.mark.parametrize("decision", [True, False])
+def test_a_flat_dry_run_prints_one_request(tmp_path, variables_path, capsys, decision):
+    stub = DecisionStub() if decision else StubProvider(answer())
+    opts = ("--scheme", THREE, "--method", "flat", "--dry-run")
+    assert tag(variables_path, tmp_path / "o", stub, *(clef(*opts) if decision else opts)) == 0
+    out = capsys.readouterr().out
+    assert "--- tier" not in out
+    if decision:
+        assert len(json.loads(out)["questions"]["option"]["criteria"]) == 9
+    assert stub.calls == []
