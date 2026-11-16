@@ -60,10 +60,11 @@ Expected:
 From the repository root, with Ollama running and signed in for cloud models:
 
 ```sh
-uv run --project tools/topic-tagger python adhoc/tiered/compare.py
+python specs/004-tiered-tagger/results/scripts/build_labelled_set.py
+uv run --project tools/topic-tagger python specs/004-tiered-tagger/results/scripts/score_labelled_set.py
 ```
 
-Expected: a table with flat and tiered × gpt-oss and Clef. Tiered rows are repeated at each
+Expected: a table with gpt-oss flat and tiered, and Clef tiered. Tiered rows are repeated at each
 descend threshold (0.1–0.7), from one low-threshold run (research R13). Each row shows:
 - top-1 hits, recall, precision, area recall, requests per variable and seconds;
 - then the variables where the two methods disagree, with the expected topics.

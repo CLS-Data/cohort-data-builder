@@ -173,7 +173,8 @@ thresholds.
   - then, per variable where the best flat and best tiered rows disagree, the expected topics and each run's topics with confidences.
 
   It also supports `--only NAME,…`, `--score-only DIR…` and `--variables PATH`. With `--variables` and no `expected.json`, it prints only the disagreements.
-- [ ] T027 [US3] Maintainer, outside the sandbox: run `uv run --project tools/topic-tagger python adhoc/tiered/compare.py`. Record the table, the date, the model versions and the Ollama version in `specs/004-tiered-tagger/research.md` § "Results". Answer SC-001 for each model: does tiered beat flat, and at which descend and keep thresholds? Recommend defaults for `--method`, `--descend-at`, `--max-areas` and `--keep-at`. Note anything worth trying next (R2 variant, `choice` instead of `noul`, the thresholds).
+- [x] T026b [US3] *(Added.)* Compare the methods on 10,000 real variables sampled from all four cohorts: gpt-oss:120b flat and tiered, Clef tiered, and tev1:0.8b on 200. Scripts and reports in `specs/004-tiered-tagger/results/`; findings in `research.md` § "Results". The ad hoc scripts were moved there and committed so the reports can be reproduced; their data stays in `adhoc/`.
+- [ ] T027 [US3] Maintainer, outside the sandbox: run `python specs/004-tiered-tagger/results/scripts/build_labelled_set.py`, then `uv run --project tools/topic-tagger python specs/004-tiered-tagger/results/scripts/score_labelled_set.py`. Record the table, the date, the model versions and the Ollama version in `specs/004-tiered-tagger/research.md` § "Results". Answer SC-001 for each model: does tiered beat flat, and at which descend and keep thresholds? Recommend defaults for `--method`, `--descend-at`, `--max-areas` and `--keep-at`. Note anything worth trying next (R2 variant, `choice` instead of `noul`, the thresholds).
 
 ---
 

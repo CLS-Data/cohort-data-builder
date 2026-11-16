@@ -117,11 +117,17 @@ tools/topic-tagger/
 ├── docs/formats.md
 └── README.md
 
-adhoc/tiered/                 # NOT committed (/adhoc/ added to .gitignore)
-├── variables.jsonl      # ~80 fictional variables, tagger input format
-├── expected.json        # {variable: [topic ids a person expects]}
-├── compare.py           # tags both ways with the cloud model, scores, prints the table
-└── runs/                # output folders, one per method and date
+specs/004-tiered-tagger/results/   # committed after the 10k study: reports and the scripts
+├── report-10k.html, report-clef-vs-tev.html
+└── scripts/
+    ├── build_labelled_set.py   # writes the fictional labelled set (82 variables)
+    ├── score_labelled_set.py   # tags it each way, scores against expected topics
+    └── compare_sample.py       # samples real variables, tags them each way, writes a report
+
+adhoc/tiered/                 # NOT committed (/adhoc/ in .gitignore): the scripts' data
+├── variables.jsonl, expected.json   # the labelled set
+├── runs/                    # labelled-set run folders
+└── big/                     # the real-variable export, sample and run folders
 ```
 
 **Structure Decision**: everything is inside the tagger's own project, as feature 002

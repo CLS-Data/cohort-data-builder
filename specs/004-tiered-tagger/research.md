@@ -182,3 +182,66 @@
 - **Alternatives**: Flat with one `noul` question per topic (the first version); flat in
   groups of 26. Both were dropped. The comparison is flat and tiered with gpt-oss, and
   tiered with Clef.
+
+## Results
+
+### 10,000 real variables, 13 November 2026
+
+Full numbers: `results/report-10k.html`. Settings: `results/README.md`. Every run tagged all
+10,000 variables, with none failed.
+
+| | gpt-oss:120b flat | gpt-oss:120b tiered | Clef tiered |
+|---|---|---|---|
+| Requests | 503 | 5,546 (507 + 5,039) | 20,423 (10,000 + 10,423) |
+| Wall time, 8 workers | 22.5 min | 67 min | 65 min |
+| Seconds per variable, 1 worker | 1.08 | 3.21 | 3.11 |
+| Mean tags per variable | 1.27 | 1.58 | 1.12 |
+| Variables with 2+ topics | 25.5% | 45.3% | 11.0% |
+| Topics from 2+ areas | 10.4% | 19.9% | 4.5% |
+| `other` as top topic | 2.9% | 1.9% | 0.2% |
+| Top confidence < 0.5 | 2.9% | 3.4% | 7.2% |
+
+How often the runs agree:
+
+| Pair | Same top topic | Same top area | Any topic shared |
+|---|---|---|---|
+| gpt-oss flat vs tiered | 73.6% | 84.2% | 85.7% |
+| gpt-oss flat vs Clef | 65.8% | 78.6% | 74.0% |
+| gpt-oss tiered vs Clef | 68.0% | 80.0% | 80.1% |
+
+All three runs pick the same top topic for 58.4% of variables, and the same top area for
+72.9%.
+
+- **Cost:** tiered tagging takes about three times as long as flat, with either model.
+  gpt-oss tiered makes 11 times the requests of flat, because each followed area costs a
+  request per batch. Clef makes nearly four times the requests of gpt-oss tiered, because it takes
+  one variable per request. The two tiered runs take about the same time.
+- **Several topics:** Clef rarely gives more than one area or topic, even at 0.3 and when
+  asked to share the probability. It followed a second area for 4% of variables. gpt-oss
+  tiered gives the most tags, and the pilot showed some of them are spurious.
+- **The fallback:** offered at tier 1, it is used far less in tiered runs (1.9% and 0.2%)
+  than in flat (2.9%). Flat runs often fall back to `other` where tiered runs find a topic,
+  usually Interview and fieldwork.
+- **Where they differ:** mostly between neighbouring topics. For example:
+  - qualifications against further education or training;
+  - cognitive function against cognitive skills;
+  - school engagement against secondary schooling.
+
+  These choices depend on the scheme more than the method.
+
+### tev1:0.8b, a local decision model, 16 November 2026
+
+`results/report-clef-vs-tev.html`: the first 200 variables of the same sample.
+
+- tev works through the same provider with no code change: 200 tagged and none failed, in
+  396 requests.
+- It agrees with Clef on the top topic for 56.5% of variables, and on the top area for 71%.
+- Its confidence is lower (median 0.83, against Clef's 0.92). It takes `other` far more
+  often (8.5%, against 0%).
+- It is no faster per variable than Clef's cloud model (3.8 s against 3.1 s with one worker).
+
+### Still to do
+
+- Score accuracy on the labelled set (T027), to say which method is right where they
+  differ.
+- Choose the default method and thresholds from that.
