@@ -191,6 +191,42 @@ description = "..."
 - Ids are what gets stored: rename one only if you mean to retag.
 - Keep as many scheme files as you like and choose one per run with `--scheme`.
 
+**One, two or three tiers.** The `domains`/`topics` form above is a two-tier taxonomy. Any
+taxonomy of one to three tiers can instead be written with nested `[[categories]]`:
+
+```toml
+[[categories]]                       # tier 1
+id = "health"
+label = "Health"
+description = "Physical and mental health."
+
+  [[categories.categories]]          # tier 2: a group…
+  id = "physical_health"
+  label = "Physical health"
+
+    [[categories.categories.categories]]   # tier 3
+    id = "respiratory"
+    label = "Respiratory conditions"
+
+  [[categories.categories]]          # …and a leaf beside it: depth may be uneven
+  id = "smoking"
+  label = "Smoking"
+
+[[categories]]                       # a tier-1 leaf
+id = "other"
+label = "Other"
+```
+
+- A category with nothing under it is a **leaf**: what variables are tagged with. A
+  category with categories under it is a **group**. A one-tier taxonomy is a plain list
+  of `[[categories]]`.
+- Descriptions are optional here, but the model reads them, so write them where a label
+  is not enough.
+- At most three tiers, at least two leaves, and `fallback_topic` must be a leaf. A file
+  uses `categories` or `domains`, not both.
+- In the report and statistics, an **area** is a tier-1 category, with every leaf beneath
+  it; a tier-1 leaf is an area of its own.
+
 **Exit codes**
 
 | Code | Meaning |

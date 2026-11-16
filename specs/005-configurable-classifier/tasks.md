@@ -99,7 +99,7 @@ record stores leaves, and its path through the tiers.
 with each fixture taxonomy. Every stored topic is a leaf of that taxonomy, and three-tier
 tiered records carry two-step paths.
 
-- [ ] T006 [P] [US1] Write failing tests in `tests/test_tiered.py`:
+- [x] T006 [P] [US1] Write failing tests in `tests/test_tiered.py`:
   1. `build_tree(scheme_3tier)` keeps `health → physical_health → {respiratory, cardiac, diabetes}`. It puts `other` at tier 1 as an exit, and `_height(root) == 3`.
   2. Moving the fallback prunes empty groups, repeatedly up the tree. A fixture where the fallback is the only leaf of a tier-2 group, itself the only child of a tier-1 group, loses both groups.
   3. `walk` over `scheme_3tier` with a scripted decider:
@@ -109,22 +109,22 @@ tiered records carry two-step paths.
      - `smoking` is **not** dropped as an exit (research R5).
   4. The fallback chosen with a group that gives tags is still dropped, as in 004.
   5. `requests_by_tier` has three entries.
-- [ ] T007 [P] [US1] Write failing tests in `tests/test_prompt.py`:
+- [x] T007 [P] [US1] Write failing tests in `tests/test_prompt.py`:
   1. The flat chat prompt for `scheme_small.toml` still equals `tests/fixtures/flat_prompt.txt`.
   2. For `scheme_3tier.toml`, the flat prompt lists every leaf once, under headings of its path (`## Health › Physical health`). A tier-1 leaf goes under no heading.
   3. For `scheme_1tier.toml`, it lists the leaves with no headings.
-- [ ] T008 [US1] Write failing tests in `tests/test_runner.py`. Use the scripted chat model to tag with `scheme_1tier.toml` flat, and with `scheme_3tier.toml` flat and tiered. Check:
+- [x] T008 [US1] Write failing tests in `tests/test_runner.py`. Use the scripted chat model to tag with `scheme_1tier.toml` flat, and with `scheme_3tier.toml` flat and tiered. Check:
   - every record's topics are leaves of its scheme;
   - tiered records have `method == "tiered"` and paths of one or two entries;
   - `RunResult.requests_by_tier` has three entries for the three-tier run.
-- [ ] T009 [US1] Implement `build_tree` for any depth in `src/topic_tagger/tiered.py`:
+- [x] T009 [US1] Implement `build_tree` for any depth in `src/topic_tagger/tiered.py`:
   - convert from `scheme.root`;
   - move the fallback to tier 1, pruning empty groups repeatedly up the tree;
   - in `walk`, restrict `exits` to the fallback id (research R5). Update the comment and docstring that describe areas and exits so they say "groups".
-- [ ] T010 [US1] Implement the path headings in `src/topic_tagger/prompt.py` `_system()` (no headings for one tier; the 004 output is unchanged for two tiers), so that T007 passes.
-- [ ] T011 [US1] Make T008 pass in `src/topic_tagger/runner.py`. It is probably only `_tiered` needing no area-specific assumptions. Check that `display.py`, `stats.py` and `report.py` work for 1- and 3-tier schemes by extending one test each in `tests/test_display.py`, `tests/test_stats.py` and `tests/test_report.py`, with a 3-tier scheme. Fix only what fails.
+- [x] T010 [US1] Implement the path headings in `src/topic_tagger/prompt.py` `_system()` (no headings for one tier; the 004 output is unchanged for two tiers), so that T007 passes.
+- [x] T011 [US1] Make T008 pass in `src/topic_tagger/runner.py`. It is probably only `_tiered` needing no area-specific assumptions. Check that `display.py`, `stats.py` and `report.py` work for 1- and 3-tier schemes by extending one test each in `tests/test_display.py`, `tests/test_stats.py` and `tests/test_report.py`, with a 3-tier scheme. Fix only what fails.
 
-- [ ] T011b [US1] Document the nested form in the same PR:
+- [x] T011b [US1] Document the nested form in the same PR:
   - **`docs/formats.md`**: the `[[categories]]` nesting, at most 3 tiers, optional descriptions, the rules from data-model "Category", and the `scheme.json` `categories` and `tiers` fields;
   - **`README.md`**: taxonomies of 1–3 tiers, uneven depth, and that areas in the report are tier-1 categories.
 

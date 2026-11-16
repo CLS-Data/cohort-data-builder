@@ -1,8 +1,9 @@
-"""Tiered tagging: walk the taxonomy one tier at a time (feature 004).
+"""Tiered tagging: walk the taxonomy one tier at a time (features 004 and 005).
 
-The scheme becomes a tree of ``Node``s: a root, its areas (the scheme's domains), and their
-topics. Tagging tiered asks, for each variable, which areas apply, then which topics within
-each area that passed the threshold, and so on for deeper trees.
+The scheme becomes a tree of ``Node``s: a root, its tier-1 categories, and so on down to the
+leaves, one to three tiers deep. Tagging tiered asks, for each variable, which tier-1
+categories apply, then which categories within each group that passed the threshold, and so
+on down to the leaves.
 """
 
 from __future__ import annotations
@@ -20,19 +21,22 @@ from topic_tagger.variables import Variable
 
 @dataclass(frozen=True)
 class Node:
-    """One option in the taxonomy: an area (with children) or a topic (a leaf).
+    """One option in the taxonomy: a group (with children) or a leaf.
 
     Attributes:
-        id: The area or topic id; ``""`` for the root.
+        id: The category id; ``""`` for the root.
         label: Its label.
-        description: Its description.
-        children: Its children, in scheme order; empty for a topic.
+        description: Its description; may be empty.
+        children: Its children, in scheme order; empty for a leaf.
+        is_exit: True for the fallback offered at tier 1: kept only when nothing else is
+            found.
     """
 
     id: str
     label: str
     description: str
     children: tuple[Node, ...] = ()
+    is_exit: bool = False
 
     @property
     def is_leaf(self) -> bool:
@@ -51,20 +55,25 @@ class Node:
 
 
 def build_tree(scheme: Scheme) -> Node:
-    """The scheme as a tree: root → one node per domain → one leaf per topic.
+    """The taxonomy as a tree of nodes, with the fallback offered at tier 1 as an exit.
 
-    The fallback topic is moved out of its domain and offered at tier 1, beside the areas,
-    as an exit for variables the model cannot place: it is taken like an area (see ``walk``)
-    and kept only when nothing else is found. A domain left empty by the move is dropped.
+    The fallback leaf is moved out of wherever it sits and offered beside the tier-1
+    categories, for variables the model cannot place: it is taken like a group (see
+    ``walk``) and kept only when nothing else is found. Groups the move leaves empty are
+    dropped, all the way up.
     """
-    fallback = next(t for t in scheme.topics if t.id == scheme.fallback_topic)
-    areas = []
-    for d in scheme.domains:
-        topics = tuple(Node(t.id, t.label, t.description) for t in d.topics if t is not fallback)
-        if topics:
-            areas.append(Node(d.id, d.label, d.description, topics))
-    exit_ = Node(fallback.id, fallback.label, fallback.description)
-    return Node("", scheme.name, "", (*areas, exit_))
+    fallback = scheme.fallback_topic
+
+    def convert(c) -> Node | None:
+        if c.is_leaf:
+            return None if c.id == fallback else Node(c.id, c.label, c.description)
+        children = tuple(n for n in map(convert, c.children) if n is not None)
+        return Node(c.id, c.label, c.description, children) if children else None
+
+    tier1 = [n for n in map(convert, scheme.root.children) if n is not None]
+    leaf = next(t for t in scheme.topics if t.id == fallback)
+    exit_ = Node(leaf.id, leaf.label, leaf.description, is_exit=True)
+    return Node("", scheme.name, "", (*tier1, exit_))
 
 
 Tags = list[tuple[str, float]]
@@ -305,15 +314,16 @@ def walk(
                 for child_id, conf in chosen:
                     reach(_child(node, child_id), tier + 1, i, conf)
                 continue
-            # A tier of areas, perhaps with an exit topic: all are chosen alike, by
-            # descend_at, the strongest always, at most max_areas.
+            # A tier with groups, perhaps with leaves beside them (the exit, or real leaves
+            # in an uneven taxonomy): all are chosen alike, by descend_at, the strongest
+            # always, at most max_areas.
             areas = sorted(chosen, key=lambda kv: (-kv[1], order[kv[0]]))
             follow = [(c, conf) for c, conf in areas if conf >= descend_at] or areas[:1]
             if max_areas:
                 follow = follow[:max_areas]
             for child_id, conf in follow:
                 child = _child(node, child_id)
-                if child.is_leaf:
+                if child.is_exit:
                     exits.add(child.id)
                 reach(child, tier + 1, i, conf)
 

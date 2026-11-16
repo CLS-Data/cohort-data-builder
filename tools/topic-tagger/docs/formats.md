@@ -49,12 +49,48 @@ description = "Physical and mental health."
 |---|---|
 | `name`, `guidance` | Required text. The guidance is the model's instructions, before the topics. |
 | `version` | Required whole number; your own label. |
-| `fallback_topic` | Required; must be a topic in the scheme. |
+| `fallback_topic` | Required; must be a topic (a leaf) in the scheme. |
 | `domains` | At least one. Each has `id`, `label`, `description` and at least one topic. |
 | `domains.topics` | Each has `id`, `label` and `description`. |
 
+### Nested form: one to three tiers
+
+Instead of `domains`, a file may list `categories`, nested up to three deep:
+
+```toml
+[[categories]]
+id = "health"
+label = "Health"
+description = "Physical and mental health."
+
+  [[categories.categories]]
+  id = "physical_health"
+  label = "Physical health"
+
+    [[categories.categories.categories]]
+    id = "respiratory"
+    label = "Respiratory conditions"
+    description = "Asthma, bronchitis, wheeze."
+
+[[categories]]
+id = "other"
+label = "Other"
+```
+
+| Field | Rules |
+|---|---|
+| `categories` | At least one, at every level where it appears. A file has `categories` or `domains`, not both. |
+| `id` | As below. |
+| `label` | Required text. |
+| `description` | Optional text (empty when missing). |
+| `categories` (inside a category) | Makes it a **group**: at least one category. Without it, the category is a **leaf**. |
+
+At most three tiers (a category inside a tier-3 category is refused); at least two leaves;
+`fallback_topic` must be a leaf. Depth may be uneven: a leaf can sit beside a group. Leaves
+are what variables are tagged with; the `domains` form is the same as two tiers.
+
 Ids are lower-case letters, digits and `_`, start with a letter, and are unique across the
-whole file, domains and topics together. Other keys (for example a code from another
+whole file, at every tier (domains and topics together, in the `domains` form). Other keys (for example a code from another
 vocabulary) are allowed but not used.
 
 The scheme's **hash** is the first 12 hex characters of SHA-256 over its parsed content, so
@@ -107,10 +143,17 @@ The scheme as used, with its hash:
 
 ```json
 {"name": "My topics", "version": 1, "hash": "c87a35ec8bc2", "guidance": "...",
- "fallback_topic": "other",
+ "fallback_topic": "other", "tiers": 2,
+ "categories": [{"id": "health", "label": "Health", "description": "...",
+                 "categories": [{"id": "smoking", "label": "Smoking", "description": "..."}]}],
  "domains": [{"id": "health", "label": "Health", "description": "...",
               "topics": [{"id": "smoking", "label": "Smoking", "description": "..."}]}]}
 ```
+
+`categories` is the taxonomy, nested as in the scheme file (a leaf has no `categories`);
+`tiers` is its depth. `domains` is a two-level view kept for older readers: one entry per
+tier-1 category, with every leaf beneath it (a tier-1 leaf is a domain of itself). Folders
+written before `categories` existed are read from `domains`.
 
 ### `run.json`
 
