@@ -429,3 +429,12 @@ def test_check_false_never_checks(scheme_run_path, fake_decision):
 
     Tagger(scheme_run_path, provider=fake_decision, check=False).tag(["a"])
     assert fake_decision.checked == 0
+
+
+def test_a_single_string_is_refused_rather_than_tagged_letter_by_letter(
+    scheme_run_path, fake_decision
+):
+    from topic_tagger import tag
+
+    with pytest.raises(TypeError, match="list"):
+        tag("Do you smoke?", scheme_run_path, provider=fake_decision)
