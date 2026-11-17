@@ -307,3 +307,98 @@ def test_a_provider_object_must_have_what_is_needed(small_scheme_path, obj, miss
 
     with pytest.raises(TypeError, match=missing):
         Tagger(small_scheme_path, provider=obj)
+
+
+# --- US3: errors a caller can handle ----------------------------------------------------
+
+
+def test_a_broken_scheme_is_a_scheme_error(tmp_path_factory):
+    from topic_tagger import SchemeError, parse_scheme, tag
+
+    bad = tmp_path_factory.mktemp("schemes") / "bad.toml"
+    bad.write_text('name = "x"\nversion = 1\n', encoding="utf-8")
+    with pytest.raises(SchemeError) as err:
+        tag(["a"], bad)
+    assert len(err.value.problems) > 1
+    with pytest.raises(SchemeError):
+        parse_scheme('name = "x"\n')
+
+
+def test_a_bad_setting_is_a_value_error_and_reaches_no_provider(
+    small_scheme_path, fake_decision, fake_chat
+):
+    from topic_tagger import tag
+
+    with pytest.raises(ValueError) as err:
+        tag(["a"], small_scheme_path, provider=fake_decision, descend_at=1.5)
+    assert str(err.value) == "--descend-at must be between 0 and 1"
+    with pytest.raises(ValueError, match="--keep-at"):
+        tag(["a"], small_scheme_path, provider=fake_chat, keep_at=0.4)
+    assert fake_decision.calls == [] and fake_decision.checked == 0
+    assert fake_chat.calls == [] and fake_chat.checked == 0
+
+
+def test_a_bad_input_names_its_position(small_scheme_path, fake_decision):
+    from topic_tagger import tag
+
+    with pytest.raises(TypeError, match="input 0"):
+        tag([42], small_scheme_path, provider=fake_decision)
+    with pytest.raises(ValueError, match="^input 1: 'file' is missing"):
+        tag(["ok", {"variable": "x"}], small_scheme_path, provider=fake_decision)
+    assert fake_decision.calls == []
+
+
+def test_an_unreachable_host_is_raised_before_any_question(small_scheme_path):
+    from conftest import FakeDecisionModel
+    from topic_tagger import ProviderError, tag
+
+    model = FakeDecisionModel(check_error=ProviderError("model missing"))
+    with pytest.raises(ProviderError, match="model missing"):
+        tag(["a"], small_scheme_path, provider=model)
+    assert model.calls == []
+
+
+def test_a_cloud_model_needs_allow_remote(small_scheme_path):
+    from conftest import FakeDecisionModel
+    from topic_tagger import ProviderError, RemoteModelError, tag
+
+    model = FakeDecisionModel(remote=True)
+    with pytest.raises(RemoteModelError) as err:
+        tag(["a"], small_scheme_path, provider=model, model="clef:cloud")
+    assert isinstance(err.value, ProviderError)
+    assert "clef:cloud" in str(err.value) and "allow_remote=True" in str(err.value)
+    assert model.calls == [] and model.checked == 0
+    assert tag(["a"], small_scheme_path, provider=model, allow_remote=True)[0].tags
+
+
+def test_a_refused_question_is_raised_with_its_name():
+    from conftest import FakeDecisionModel
+    from topic_tagger import OptionLimitError, tag
+
+    model = FakeDecisionModel(refuse_over=5)
+    with pytest.raises(OptionLimitError) as err:
+        tag(["a", "b"], provider=model, method="flat")
+    assert err.value.options == 107
+    assert err.value.question == "every topic, asked flat"
+
+
+def test_an_input_that_keeps_failing_is_a_failed_result(small_scheme_path):
+    from conftest import FakeDecisionModel
+    from topic_tagger import tag
+
+    model = FakeDecisionModel(fail_for={"bad"})
+    results = tag(["good", "bad", "also good"], small_scheme_path, provider=model)
+    assert [r.failed for r in results] == [False, True, False]
+    assert results[1].error == "no answer" and results[1].tags == []
+    assert results[0].error == results[2].error == ""
+    assert results.failed == [results[1]]
+
+
+def test_the_api_never_prints_prompts_exits_or_opens_files():
+    from pathlib import Path
+
+    import topic_tagger.api
+
+    source = Path(topic_tagger.api.__file__).read_text(encoding="utf-8")
+    for call in ("print(", "input(", "sys.exit", "open("):
+        assert call not in source, call
