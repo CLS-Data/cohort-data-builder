@@ -41,5 +41,5 @@ dev = [
     "pyreadstat==1.3.7",
     "pytest==9.2.0",
     "pytest-playwright==0.10.0",
-    "ruff==0.17.4",
+    "ruff==0.17.5",
 ]
