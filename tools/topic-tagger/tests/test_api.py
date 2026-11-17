@@ -61,14 +61,13 @@ def test_variables_and_dicts_are_sent_as_the_command_line_sends_them(
     scheme_run_path, fake_decision
 ):
     from topic_tagger import tag
-    from topic_tagger.tiered import _state
 
     v = Variable("alpha", "SMK", "Smokes", (("1", "Yes"), ("2", "No")))
     line = {"file": "beta", "variable": "AGE", "label": "Age now", "values": [[1, "16-24"]]}
     results = tag([v, line, "plain"], scheme_run_path, provider=fake_decision)
     assert [r.input for r in results] == [v, line, "plain"]
     states = [s for s, _, _ in fake_decision.calls]
-    assert _state(v) in states
+    assert {"name": "SMK", "label": "Smokes", "values": ["1: Yes", "2: No"]} in states
     assert {"name": "AGE", "label": "Age now", "values": ["1: 16-24"]} in states
     assert {"name": "", "label": "plain", "values": []} in states
 

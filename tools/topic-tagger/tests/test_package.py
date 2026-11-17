@@ -14,8 +14,11 @@ def test_the_version_agrees_with_pyproject():
 
 
 def test_it_runs_as_a_module():
-    done = subprocess.run([sys.executable, "-m", "topic_tagger", "--help"], capture_output=True)
+    done = subprocess.run(
+        [sys.executable, "-m", "topic_tagger", "--help"], capture_output=True, text=True
+    )
     assert done.returncode == 0
+    assert "usage:" in done.stdout and "tag" in done.stdout
 
 
 def test_the_example_schemes_are_packaged_and_load(tmp_path):
