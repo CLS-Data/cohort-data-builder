@@ -313,6 +313,8 @@ class Tagger:
             OptionLimitError: The model refused a question for having too many options.
                 Nothing is returned: the same call would be refused again.
         """
+        if isinstance(inputs, (str, bytes, dict, Variable)):
+            raise TypeError("tag takes a list of inputs; wrap one input in a list or use classify")
         items = list(inputs)
         variables = [_to_variable(i, item) for i, item in enumerate(items)]
         s = self.settings
