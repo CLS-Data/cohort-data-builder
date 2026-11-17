@@ -141,3 +141,11 @@ def test_real_bcs70_search_paging_and_details(page, serve):
     more = page.locator("#results .vrow-more").first
     expect(more.locator(".vm-meta")).to_be_visible()
     expect(more.locator(".vm-values, .vm-note").first).to_be_visible()
+
+
+def test_a_dictionary_that_fails_to_load_is_explained_in_the_details(mini):
+    mini.route("**/dict/mini_age5.json", lambda route: route.fulfill(status=500))
+    mini.get_by_role("button", name="Show details for smoke5").click()
+    warning = row(mini, "smoke5").locator(".vm-warn")
+    expect(warning).to_contain_text("mini_age5.json")
+    expect(warning).to_contain_text("HTTP 500")

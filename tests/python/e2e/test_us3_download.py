@@ -226,3 +226,11 @@ def test_dropping_a_variable_anywhere_on_selection_adds_it(mini):
     )
     expect(column(mini, "alc10")).to_be_visible()
     expect(mini.locator("#basket-cols li")).to_have_count(3)
+
+
+def test_a_download_that_cannot_fetch_its_templates_says_why(mini):
+    pick(mini, "smoke5")
+    review(mini)
+    mini.route("**/templates/**", lambda route: route.abort())
+    download_button(mini).click()
+    expect(mini.get_by_text(re.compile("Could not build the download"))).to_be_visible()

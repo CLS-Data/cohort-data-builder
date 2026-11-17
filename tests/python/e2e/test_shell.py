@@ -74,3 +74,9 @@ def test_theme_choice_survives_reload(page, mini_url):
     expect(html).to_have_attribute("data-theme", "dark")
     page.get_by_role("button", name="Switch colour theme").click()
     expect(html).to_have_attribute("data-theme", "light")
+
+
+def test_a_cohort_whose_index_is_missing_says_so(page, serve, mini_site):
+    (mini_site / "data" / "mini" / "index.json").unlink()
+    page.goto(serve(mini_site))
+    expect(page.get_by_text("Could not load the mini data.")).to_be_visible()
