@@ -13,7 +13,8 @@ An example scheme is bundled (based on the CLOSER Discovery topics for UK cohort
 for you to copy and adapt; the tool never uses it unless you pass it.
 
 This folder is a self-contained project: copy it anywhere and it works on its own. The
-file formats are in [docs/formats.md](docs/formats.md).
+file formats are in [docs/formats.md](docs/formats.md). It can also be used from Python
+code: see [Using it from Python](#using-it-from-python).
 
 ## Quick start (about 15 minutes)
 
@@ -440,16 +441,76 @@ options, with their defaults.
 A host that needs an API key reads it from `TOPIC_TAGGER_API_KEY`, never from an option,
 so it is not in your shell history or in `run.json`.
 
+## Using it from Python
+
+Everything the command line does to tag, you can also do from code, with the same scheme
+files and the same results, and nothing written to disk:
+
+```python
+from topic_tagger import tag
+
+results = tag(["Do you smoke?", "Weight in kg"], "my-scheme.toml")
+print([r.topics for r in results])
+```
+
+Each input may be plain text (sent to the model as the variable's label), a `Variable`, or
+a dict in the [`variables.jsonl` line format](docs/formats.md); they can be mixed. Results
+come back in input order. Each one has `tags` (`topic`, `label`, `confidence`, strongest
+first), `path` (tiered: the groups followed), and `failed` with `error`. The whole call
+also has `settings`, `sources` (where each setting came from), `notes` and
+`requests_by_tier`.
+
+**Settings** work as on the command line: an argument you pass, else the scheme's `[run]`
+table, else the default. The arguments are named as the options are, with underscores:
+
+```python
+tag(texts, "my-scheme.toml", provider="ollama-decision", model="clef:cloud",
+    method="flat", allow_remote=True)
+```
+
+`base_url`, `api_key` (default: `TOPIC_TAGGER_API_KEY`), `timeout`, `batch_size`,
+`workers` and `retries` are arguments too; a scheme cannot set them.
+
+**Schemes**: pass a path, a `Scheme`, or nothing for the bundled example. For TOML text,
+pass `parse_scheme(text)`; it gives the same hash as the same text in a file.
+
+**Many calls**: make a `Tagger` once and call `.tag()` or `.classify()` on it. The host is
+checked once, before its first request. `classify(text, scheme)` tags one input and returns
+one result.
+
+**Your own model**: pass an object as `provider`. It needs `check()` and `is_remote()`,
+plus either `decide(state, instructions, options)` returning each option's probability (a
+decision model) or `complete(messages, schema)` returning the reply's text (a chat model).
+This is also how to test code that calls the tagger without a model.
+
+**Errors** are exceptions; the API never prints, prompts or exits:
+
+| Raised | When |
+|---|---|
+| `SchemeError` | The scheme cannot be read or breaks a rule (every problem is listed). |
+| `ValueError` | A setting is out of range or does not fit the others (named as the option, e.g. `--keep-at` for `keep_at`), or a dict input is not a valid line. |
+| `TypeError` | An input is not text, a `Variable` or a dict, or a provider object lacks a method. |
+| `RemoteModelError` | The model runs in the cloud and you did not pass `allow_remote=True`. Nothing is sent. |
+| `ProviderError` | The host cannot be reached or lacks the model. |
+| `OptionLimitError` | The model refused a question for having too many options; the message names it. |
+
+An input that still fails after the retries is not an exception: its result has
+`failed=True`.
+
+The API does not write `tags.jsonl`, carry on from an earlier run, or make a report; use
+the command line for those. The full contract is in
+[specs/006-tagger-api/contracts/api.md](../../specs/006-tagger-api/contracts/api.md).
+
 ## Demonstrating every feature
 
 `scripts/demo.py` runs the tool through every feature on a few of the fictional test
 variables, and checks what each run wrote. It covers one to three tiers, chat and decision
-models, flat and tiered tagging, refusals, `[run]`, `[questions]`, the hash, and carrying
-on after a stop:
+models, flat and tiered tagging, refusals, `[run]`, `[questions]`, the hash, carrying
+on after a stop, and the Python API:
 
 ```sh
 uv run python scripts/demo.py --offline     # checks and dry runs only; no model needed
-uv run python scripts/demo.py --yes         # every step: 20 steps, through the local Ollama
+uv run python scripts/demo.py --yes         # every step: 22 steps, through the local Ollama
 ```
 
 Models default to `gpt-oss:20b-cloud` and `clef:cloud` (`--chat-model`,

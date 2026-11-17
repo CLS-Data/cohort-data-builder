@@ -9,13 +9,13 @@ What it covers:
 - **Without a model** (``--offline`` runs only these): ``check-scheme`` on one-, two- and
   three-tier schemes and on a bad one; bad ``[run]`` values and options refused with exit 2;
   dry runs printing every tier, with the scheme's questions and guidance, for both kinds
-  of model.
+  of model; the Python API with a model object (settings, the one-tier note, consent).
 - **With models**: one, two and three tiers × chat and decision model × flat and tiered
   (twelve runs); a decision model given a large question, flat and at a group: refused
   with the question named (exit 5), or, for a model with no such limit, answered; a
   scheme's ``[run]`` table driving a run on its own; carrying on from
   where a run stopped; editing ``[run]`` keeping the tags, editing ``[questions]`` or the
-  method redoing them.
+  method redoing them; the Python API tagging with both real models.
 
 Run it from ``tools/topic-tagger``::
 
@@ -541,6 +541,99 @@ def stop_and_carry_on(ctx: Context) -> list[Check]:
     return checks
 
 
+# --- The Python API (feature 006) -------------------------------------------------------
+
+
+class _FirstOption:
+    """A decision model in code, with no host: it always prefers the first option."""
+
+    def __init__(self, remote: bool = False):
+        self.remote = remote
+        self.calls = 0
+
+    def check(self) -> None:
+        """Nothing to check."""
+
+    def is_remote(self) -> bool:
+        """Whether it pretends to be a cloud model."""
+        return self.remote
+
+    def decide(self, state: dict, instructions: str, options: dict) -> dict[str, float]:
+        """0.9 for the first option, the rest shared equally."""
+        self.calls += 1
+        ids = list(options)
+        rest = 0.1 / (len(ids) - 1) if len(ids) > 1 else 0.0
+        return {o: (0.9 if i == 0 else rest) for i, o in enumerate(ids)}
+
+
+def python_api_offline(ctx: Context) -> list[Check]:
+    """``tag`` from code with a model object: tags, settings, the one-tier note, consent."""
+    from topic_tagger import RemoteModelError, load_scheme, tag
+
+    texts = ["Do you smoke?", "Weight in kg", "Household income"]
+    results = tag(texts, SCHEME_3, provider=_FirstOption())
+    leaves = {t.id for t in load_scheme(SCHEME_3).topics}
+    checks = [
+        Check("one result per input, in order", [r.input for r in results] == texts),
+        Check(
+            "every tag is a leaf, with a path through the tiers",
+            all(r.tags and set(r.topics) <= leaves and r.path for r in results),
+            str(results[0].topics),
+        ),
+        Check(
+            "settings from the file's [run], the provider from the call",
+            results.sources.get("method") == "file" and results.sources["provider"] == "call",
+            str(results.sources),
+        ),
+    ]
+    flat = tag(texts, SCHEME_3, provider=_FirstOption(), method="flat")
+    checks.append(
+        Check(
+            'method="flat" overrides the file',
+            flat.settings["method"] == "flat" and all(r.path is None for r in flat),
+        )
+    )
+    one = tag(texts, SCHEME_1, provider=_FirstOption(), method="tiered")
+    checks.append(
+        Check("a one-tier taxonomy tags flat, with a note", one.notes != [], str(one.notes))
+    )
+    cloud = _FirstOption(remote=True)
+    try:
+        tag(texts, SCHEME_3, provider=cloud)
+        refused = False
+    except RemoteModelError:
+        refused = True
+    checks.append(Check("a cloud model needs allow_remote=True", refused and cloud.calls == 0))
+    return checks
+
+
+def python_api_with_models(ctx: Context) -> list[Check]:
+    """``tag`` from code with the real chat and decision models, on the sampled variables."""
+    from topic_tagger import load_scheme, tag
+    from topic_tagger.variables import read_variables
+
+    variables = read_variables(ctx.variables)
+    leaves = {t.id for t in load_scheme(SCHEME_3).topics}
+    checks = []
+    for kind, provider, name in (
+        ("decision", "ollama-decision", ctx.args.decision_model),
+        ("chat", "ollama", ctx.args.chat_model),
+    ):
+        options = {"base_url": ctx.args.base_url} if ctx.args.base_url else {}
+        results = tag(
+            variables, SCHEME_3, provider=provider, model=name, allow_remote=True, **options
+        )
+        tagged = [r for r in results if not r.failed]
+        checks.append(
+            Check(
+                f"{kind} model: every variable tagged with leaves",
+                len(tagged) == len(variables) and all(set(r.topics) <= leaves for r in tagged),
+                f"{len(tagged)} of {len(variables)}; e.g. {results[0].topics}",
+            )
+        )
+    return checks
+
+
 def steps() -> list[Step]:
     """Every step, in the order they run."""
     out = [
@@ -550,6 +643,9 @@ def steps() -> list[Step]:
             "dry run, decision model: every tier, guidance and questions", False, dry_run_decision
         ),
         Step("dry run, chat model: every tier and Question: lines", False, dry_run_chat),
+        Step(
+            "python API: tag, settings and errors, with a model object", False, python_api_offline
+        ),
     ]
     for tiers, scheme in ((1, SCHEME_1), (2, SCHEME_2), (3, SCHEME_3)):
         for kind in ("chat", "decision"):
@@ -566,6 +662,7 @@ def steps() -> list[Step]:
         Step("refusal: a group too big for a decision model", True, refusal_group),
         Step("the scheme file controls the run; hash and resume", True, file_controls_the_run),
         Step("stop part way and carry on", True, stop_and_carry_on),
+        Step("python API with the real models", True, python_api_with_models),
     ]
     return out
 

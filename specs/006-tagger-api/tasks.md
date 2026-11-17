@@ -229,15 +229,15 @@ contracts/api.md and quickstart.md.
 
 ## Phase 7: Polish and cross-cutting
 
-- [ ] T022 Write failing `tests/test_api.py::test_the_api_and_the_cli_give_the_same_tags` (SC-002, FR-014). For each of the four combinations (chat or decision model, flat or tiered) on `tests/fixtures/variables.jsonl`:
+- [x] T022 Write failing `tests/test_api.py::test_the_api_and_the_cli_give_the_same_tags` (SC-002, FR-014). For each of the four combinations (chat or decision model, flat or tiered) on `tests/fixtures/variables.jsonl`:
   - run `cli.main([...], provider_factory=lambda args: model, clock=FakeClock())` into `tmp_path` with `--yes --plain --batch-size 20 --workers 1`;
   - run `tag(read_variables(path), …, provider=model, batch_size=20, workers=1)`;
   - with one worker, the batches are the same and in the same order on both sides;
   - assert each variable's topics, confidences and path are equal.
 
   Use `scheme_small.toml`. For chat, use a deterministic `FakeChatModel` whose reply depends only on the request, not on call order. Fix any difference found in `api.py`. Commit the test, then the fix.
-- [ ] T023 [P] Bump the version to `0.2.0` in `pyproject.toml` and `src/topic_tagger/__init__.py`. Add a test in `tests/test_package.py` that the two agree. Run `uv lock` (the project's own entry changes only).
-- [ ] T024 [P] Add a "Using it from Python" section to `README.md`, after the CLI sections:
+- [x] T023 [P] Bump the version to `0.2.0` in `pyproject.toml` and `src/topic_tagger/__init__.py`. Add a test in `tests/test_package.py` that the two agree. Run `uv lock` (the project's own entry changes only).
+- [x] T024 [P] Add a "Using it from Python" section to `README.md`, after the CLI sections:
   - a three-line example;
   - schemes from text;
   - overriding `[run]`;
@@ -248,7 +248,7 @@ contracts/api.md and quickstart.md.
   - a link to `specs/006-tagger-api/contracts/api.md`.
 
   Also add a line to the repository `CLAUDE.md` tagger paragraph: "it can also be used from Python (`from topic_tagger import tag`)".
-- [ ] T025 [P] Add the 006 API to `scripts/demo.py`. It needs no network, so it goes in the `--offline` group:
+- [x] T025 [P] Add the 006 API to `scripts/demo.py`. It needs no network, so it goes in the `--offline` group:
   - a step `python API: tag, settings and errors` that runs `tag` with an inline fake decision model on `example-3-tier.toml`;
   - it checks the leaf tags, `sources`, the one-tier note, and `RemoteModelError`.
 - [ ] T026 Run quickstart.md steps 1–5, the full suite, ruff, and at the repository root `uv run pytest tests/python` (checking `scripts/topics.py` still merges). Tick the tasks here.
