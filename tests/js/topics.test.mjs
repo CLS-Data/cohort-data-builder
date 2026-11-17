@@ -149,3 +149,8 @@ test("confidence thresholds are 30, 50, 70 or 90, defaulting to 50", () => {
   assert.equal(validConf("90"), 50);
   assert.equal(validConf(undefined), 50);
 });
+
+test("shade does not divide by zero when every count is zero", () => {
+  assert.equal(shade(0, 0, 0, "row"), 0);
+  assert.equal(shade(0, 0, 0, "abs"), 0);
+});

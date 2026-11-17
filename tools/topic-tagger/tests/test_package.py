@@ -4,13 +4,21 @@ import sys
 import topic_tagger
 
 
-def test_the_package_has_a_version():
-    assert topic_tagger.__version__ == "0.1.0"
+def test_the_version_agrees_with_pyproject():
+    import tomllib
+    from pathlib import Path
+
+    pyproject = Path(__file__).parents[1] / "pyproject.toml"
+    project = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]
+    assert project["version"] == topic_tagger.__version__
 
 
 def test_it_runs_as_a_module():
-    done = subprocess.run([sys.executable, "-m", "topic_tagger", "--help"], capture_output=True)
+    done = subprocess.run(
+        [sys.executable, "-m", "topic_tagger", "--help"], capture_output=True, text=True
+    )
     assert done.returncode == 0
+    assert "usage:" in done.stdout and "tag" in done.stdout
 
 
 def test_the_example_schemes_are_packaged_and_load(tmp_path):

@@ -143,3 +143,18 @@ def test_a_lock_left_by_a_run_that_ended_needs_force(tmp_path):
         TagStore(tmp_path).lock()
     TagStore(tmp_path).lock(force=True)
     assert (tmp_path / ".lock").read_text().strip() == str(os.getpid())
+
+
+def test_a_bad_line_in_the_middle_is_skipped_and_the_rest_kept(tmp_path):
+    store = TagStore(tmp_path)
+    store.append([rec("a")])
+    with (tmp_path / "tags.jsonl").open("a") as fh:
+        fh.write("not json\n")
+        fh.write('{"variable": "nofile", "scheme": "h1"}\n')
+        fh.write("[1, 2]\n")
+    store.append([rec("b")])
+    fresh = TagStore(tmp_path)
+    fresh.load()
+    assert fresh.state("f/a", "h1") == "current"
+    assert fresh.state("f/b", "h1") == "current"
+    assert len(fresh.records) == 2

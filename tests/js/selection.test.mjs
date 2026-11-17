@@ -66,7 +66,7 @@ test("add returns the refusal reason and leaves the selection alone", () => {
   assert.match(r.reason, /mini_noid/);
 });
 
-test("remove, toggle, addMany and removeMany report how many changed", () => {
+test("addMany adds only the selectable items and says how many", () => {
   const many = addMany(
     [],
     [item("sex"), item("smoke5"), item("PID"), item("areacode", 3)],
@@ -74,14 +74,35 @@ test("remove, toggle, addMany and removeMany report how many changed", () => {
   );
   assert.equal(many.changed, 2);
   assert.ok(has(many.selection, "mini_age5", "sex"));
-  const off = toggle(many.selection, item("sex"), manifest);
+  assert.ok(has(many.selection, "mini_age5", "smoke5"));
+});
+
+test("addMany of nothing changes nothing", () => {
+  const r = addMany([], [], manifest);
+  assert.equal(r.changed, 0);
+  assert.deepEqual(r.selection, []);
+});
+
+test("toggle removes a selected item and adds it back", () => {
+  const start = add([], item("sex"), manifest).selection;
+  const off = toggle(start, item("sex"), manifest);
   assert.equal(off.changed, 1);
   assert.ok(!has(off.selection, "mini_age5", "sex"));
   const on = toggle(off.selection, item("sex"), manifest);
+  assert.equal(on.changed, 1);
   assert.ok(has(on.selection, "mini_age5", "sex"));
-  assert.equal(remove(on.selection, "mini_age5:sex").changed, 1);
-  assert.equal(remove(on.selection, "mini_age5:nothing").changed, 0);
-  const gone = removeMany(on.selection, [item("sex"), item("smoke5"), item("nolab5")]);
+});
+
+test("remove takes out one item by key and ignores an unknown key", () => {
+  const start = add([], item("sex"), manifest).selection;
+  assert.equal(remove(start, "mini_age5:sex").changed, 1);
+  assert.deepEqual(remove(start, "mini_age5:sex").selection, []);
+  assert.equal(remove(start, "mini_age5:nothing").changed, 0);
+});
+
+test("removeMany counts only the items that were selected", () => {
+  const start = addMany([], [item("sex"), item("smoke5")], manifest).selection;
+  const gone = removeMany(start, [item("sex"), item("smoke5"), item("nolab5")]);
   assert.equal(gone.changed, 2);
   assert.deepEqual(gone.selection, []);
 });
@@ -160,4 +181,9 @@ test("restore tolerates garbage", () => {
   assert.deepEqual(restore("nonsense", vars, manifest), []);
   assert.deepEqual(restore(undefined, vars, manifest), []);
   assert.deepEqual(restore([42, "x", {}], vars, manifest), []);
+});
+
+test("rangeBetween from a row to itself gives just that row", () => {
+  const key = rowKey(byName("smoke5"));
+  assert.deepEqual(rangeBetween(vars, key, key, manifest), [item("smoke5")]);
 });

@@ -147,16 +147,22 @@ def test_records_carry_the_scheme_hash_and_model(tmp_path, small_scheme, variabl
 
 
 def test_never_more_requests_in_flight_than_workers(tmp_path, small_scheme, variables_path, clock):
-    import time
+    import itertools
+    import threading
 
-    def slow(messages, schema):
-        time.sleep(0.02)
+    both = threading.Barrier(2, timeout=5)  # the first two requests wait for each other
+    first_two = itertools.count()
+
+    def paired(messages, schema):
+        if next(first_two) < 2:
+            both.wait()
         return answer()(messages, schema)
 
-    stub = StubProvider(slow)
+    stub = StubProvider(paired)
     run(
         tmp_path, small_scheme, stub, read_variables(variables_path), clock, batch_size=5, workers=2
     )
+    assert not both.broken, "the first two requests never ran at once"
     assert stub.max_in_flight == 2
 
 

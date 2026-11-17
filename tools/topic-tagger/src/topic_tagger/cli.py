@@ -17,7 +17,7 @@ from topic_tagger.display import RunView
 from topic_tagger.prompt import build_messages, build_option_messages
 from topic_tagger.providers import Provider, ProviderError, get_provider
 from topic_tagger.report import render_report
-from topic_tagger.run_settings import DECISION, KEYS, resolve
+from topic_tagger.run_settings import DECISION, KEYS, settle
 from topic_tagger.runner import Runner, Settings, install_stop_handler
 from topic_tagger.scheme import SchemeError, bundled_scheme_text, load_scheme, scheme_from_json
 from topic_tagger.stats import compute_stats
@@ -35,6 +35,17 @@ from topic_tagger.variables import InputError, read_variables
 OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED, REFUSED, STOPPED = 0, 1, 2, 3, 4, 5, 130
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 SUMMARY_TOP = 10  # files or groups listed in the end-of-run summary
+
+
+def _at_least_one(text: str) -> int:
+    """An argparse type: a whole number of 1 or more."""
+    try:
+        n = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number") from None
+    if n < 1:
+        raise argparse.ArgumentTypeError(f"must be at least 1, not {n}")
+    return n
 
 
 def main(
@@ -128,8 +139,8 @@ def _parser() -> argparse.ArgumentParser:
         type=int,
         help="tiered: follow at most this many groups per question; 0 for no cap (default 3)",
     )
-    tag.add_argument("--batch-size", type=int, default=20, help="variables per request")
-    tag.add_argument("--workers", type=int, default=2, help="requests in flight at once")
+    tag.add_argument("--batch-size", type=_at_least_one, default=20, help="variables per request")
+    tag.add_argument("--workers", type=_at_least_one, default=2, help="requests in flight at once")
     tag.add_argument(
         "--timeout", type=float, default=120, help="seconds before a request is retried"
     )
@@ -211,27 +222,12 @@ def _settle(args: argparse.Namespace, scheme) -> str | None:
     Returns:
         What is wrong with the command-line values, or None.
     """
-    given = {key: getattr(args, key) for key in KEYS}
-    for key in ("descend_at", "keep_at"):
-        if given[key] is not None and not 0 <= given[key] <= 1:
-            return f"--{key.replace('_', '-')} must be between 0 and 1"
-    if given["max_follow"] is not None and given["max_follow"] < 0:
-        return "--max-follow must be 0 (no cap) or more"
-    settled = resolve(given, scheme.run)
-    values, sources = settled.values, settled.sources
-    if given["keep_at"] is not None and values["provider"] != DECISION:
-        return "--keep-at needs --provider ollama-decision"
-    tiered_options = [k for k in ("descend_at", "max_follow") if sources[k] == "cli"]
-    if values["method"] == "flat" and tiered_options:
-        return "--descend-at and --max-follow need --method tiered"
+    try:
+        settled = settle({key: getattr(args, key) for key in KEYS}, scheme)
+    except ValueError as e:
+        return str(e)
     for note in settled.notes:
         _err(note)
-    if values["method"] == "tiered" and scheme.tiers == 1:
-        _err("This taxonomy has one tier: tagging flat.")
-        values["method"] = "flat"
-    if values["method"] == "flat":  # the tiered settings do not apply, so are not recorded
-        for key in ("descend_at", "max_follow"):
-            sources.pop(key)
     for key, value in settled.values.items():
         setattr(args, key, value)
     args.settings_source = settled.sources

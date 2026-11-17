@@ -67,6 +67,8 @@ class OpenAICompatProvider:
             raise ProviderError(self._unreachable()) from e
         except openai.APIError as e:
             raise ProviderError(f"{self.base_url} answered with an error: {e}") from e
+        except ValueError as e:  # a 200 whose body is not JSON, e.g. a proxy's error page
+            raise ProviderError(f"{self.base_url} answered with something that is not JSON") from e
         if self.model not in names:
             if self.install:
                 command = self.install.format(model=self.model)
@@ -101,4 +103,6 @@ class OpenAICompatProvider:
             raise ProviderError(self._unreachable()) from e
         except openai.APIError as e:
             raise ProviderError(f"the host answered with an error: {e}") from e
+        except ValueError as e:  # a 200 whose body is not JSON, e.g. a proxy's error page
+            raise ProviderError(f"{self.base_url} answered with something that is not JSON") from e
         return reply.choices[0].message.content or ""

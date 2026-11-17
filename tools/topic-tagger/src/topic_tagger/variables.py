@@ -91,6 +91,23 @@ def _parse(line: str) -> Variable:
         data = json.loads(line)
     except json.JSONDecodeError as e:
         raise ValueError(f"not valid JSON ({e.msg})") from e
+    return variable_from_dict(data)
+
+
+def variable_from_dict(data: Any) -> Variable:
+    """Make a variable from one line of ``variables.jsonl``, already parsed.
+
+    Args:
+        data: The line's object: ``file`` and ``variable`` (required), ``label`` and
+            ``values`` (``[value, label]`` pairs), and any other fields, kept in ``extra``.
+
+    Returns:
+        The variable.
+
+    Raises:
+        ValueError: If ``data`` is not an object, ``file`` or ``variable`` is missing or
+            empty, or ``values`` is not a list of pairs.
+    """
     if not isinstance(data, dict):
         raise ValueError("not a JSON object")
     for name in ("file", "variable"):

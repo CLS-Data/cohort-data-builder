@@ -19,6 +19,8 @@ class FakeOllama:
         self.models = list(models)
         self.content = content
         self.delay = delay
+        self.status = 200  # every reply's HTTP status
+        self.raw: bytes | None = None  # a reply body to send instead of the JSON one
         self.requests: list[dict] = []
         fake = self
 
@@ -27,8 +29,8 @@ class FakeOllama:
                 pass
 
             def _send(self, body):
-                data = json.dumps(body).encode()
-                self.send_response(200)
+                data = fake.raw if fake.raw is not None else json.dumps(body).encode()
+                self.send_response(fake.status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
@@ -200,3 +202,19 @@ def test_get_provider_lists_the_known_ones_for_an_unknown_name():
 @pytest.mark.parametrize("model", ["gpt-oss:20b-cloud", "clef:cloud"])
 def test_both_cloud_suffixes_are_remote(model):
     assert ollama("http://localhost:11434/v1", model=model).is_remote()
+
+
+def test_a_rejected_key_is_a_provider_error_naming_the_status(fake):
+    fake.status = 401
+    for call in (lambda p: p.check(), lambda p: p.complete([], SCHEMA)):
+        with pytest.raises(ProviderError) as err:
+            call(provider(fake.url, api_key="wrong"))
+        assert "401" in str(err.value)
+
+
+def test_a_reply_that_is_not_json_is_a_provider_error(fake):
+    fake.raw = b"<html>gateway error</html>"
+    for call in (lambda p: p.check(), lambda p: p.complete([], SCHEMA)):
+        with pytest.raises(ProviderError) as err:
+            call(provider(fake.url))
+        assert "not JSON" in str(err.value)

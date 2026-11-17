@@ -53,3 +53,8 @@ test("choosing Stata code applies Stata's name rules whatever the output format"
   assert.match(problems([col("a", "a".repeat(33))], "PID", "sav", ["r", "stata"]).get("f:a"), /32/);
   assert.equal(problems([col("a", "a.b")], "PID", "csv", ["r", "python"]).size, 0);
 });
+
+test("an empty selection has no problems", () => {
+  assert.equal(problems([], "PID", "csv").size, 0);
+  assert.equal(problems([], "PID", "dta", ["stata"]).size, 0);
+});
