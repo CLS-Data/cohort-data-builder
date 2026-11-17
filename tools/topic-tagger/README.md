@@ -464,8 +464,14 @@ also has `settings`, `sources` (where each setting came from), `notes` and
 table, else the default. The arguments are named as the options are, with underscores:
 
 ```python
-tag(texts, "my-scheme.toml", provider="ollama-decision", model="clef:cloud",
-    method="flat", allow_remote=True)
+tag(
+    texts,
+    "my-scheme.toml",
+    provider="ollama-decision",
+    model="clef:cloud",
+    method="flat",
+    allow_remote=True,
+)
 ```
 
 `base_url`, `api_key` (default: `TOPIC_TAGGER_API_KEY`), `timeout`, `batch_size`,
