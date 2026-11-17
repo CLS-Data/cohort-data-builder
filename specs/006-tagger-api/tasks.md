@@ -251,7 +251,7 @@ contracts/api.md and quickstart.md.
 - [x] T025 [P] Add the 006 API to `scripts/demo.py`. It needs no network, so it goes in the `--offline` group:
   - a step `python API: tag, settings and errors` that runs `tag` with an inline fake decision model on `example-3-tier.toml`;
   - it checks the leaf tags, `sources`, the one-tier note, and `RemoteModelError`.
-- [ ] T026 Run quickstart.md steps 1–5, the full suite, ruff, and at the repository root `uv run pytest tests/python` (checking `scripts/topics.py` still merges). Tick the tasks here.
+- [x] T026 Run quickstart.md steps 1–5, the full suite, ruff, and at the repository root `uv run pytest tests/python` (checking `scripts/topics.py` still merges). Tick the tasks here.
 - [ ] T027 Maintainer, outside the sandbox: run quickstart.md step 6 against the local Ollama, and `uv run python scripts/demo.py --yes`.
 
 ---
