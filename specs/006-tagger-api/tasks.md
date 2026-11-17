@@ -95,7 +95,7 @@ contracts/api.md and quickstart.md.
 
 **Independent test**: with `fake_decision`, tag three strings with `scheme_run.toml` (decision, tiered). Each result has leaf topics, confidences and a path; `tmp_path` stays empty; `capsys` captures nothing.
 
-- [ ] T010 [US1] Write failing tests in the new `tests/test_api.py`:
+- [x] T010 [US1] Write failing tests in the new `tests/test_api.py`:
   0. An autouse fixture in `tests/test_api.py`: `monkeypatch.chdir(tmp_path)` before each test. After it, assert `list(tmp_path.iterdir()) == []` and `capsys.readouterr() == ("", "")`. Tests that expect an exception still pass through it (SC-003).
   1. `tag(["Do you smoke?", "Weight in kg", "Do you smoke?"], scheme_run_path, provider=fake_decision)` returns 3 results in input order:
      - each `input` is the string passed;
@@ -113,8 +113,8 @@ contracts/api.md and quickstart.md.
      - `requests_by_tier` is non-empty.
   6. `tag([], …)` returns empty `Results`, and `fake_decision.calls == []` and `checks == 0`.
   7. `Result.topics` lists the topic ids. `Result.to_dict()` has `topics`, `method`, `model`, `scheme`, `failed` and `error`, plus `path` when tiered.
-- [ ] T011 [US1] Run T010 and see it fail. Commit as `test(tagger): tag and classify in one call`.
-- [ ] T012 [US1] Create `src/topic_tagger/api.py` with Google-style docstrings throughout:
+- [x] T011 [US1] Run T010 and see it fail. Commit as `test(tagger): tag and classify in one call`.
+- [x] T012 [US1] Create `src/topic_tagger/api.py` with Google-style docstrings throughout:
   - `Tag(topic, label, confidence)`: frozen dataclass.
   - `Result(input, tags, path, failed, error)`, with the `topics` property and `to_dict()`, as in data-model.md.
   - `Results`: a `Sequence[Result]` with `settings`, `sources`, `notes`, `requests_by_tier`, `retries`, `scheme_name`, `scheme_hash` and a `failed` property.
@@ -141,7 +141,7 @@ contracts/api.md and quickstart.md.
   - Module-level `tag(inputs, scheme=None, **options)` and `classify(input, scheme=None, **options)`.
 
   Run T010 until it passes. Commit as `feat(tagger): tag and classify text and variables in code`.
-- [ ] T013 [US1] Re-export from `src/topic_tagger/__init__.py`, with `__all__` exactly as in contracts/api.md:
+- [x] T013 [US1] Re-export from `src/topic_tagger/__init__.py`, with `__all__` exactly as in contracts/api.md:
   - `tag`, `classify`, `Tagger`, `Result`, `Results`, `Tag`;
   - `Variable`, `Scheme`, `load_scheme`, `parse_scheme`;
   - `SchemeError`, `ProviderError`, `OptionLimitError`, `RemoteModelError` (a stub class until US3).
