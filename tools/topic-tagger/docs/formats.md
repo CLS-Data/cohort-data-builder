@@ -49,17 +49,99 @@ description = "Physical and mental health."
 |---|---|
 | `name`, `guidance` | Required text. The guidance is the model's instructions, before the topics. |
 | `version` | Required whole number; your own label. |
-| `fallback_topic` | Required; must be a topic in the scheme. |
+| `fallback_topic` | Required; must be a topic (a leaf) in the scheme. |
 | `domains` | At least one. Each has `id`, `label`, `description` and at least one topic. |
 | `domains.topics` | Each has `id`, `label` and `description`. |
 
+### Nested form: one to three tiers
+
+Instead of `domains`, a file may list `categories`, nested up to three deep:
+
+```toml
+[[categories]]
+id = "health"
+label = "Health"
+description = "Physical and mental health."
+
+  [[categories.categories]]
+  id = "physical_health"
+  label = "Physical health"
+
+    [[categories.categories.categories]]
+    id = "respiratory"
+    label = "Respiratory conditions"
+    description = "Asthma, bronchitis, wheeze."
+
+[[categories]]
+id = "other"
+label = "Other"
+```
+
+| Field | Rules |
+|---|---|
+| `categories` | At least one, at every level where it appears. A file has `categories` or `domains`, not both. |
+| `id` | As below. |
+| `label` | Required text. |
+| `description` | Optional text (empty when missing). |
+| `categories` (inside a category) | Makes it a **group**: at least one category. Without it, the category is a **leaf**. |
+
+At most three tiers (a category inside a tier-3 category is refused); at least two leaves;
+`fallback_topic` must be a leaf. Depth may be uneven: a leaf can sit beside a group. Leaves
+are what variables are tagged with; the `domains` form is the same as two tiers.
+
 Ids are lower-case letters, digits and `_`, start with a letter, and are unique across the
-whole file, domains and topics together. Other keys (for example a code from another
+whole file, at every tier (domains and topics together, in the `domains` form). Other keys (for example a code from another
 vocabulary) are allowed but not used.
 
-The scheme's **hash** is the first 12 hex characters of SHA-256 over its parsed content, so
-any change to content (not comments or layout) changes it and makes existing tags out of
-date. Each topic's **number** is its position across the whole scheme, counting from 0.
+### `[run]`: how to classify (optional)
+
+```toml
+[run]
+provider   = "ollama-decision"   # or "ollama" (chat models)
+model      = "clef:cloud"
+method     = "tiered"            # or "flat"
+descend_at = 0.3                 # tiered: follow a group at this confidence or above
+max_follow = 3                   # tiered: most groups followed per question; 0 for no cap
+keep_at    = 0.3                 # decision models: keep a leaf at this probability or above
+```
+
+Every key is optional. Each setting comes from the command line if given, then from
+`[run]`, then from its default (`ollama`, `gpt-oss:20b`, flat for a chat model and tiered
+for a decision model, 0.5, 3, 0.3). An unknown key, or a value out of range, is refused
+when the file is loaded, as `run.<key>`. A `keep_at` here is ignored, with a note, when the
+run uses a chat model. The host's address, keys, workers, batch size, retries, timeout and
+output folder are not in `[run]`: they belong to one machine, or are secret.
+
+### `[questions]`: the wording of each question (optional)
+
+```toml
+[questions]
+flat  = "Which topic is this variable about?"
+tier1 = "Which domain of a survey is this variable about?"
+tier2 = "Which topic within {group} is this variable about?"
+tier3 = "Which subtopic within {group} is this variable about?"
+```
+
+`flat` is asked when tagging flat; `tier1` to `tier3` at each tier when tagging tiered.
+`{group}` is replaced by the label of the group whose children are offered: the scheme's
+`name` at tier 1. Keys beyond the taxonomy's depth (`tier3` in a two-tier scheme), unknown
+keys and empty questions are refused when the file is loaded. A tier with no question uses
+the built-in wording.
+
+- **Decision models** see the guidance, a blank line, then the question, as each question's
+  `instructions`. The request has no other place for background, so this is how the
+  guidance reaches them. The variable alone is the `state`.
+- **Chat models** see the line `Question: …` after the guidance, before the options. With
+  no `[questions]`, chat prompts are exactly as before.
+
+The questions are part of the hash: rewording one makes existing tags out of date.
+
+The scheme's **hash** is the first 12 hex characters of SHA-256 over its parsed content,
+leaving out `[run]`, so any change to content (not comments, layout or `[run]`) changes it
+and makes existing tags out of date. Changing a model or a threshold in `[run]` does not:
+it is how a run is made, not what the tags mean.
+
+Each topic's **number** is its position across the whole scheme, counting from 0.
 
 `topic-tagger init-scheme PATH` copies the bundled example to start from;
 `topic-tagger check-scheme PATH` lists every mistake with its location.
@@ -78,7 +160,8 @@ date. Each topic's **number** is its position across the whole scheme, counting 
 ### `tags.jsonl`
 
 ```json
-{"file": "wave1", "variable": "SMOKE", "topics": [["smoking", 0.9], ["health_general", 0.4]], "scheme": "c87a35ec8bc2", "model": "ollama:gpt-oss:20b", "tagged": "2027-01-15T08:00:00Z"}
+{"file": "wave1", "variable": "SMOKE", "topics": [["smoking", 0.9], ["health_general", 0.4]], "scheme": "c87a35ec8bc2", "model": "ollama:gpt-oss:20b", "tagged": "2027-01-15T08:00:00Z", "method": "flat"}
+{"file": "wave1", "variable": "SMOKE", "topics": [["smoking", 0.9]], "scheme": "c87a35ec8bc2", "model": "ollama-decision:clef:cloud", "tagged": "2027-01-15T08:00:00Z", "method": "tiered", "path": [["health", 0.95]]}
 ```
 
 | Field | Rules |
@@ -88,12 +171,17 @@ date. Each topic's **number** is its position across the whole scheme, counting 
 | `scheme` | The hash of the scheme the tags were made with. |
 | `model` | `provider:model`. |
 | `tagged` | ISO 8601 UTC time. |
+| `method` | `flat` or `tiered`: how the tags were made. A line without it was made by the flat method. |
+| `path` | Tiered only: the groups followed, top down, as `[group id, confidence]` (two entries per branch in a three-tier taxonomy). A flat record, from a chat or a decision model, has none. |
+
+`topics` means the same for both methods: each topic with its own confidence. In a tiered
+line it is the topic-level confidence, merged across areas (highest per topic).
 
 During a run lines are only appended, so a variable may appear more than once: the last
 line wins, and a cut-off last line is ignored. When a run ends the file is rewritten with
 one line per variable, sorted by `file` then `variable`. A variable that could not be
 tagged has no line, so the next run tries it again. A line whose `scheme` differs from the
-current scheme's hash is out of date and is redone.
+current scheme's hash, or whose `method` differs from the run's, is out of date and is redone.
 
 ### `scheme.json`
 
@@ -101,10 +189,18 @@ The scheme as used, with its hash:
 
 ```json
 {"name": "My topics", "version": 1, "hash": "c87a35ec8bc2", "guidance": "...",
- "fallback_topic": "other",
+ "fallback_topic": "other", "tiers": 2, "questions": {"tier2": "Which topic within {group}?"},
+ "categories": [{"id": "health", "label": "Health", "description": "...",
+                 "categories": [{"id": "smoking", "label": "Smoking", "description": "..."}]}],
  "domains": [{"id": "health", "label": "Health", "description": "...",
               "topics": [{"id": "smoking", "label": "Smoking", "description": "..."}]}]}
 ```
+
+`categories` is the taxonomy, nested as in the scheme file (a leaf has no `categories`);
+`tiers` is its depth; `questions` is the `[questions]` table (`{}` when there is none).
+`domains` is a two-level view kept for older readers: one entry per
+tier-1 category, with every leaf beneath it (a tier-1 leaf is a domain of itself). Folders
+written before `categories` existed are read from `domains`.
 
 ### `run.json`
 
@@ -115,9 +211,12 @@ The scheme as used, with its hash:
 
 | Field | Meaning |
 |---|---|
-| `status` | `finished` or `stopped` (Ctrl-C). |
-| `settings` | Provider, base URL, model, batch size, workers, timeout, retries, files, limit, retag, grouping field, variables path, scheme path and hash. Never an API key. |
-| `counts` | `total`, `todo`, `tagged`, `skipped` (already current), `failed`, `requests`, `retries`, `singles` (variables retried one at a time). |
+| `status` | `finished` or `stopped` (Ctrl-C, or a refusal). |
+| `stop_reason` | Only when a model refused a question for its number of options (exit 5): the message shown, naming the question. |
+| `settings` | Provider, base URL, model, `method` (`flat` or `tiered`), for tiered runs `descend_at` and `max_follow` (also written as `max_areas`, its 004 name), for decision models (`ollama-decision`) `keep_at`, batch size, workers, timeout, retries, files, limit, retag, grouping field, variables path, scheme path and hash. Never an API key. |
+| `settings_source` | Where each of `provider`, `model`, `method`, `descend_at`, `max_follow` and `keep_at` came from: `cli`, `file` (the scheme's `[run]`) or `default`. Only the settings that apply to the run are listed. |
+| `tiers` | How many tiers the taxonomy has. |
+| `counts` | `total`, `todo`, `tagged`, `skipped` (already current), `failed`, `requests`, `requests_by_tier` (index 0 is tier 1; a flat run has one entry), `retries`, `singles` (variables retried one at a time). |
 | `failed` | `file/variable` of each variable that could not be tagged. |
 | `timeline` | `[seconds, variables]`: variables tagged in each 10-second step. |
 | `stats` | The statistics below, from the records current when the run ended. |

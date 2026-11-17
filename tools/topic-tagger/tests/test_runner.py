@@ -202,3 +202,113 @@ def test_the_stop_handler_stops_then_exits(small_scheme):
     finally:
         restore()
     assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
+
+
+def tiered_answer(messages, schema):
+    """Picks "health" at tier 1 and the first listed option at tier 2, for every variable."""
+    head = messages[0]["content"].split("Rules:")[0]
+    opts = [line[2:].split(":")[0] for line in head.splitlines() if line.startswith("- ")]
+    pick = "health" if "health" in opts else opts[0]
+    rows = [json.loads(x) for x in messages[1]["content"].split("\n") if x.startswith("{")]
+    return json.dumps(
+        {
+            "variables": [
+                {"id": r["id"], "topics": [{"topic": pick, "confidence": 0.8}]} for r in rows
+            ]
+        }
+    )
+
+
+def test_a_tiered_run_walks_each_batch(tmp_path, small_scheme, variables_path, clock):
+    variables = read_variables(variables_path)
+    settings = Settings(batch_size=20, workers=2, retries=1, model="stub:test", method="tiered")
+    runner = Runner(small_scheme, StubProvider(tiered_answer), TagStore(tmp_path), settings, clock)
+    result = runner.run(variables)
+    batches = -(-len(variables) // 20)
+    assert result.tagged == len(variables) and result.failed == []
+    assert result.requests_by_tier == [batches, batches]
+    assert result.requests == 2 * batches
+    records = [json.loads(x) for x in (tmp_path / "tags.jsonl").read_text().splitlines()]
+    assert {r["topics"][0][0] for r in records} == {"smoking"}
+
+
+def test_a_tiered_run_stops_gently(tmp_path, small_scheme, variables_path, clock):
+    settings = Settings(batch_size=20, workers=1, retries=1, model="stub:test", method="tiered")
+    runner = Runner(small_scheme, StubProvider(tiered_answer), TagStore(tmp_path), settings, clock)
+    runner.request_stop()
+    result = runner.run(read_variables(variables_path))
+    assert result.stopped and result.tagged == 0 and result.failed == []
+
+
+def test_a_flat_run_counts_its_requests_as_one_tier(tmp_path, small_scheme, variables_path, clock):
+    result, _, _ = run(
+        tmp_path, small_scheme, StubProvider(answer()), read_variables(variables_path), clock
+    )
+    assert result.requests_by_tier == [result.requests]
+
+
+def test_a_flat_run_keeps_topics_from_several_areas(tmp_path, small_scheme, variables_path, clock):
+    def two_areas(messages, schema):
+        rows = [json.loads(x) for x in messages[1]["content"].split("\n") if x.startswith("{")]
+        both = [{"topic": "smoking", "confidence": 0.9}, {"topic": "age", "confidence": 0.6}]
+        return json.dumps({"variables": [{"id": r["id"], "topics": both} for r in rows]})
+
+    result, _, _ = run(
+        tmp_path, small_scheme, StubProvider(two_areas), read_variables(variables_path), clock
+    )
+    records = [json.loads(x) for x in (tmp_path / "tags.jsonl").read_text().splitlines()]
+    assert result.tagged == 60
+    assert all(r["topics"] == [["smoking", 0.9], ["age", 0.6]] for r in records)
+
+
+# --- One and three tiers (feature 005, US1) ---------------------------------------------
+
+
+def scheme_at(name):
+    from conftest import FIXTURES
+    from topic_tagger.scheme import load_scheme
+
+    return load_scheme(FIXTURES / name)
+
+
+def records_in(folder):
+    return [json.loads(x) for x in (folder / "tags.jsonl").read_text().splitlines()]
+
+
+def test_a_one_tier_taxonomy_tags_flat(tmp_path, variables_path, clock):
+    scheme = scheme_at("scheme_1tier.toml")
+    result, records, _ = run(
+        tmp_path,
+        scheme,
+        StubProvider(answer("housing", 0.7)),
+        read_variables(variables_path),
+        clock,
+    )
+    assert result.tagged == 60
+    assert all(r["topics"] == [["housing", 0.7]] for r in records)
+
+
+def test_a_three_tier_taxonomy_tags_flat_with_leaves(tmp_path, variables_path, clock):
+    scheme = scheme_at("scheme_3tier.toml")
+    result, records, _ = run(
+        tmp_path,
+        scheme,
+        StubProvider(answer("cardiac", 0.6)),
+        read_variables(variables_path),
+        clock,
+    )
+    assert result.tagged == 60 and all(r["topics"][0][0] == "cardiac" for r in records)
+
+
+def test_a_three_tier_taxonomy_tags_tiered_down_to_its_leaves(tmp_path, variables_path, clock):
+    scheme = scheme_at("scheme_3tier.toml")
+    variables = read_variables(variables_path)
+    settings = Settings(batch_size=20, workers=2, retries=1, model="stub:test", method="tiered")
+    runner = Runner(scheme, StubProvider(tiered_answer), TagStore(tmp_path), settings, clock)
+    result = runner.run(variables)
+    batches = -(-len(variables) // 20)
+    assert result.tagged == 60 and result.failed == []
+    assert result.requests_by_tier == [batches, batches, batches]
+    for r in records_in(tmp_path):
+        assert r["method"] == "tiered" and r["topics"] == [["respiratory", 0.8]]
+        assert r["path"] == [["health", 0.8], ["physical_health", 0.8]]

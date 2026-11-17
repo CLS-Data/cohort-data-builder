@@ -103,3 +103,26 @@ def test_the_error_names_what_was_wrong(small_scheme):
         parse_reply(reply((0, [("smoking", 0.9), ("vaping", 0.8)])), small_scheme, 1)
     assert "'vaping'" in str(err.value)
     assert "variables.0.topics.1.topic" in str(err.value)
+
+
+def test_options_reply_accepts_only_the_options_given():
+    from topic_tagger.reply import parse_options_reply
+
+    order = {"smoking": 0, "alcohol": 1}.__getitem__
+    text = reply((0, [("alcohol", 0.5), ("smoking", 0.5)]), (1, [("smoking", 0.8)]))
+    assert parse_options_reply(text, ["smoking", "alcohol"], 2, order) == {
+        0: [("smoking", 0.5), ("alcohol", 0.5)],  # tie: given order
+        1: [("smoking", 0.8)],
+    }
+    with pytest.raises(ReplyError):
+        parse_options_reply(reply((0, [("age", 0.9)])), ["smoking", "alcohol"], 1, order)
+
+
+def test_areas_can_be_the_options():
+    from topic_tagger.reply import parse_options_reply
+
+    order = {"health": 0, "demographics": 1}.__getitem__
+    text = reply((0, [("demographics", 0.7), ("health", 0.2)]))
+    assert parse_options_reply(text, ["health", "demographics"], 1, order) == {
+        0: [("demographics", 0.7), ("health", 0.2)]
+    }

@@ -160,6 +160,24 @@ uv run topic-tagger check-scheme my-scheme.toml     # lists every mistake, with 
 uv run topic-tagger tag variables.jsonl --out tags/ --scheme my-scheme.toml --dry-run
 ```
 
+A valid scheme is summarised with the size of every question it leads to:
+
+```text
+CLOSER topics (version 1): 2 tiers, hash 3c9f6b4b4ef9
+  tier 1: 15 categories (15 groups)
+  tier 2: 107 categories (107 leaves)
+  107 leaves; fallback: other
+  largest question, flat: 107 options (every leaf)
+  largest question, tier 1: 16 options (15 groups and the fallback exit)
+  largest question, tier 2: 23 options (in physical_health, "Physical health")
+```
+
+Compare the largest question with what your model accepts. A decision model has its own
+limit on options per question, which the tool cannot look up (`clef:cloud` answered all
+107 topics of this scheme flat when tested). If a model does refuse a question, the run
+stops with exit 5 and says which one (see [With a decision model](#with-a-decision-model-clef)).
+A scheme with a `[run]` table also shows its settings.
+
 The file looks like this:
 
 ```toml
@@ -191,6 +209,45 @@ description = "..."
 - Ids are what gets stored: rename one only if you mean to retag.
 - Keep as many scheme files as you like and choose one per run with `--scheme`.
 
+**One, two or three tiers.** The `domains`/`topics` form above is a two-tier taxonomy. Any
+taxonomy of one to three tiers can instead be written with nested `[[categories]]`:
+
+```toml
+[[categories]]                       # tier 1
+id = "health"
+label = "Health"
+description = "Physical and mental health."
+
+  [[categories.categories]]          # tier 2: a group…
+  id = "physical_health"
+  label = "Physical health"
+
+    [[categories.categories.categories]]   # tier 3
+    id = "respiratory"
+    label = "Respiratory conditions"
+
+  [[categories.categories]]          # …and a leaf beside it: depth may be uneven
+  id = "smoking"
+  label = "Smoking"
+
+[[categories]]                       # a tier-1 leaf
+id = "other"
+label = "Other"
+```
+
+- A category with nothing under it is a **leaf**: what variables are tagged with. A
+  category with categories under it is a **group**. A one-tier taxonomy is a plain list
+  of `[[categories]]`.
+- Descriptions are optional here, but the model reads them, so write them where a label
+  is not enough.
+- At most three tiers, at least two leaves, and `fallback_topic` must be a leaf. A file
+  uses `categories` or `domains`, not both.
+- In the report and statistics, an **area** is a tier-1 category, with every leaf beneath
+  it; a tier-1 leaf is an area of its own.
+- Two worked examples come with the tool, in `src/topic_tagger/schemes/`:
+  `example-1-tier.toml` (a flat list) and `example-3-tier.toml` (uneven, with
+  `[questions]` and `[run]`). Copy one to start from.
+
 **Exit codes**
 
 | Code | Meaning |
@@ -200,6 +257,7 @@ description = "..."
 | 2 | Bad input, scheme or options; nothing was sent. |
 | 3 | The host could not be reached or the model is not installed; nothing was sent. |
 | 4 | Another run is using the output folder, or one left its lock (see `--force`). |
+| 5 | The model refused a question because it offers too many options; what was tagged is saved. |
 | 130 | Stopped with Ctrl-C; what was tagged is saved. |
 
 **Privacy.** Only variable metadata (names, labels, value labels) is sent, never study
@@ -207,6 +265,140 @@ data. With a local model it never leaves your machine. A model on another machin
 Ollama `-cloud` model (which runs on Ollama's servers even through your local Ollama),
 sends that metadata off your machine: the tool says so and asks first, unless you pass
 `--yes`.
+
+## Tiered tagging
+
+By default each request lists every topic in the scheme (`--method flat`). With
+`--method tiered` the tool works down the taxonomy instead:
+
+1. **Areas first.** One request per batch asks which areas (the scheme's domains) each
+   variable belongs to. Each area is shown with its topics' labels, so the model can see
+   where, say, "Pregnancy" lives.
+2. **Then topics within each area.** For each area followed, one request asks the
+   variables routed there which of that area's topics apply. Only that area's topics are
+   listed.
+
+An area is followed when its confidence is at least `--descend-at` (0.5), at most
+`--max-follow` of them (3; 0 for no cap; `--max-areas` is its older name and still
+works). The strongest area is always followed, so no variable stops at the first tier.
+
+In a three-tier taxonomy the same happens once more: within each tier-2 group followed,
+one request asks which of its children apply, by the same rules. A leaf can sit beside
+groups at any tier; it is chosen like a group and kept as a tag. A one-tier taxonomy is
+always tagged flat (the tool says so), since the two would ask the same question.
+
+The scheme's fallback topic (`other` in the bundled scheme) is not inside an area when
+tagging tiered. It is offered at the first tier, beside the areas, as a way out for a
+variable the model cannot place. It is chosen like an area (at `--descend-at`, or if it is
+the strongest option), and it is kept only if no followed area gives the variable a
+topic. A stored tag keeps its topic-level confidence, so it means the same as a flat tag.
+
+A batch takes 1 + (the number of different areas followed) requests instead of 1, but each
+request is short. Failed requests are retried as in flat runs, per area. A variable keeps
+the tags from the areas that answered, and fails only if it ends with none.
+`--dry-run --method tiered` prints the tier-1 request, then one example at each tier below,
+following the first group down (`--- tier 2 example (Health) ---`).
+
+### With a decision model (Clef)
+
+[Clef](https://ollama.com/library/clef) is a decision model: it does not write replies but
+answers typed questions about one thing with probabilities. To use it:
+
+```sh
+ollama --version          # 0.40.6 or later
+ollama signin             # clef:cloud runs in Ollama's cloud: a plan or credits
+ollama pull clef:cloud    # or `ollama pull clef` for the 18–20 GB local model
+uv run topic-tagger tag variables.jsonl --out tags/ --scheme my-scheme.toml \
+  --provider ollama-decision --model clef:cloud
+```
+
+For each variable and tier, Clef is asked one choice question. Its instructions are the
+scheme's guidance, then the question: by default "Which areas of a survey is this variable
+about? If more than one applies, share the probability between them.", then "Which
+topics…" within each area followed, or your own (see
+[Wording each question](#wording-each-question)). Each option is described by its label
+and description, and an area also by its topics. Clef gives every
+option a probability, and these sum to about 1. The probability is the confidence.
+
+Areas are followed as above. Topics are kept at `--keep-at` (0.3) or above, and the
+strongest is always kept. Because the probabilities are shared out between the options,
+a variable rarely has two areas or topics above 0.5. Lower `--descend-at` and `--keep-at`
+(0.3 lets up to three through) so a variable can be tagged from several areas.
+
+A decision model tags tiered by default. With `--method flat` it is asked one choice
+question per variable, offering every leaf at once.
+
+**Option limits are the model's.** How many options one question may offer depends on the
+model, and the tool does not check it. Ollama's documentation once gave 26, but
+`clef:cloud` answered all 107 topics of the bundled scheme in one flat question when tested
+(November 2026); tagged tiered, it is never asked more than 23 at once. When a model
+refuses a question for having too many options, the run stops at once, exit code 5, with
+a message naming the question, its number of options and the model's own words:
+
+```text
+The model clef:cloud refused a question with 107 options (every topic, asked flat):
+  HTTP 400: <the host's message>
+Tag tiered (--method tiered) so each question offers fewer options, or use a model that
+takes more options. Tags made so far are saved; a run with the same scheme and method
+carries on from them.
+```
+
+Nothing is retried and no variable is marked failed for it, because the same question would
+be refused again. Other errors (a timeout, a bad reply) are retried as usual.
+
+Clef is asked one variable at a time: 1 request, plus 1 per area followed. A cohort of
+30,000 variables is therefore 60,000 requests or more. Clef's cloud tag is
+billed per input token, so try `--limit` first. A model ending `:cloud` (or `-cloud`) runs
+off this machine, so the tool asks before sending unless you pass `--yes`.
+`--dry-run` prints the first variable's request bodies: one flat, or one per tier.
+
+## Settings in the scheme file
+
+A scheme file can say how it should be run, so that one file reproduces a classification:
+
+```toml
+[run]
+provider   = "ollama-decision"
+model      = "clef:cloud"
+method     = "tiered"
+descend_at = 0.3
+max_follow = 3
+keep_at    = 0.3
+```
+
+Every key is optional. For each setting, the command line wins, then `[run]`, then the
+default, so `--method flat` tries a different method for one run without editing the file.
+`run.json` records where each setting came from (`settings_source`), and the end-of-run
+summary names what was used, for example
+`Method: tiered with ollama-decision:clef:cloud, 2 tiers`.
+
+- A bad value is refused before anything is sent, naming it: `run.descend_at: must be
+  between 0 and 1`.
+- `keep_at` applies to decision models only. In the file, it is ignored with a note when
+  the run uses a chat model, so one file can serve both. `--keep-at` with a chat model is
+  still an error.
+- Changing `[run]` does not make existing tags out of date (the hash leaves it out).
+  Changing the method does, because each tag records the method that made it.
+- The host's address, keys, workers, batch size, retries and timeout stay on the command
+  line: they belong to one machine, or are secret.
+
+## Wording each question
+
+A `[questions]` table words the question asked at each tier, and the flat one:
+
+```toml
+[questions]
+tier1 = "Which domain of a survey is this variable about?"
+tier2 = "Which topic within {group} is this variable about?"
+```
+
+`{group}` is replaced by the label of the group being asked about (the scheme's name at
+tier 1). Keys are `flat` and `tier1` up to the scheme's depth; a tier with no question uses
+the built-in wording. This matters most for decision models, which see only the question
+and the options: their `instructions` are the scheme's guidance, a blank line, then the
+question. Chat models get the question as a `Question: …` line before the options. The
+questions are part of the scheme's hash, so changing one redoes the tags; see
+[docs/formats.md](docs/formats.md).
 
 ## Every option
 
@@ -224,9 +416,13 @@ options, with their defaults.
 |---|---|---|
 | `--scheme FILE` | required | The topics and instructions. |
 | `--group-by FIELD` | `sweep` | Input field the statistics are grouped by. |
-| `--provider NAME` | `ollama` | The model host. |
+| `--provider NAME` | `ollama`* | The model host: `ollama` for chat models, `ollama-decision` for decision models such as Clef. |
 | `--base-url URL` | `http://localhost:11434/v1` | Where the host's API is; also `TOPIC_TAGGER_BASE_URL`. |
-| `--model NAME` | `gpt-oss:20b` | Model name on the host. |
+| `--model NAME` | `gpt-oss:20b`* | Model name on the host. |
+| `--method flat\|tiered` | `flat`* | `flat`: every topic in one request. `tiered`: one tier at a time, top down. See [Tiered tagging](#tiered-tagging). Defaults to `tiered` with `ollama-decision`. |
+| `--descend-at X` | 0.5* | Tiered: follow a group at this confidence or above. |
+| `--max-follow N` | 3* | Tiered: follow at most N groups per question; 0 for no cap. `--max-areas` still works. |
+| `--keep-at X` | 0.3* | Decision models: keep a topic at this probability or above; 0 keeps every topic. The strongest is always kept. |
 | `--batch-size N` | 20 | Variables per request. |
 | `--workers N` | 2 | Requests in flight at once. |
 | `--timeout S` | 120 | Seconds before a request is abandoned and retried. |
@@ -234,13 +430,31 @@ options, with their defaults.
 | `--files A,B` | all | Tag only these data files. |
 | `--limit N` | all | Tag at most N variables. |
 | `--retag` | off | Redo variables that already have current tags. |
-| `--dry-run` | off | Print the instructions and the first batch; send nothing. |
+| `--dry-run` | off | Print the first request at every tier (one when flat); send nothing. |
 | `--yes` | off | Do not ask before sending to a remote model. |
 | `--plain` | off | Plain progress lines instead of the live view (automatic without a terminal). |
 | `--force` | off | Clear a lock left by a run that ended without cleaning up. |
 
+\* Or the scheme's `[run]` table: see [Settings in the scheme file](#settings-in-the-scheme-file).
+
 A host that needs an API key reads it from `TOPIC_TAGGER_API_KEY`, never from an option,
 so it is not in your shell history or in `run.json`.
+
+## Demonstrating every feature
+
+`scripts/demo.py` runs the tool through every feature on a few of the fictional test
+variables, and checks what each run wrote. It covers one to three tiers, chat and decision
+models, flat and tiered tagging, refusals, `[run]`, `[questions]`, the hash, and carrying
+on after a stop:
+
+```sh
+uv run python scripts/demo.py --offline     # checks and dry runs only; no model needed
+uv run python scripts/demo.py --yes         # every step: 20 steps, through the local Ollama
+```
+
+Models default to `gpt-oss:20b-cloud` and `clef:cloud` (`--chat-model`,
+`--decision-model`). `--only TEXT` runs the matching steps, and `--variables N` sets how
+many variables each run tags (6). Each run's folder is kept, with `demo-summary.json`.
 
 ## Adding a model host
 

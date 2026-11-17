@@ -28,7 +28,13 @@ class StaleLockError(Exception):
 
 
 def make_record(
-    var: Variable, topics: list[tuple[str, float]], scheme_hash: str, model: str, now: float
+    var: Variable,
+    topics: list[tuple[str, float]],
+    scheme_hash: str,
+    model: str,
+    now: float,
+    method: str = "flat",
+    path: list[tuple[str, float]] | None = None,
 ) -> dict:
     """One line of ``tags.jsonl``.
 
@@ -38,15 +44,21 @@ def make_record(
         scheme_hash: The hash of the scheme the tags were made with.
         model: ``provider:model``, or ``rule``.
         now: The time, in seconds since the epoch.
+        method: ``flat`` or ``tiered``: how the tags were made.
+        path: Tiered: the areas followed, with their confidence.
     """
-    return {
+    record = {
         "file": var.file,
         "variable": var.variable,
         "topics": [[t, c] for t, c in topics],
         "scheme": scheme_hash,
         "model": model,
         "tagged": datetime.fromtimestamp(now, UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "method": method,
     }
+    if path is not None:
+        record["path"] = [[a, c] for a, c in path]
+    return record
 
 
 class TagStore:
@@ -88,12 +100,16 @@ class TagStore:
                     continue  # cut off by a crash; that variable is simply tagged again
                 self.records[_key(r["file"], r["variable"])] = r
 
-    def state(self, key: str, scheme_hash: str) -> str:
-        """``missing``, ``stale`` (made with another scheme) or ``current``."""
+    def state(self, key: str, scheme_hash: str, method: str = "flat") -> str:
+        """``missing``, ``stale`` (made with another scheme or method) or ``current``.
+
+        A record without a ``method`` was made before methods existed, so by the flat one.
+        """
         r = self.records.get(key.lower())
         if r is None:
             return "missing"
-        return "current" if r["scheme"] == scheme_hash else "stale"
+        same = r["scheme"] == scheme_hash and r.get("method", "flat") == method
+        return "current" if same else "stale"
 
     def compact(self) -> None:
         """Rewrite ``tags.jsonl`` with one line per variable, sorted by file and variable.

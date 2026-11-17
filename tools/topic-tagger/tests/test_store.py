@@ -26,7 +26,37 @@ def test_make_record_has_the_documented_fields(clock):
         "scheme": "abc123abc123",
         "model": "ollama:m",
         "tagged": "2027-01-15T08:00:00Z",
+        "method": "flat",
     }
+
+
+def test_a_tiered_record_carries_its_path(clock):
+    var = Variable("alpha", "A01", "x")
+    rec = make_record(
+        var, [("smoking", 0.9)], "h", "m", clock.now(), method="tiered", path=[("health", 0.8)]
+    )
+    assert rec["method"] == "tiered" and rec["path"] == [["health", 0.8]]
+
+
+def test_tags_made_another_way_are_stale(tmp_path, clock):
+    store = TagStore(tmp_path)
+    store.append(
+        [
+            make_record(Variable("f", "a"), [("age", 0.5)], "h", "m", clock.now()),
+            make_record(Variable("f", "b"), [("age", 0.5)], "h", "m", clock.now(), method="tiered"),
+        ]
+    )
+    # a record written before methods existed counts as flat
+    old = {"file": "f", "variable": "c", "topics": [["age", 0.5]], "scheme": "h", "model": "m"}
+    with (tmp_path / "tags.jsonl").open("a") as f:
+        f.write(json.dumps({**old, "tagged": "x"}) + "\n")
+    fresh = TagStore(tmp_path)
+    fresh.load()
+    assert fresh.state("f/a", "h") == "current"
+    assert fresh.state("f/a", "h", "tiered") == "stale"
+    assert fresh.state("f/b", "h", "tiered") == "current"
+    assert fresh.state("f/b", "h") == "stale"
+    assert fresh.state("f/c", "h", "flat") == "current"
 
 
 def test_append_writes_one_line_per_record_at_once(tmp_path, clock):

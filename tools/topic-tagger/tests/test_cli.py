@@ -264,7 +264,8 @@ def test_check_scheme_needs_a_file(capsys):
 def test_check_scheme_summarises_a_scheme(bundled_scheme_path, capsys):
     assert main(["check-scheme", str(bundled_scheme_path)]) == 0
     out = capsys.readouterr().out
-    assert "15 domains, 107 topics" in out and "hash" in out
+    assert "2 tiers, hash 3c9f6b4b4ef9" in out  # unchanged from 004
+    assert "  tier 1: 15 categories (15 groups)" in out and "  107 leaves; fallback: other" in out
 
 
 def test_check_scheme_lists_every_mistake(tmp_path, small_scheme_path, capsys):
@@ -417,3 +418,486 @@ def test_report_rebuilds_and_can_regroup(tmp_path, variables_path, capsys):
 def test_report_needs_a_finished_folder(tmp_path, capsys):
     assert main(["report", str(tmp_path)]) == 2
     assert "run.json" in capsys.readouterr().err
+
+
+# --- Tiered tagging (feature 004) ---------------------------------------------------
+
+
+def test_method_defaults_to_flat_and_tiered_tags_every_variable(tmp_path, variables_path):
+    from test_runner import tiered_answer
+
+    stub = StubProvider(answer("smoking", 0.7))
+    assert tag(variables_path, tmp_path / "flat", stub) == 0
+    assert len(stub.calls) == 3  # 60 variables, batches of 20, one request each
+    stub = StubProvider(tiered_answer)
+    assert tag(variables_path, tmp_path / "tiered", stub, "--method", "tiered") == 0
+    assert len(records(tmp_path / "tiered")) == 60
+    assert len(stub.calls) == 6  # tier 1 and one area per batch
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ("--method", "tiered", "--descend-at", "1.5"),
+        ("--method", "tiered", "--max-areas", "-1"),
+        ("--descend-at", "0.5"),
+        ("--max-areas", "2"),
+    ],
+)
+def test_tiered_settings_are_checked(tmp_path, variables_path, capsys, extra):
+    stub = StubProvider(answer())
+    assert tag(variables_path, tmp_path / "out", stub, *extra) == 2
+    assert stub.calls == []
+    assert capsys.readouterr().err
+
+
+def test_max_areas_zero_means_no_cap(tmp_path, variables_path):
+    from test_runner import tiered_answer
+
+    stub = StubProvider(tiered_answer)
+    assert tag(variables_path, tmp_path / "o", stub, "--method", "tiered", "--max-areas", "0") == 0
+
+
+def test_tiered_dry_run_prints_tier_1_and_a_tier_2_example(tmp_path, variables_path, capsys):
+    stub = StubProvider(answer(), check_error=ProviderError("not running"))
+    assert tag(variables_path, tmp_path / "out", stub, "--method", "tiered", "--dry-run") == 0
+    out = capsys.readouterr().out
+    tier1, tier2 = out.split("--- tier 2 example (Demographics) ---")
+    assert "- demographics: Demographics" in tier1 and "Includes: Age" in tier1
+    assert "- age: Age" in tier2 and "- smoking:" not in tier2
+    assert '"name": "A01AGE"' in tier1 and '"name": "A01AGE"' in tier2
+    assert stub.calls == [] and stub.checked == 0
+
+
+def test_help_lists_the_tiered_options(capsys):
+    with pytest.raises(SystemExit):
+        main(["tag", "--help"])
+    out = capsys.readouterr().out
+    for opt in ("--method", "--descend-at", "--max-areas"):
+        assert opt in out
+
+
+class DecisionStub:
+    """A stand-in decision host for CLI runs: every option gets ``probability``."""
+
+    def __init__(self, probability=lambda state, o: 0.6, remote=False):
+        self.probability = probability
+        self.remote = remote
+        self.calls = []
+
+    def check(self):
+        pass
+
+    def is_remote(self):
+        return self.remote
+
+    def decide(self, state, instructions, options):
+        self.calls.append((state, options))
+        return {o: self.probability(state, o) for o in options}
+
+
+def clef(*extra):
+    return ("--provider", "ollama-decision", "--model", "clef:cloud", *extra)
+
+
+def test_clef_tags_tiered_by_default(tmp_path, variables_path):
+    stub = DecisionStub()
+    assert tag(variables_path, tmp_path / "o", stub, *clef()) == 0
+    recs = records(tmp_path / "o")
+    assert len(recs) == 60 and all(r["topics"] and r["method"] == "tiered" for r in recs)
+    asked = {tuple(o) for _, o in stub.calls}
+    assert ("demographics", "health", "survey", "other") in asked
+    assert ("smoking", "alcohol", "physical_health") in asked
+    assert run_json(tmp_path / "o")["settings"]["method"] == "tiered"
+
+
+def test_a_chat_model_flat_still_uses_the_flat_prompt(tmp_path, variables_path):
+    stub = StubProvider(answer("smoking", 0.7))
+    assert tag(variables_path, tmp_path / "o", stub, "--method", "flat") == 0
+    assert "smoking: Smoking — Tobacco use." in stub.calls[0][0][0]["content"]
+
+
+def test_keep_at_needs_the_decision_provider(tmp_path, variables_path, capsys):
+    stub = StubProvider(answer())
+    assert tag(variables_path, tmp_path / "o", stub, "--keep-at", "0.2") == 2
+    assert "--keep-at" in capsys.readouterr().err and stub.calls == []
+
+
+def test_keep_at_reaches_the_decider(tmp_path, variables_path):
+    probs = {"health": 0.9, "smoking": 0.7, "alcohol": 0.25}
+    stub = DecisionStub(lambda state, o: probs.get(o, 0.01))
+    tag(variables_path, tmp_path / "a", stub, *clef("--keep-at", "0.2"))
+    assert [t for t, _ in records(tmp_path / "a")[0]["topics"]] == ["smoking", "alcohol"]
+    tag(variables_path, tmp_path / "b", stub, *clef())
+    assert [t for t, _ in records(tmp_path / "b")[0]["topics"]] == ["smoking"]
+
+
+def test_a_cloud_decision_model_asks_before_sending(tmp_path, variables_path, capsys):
+    argv = [
+        "tag",
+        str(variables_path),
+        "--out",
+        str(tmp_path / "o"),
+        "--scheme",
+        SMALL,
+        *clef(),
+    ]
+    assert main(argv) == 2  # the real provider: clef:cloud is remote; no --yes, no terminal
+    assert "leave this machine" in capsys.readouterr().err
+
+
+def test_decision_dry_run_prints_the_request_bodies(tmp_path, variables_path, capsys):
+    stub = DecisionStub()
+    assert tag(variables_path, tmp_path / "o", stub, *clef("--dry-run")) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("--- tier 1 ---\n")
+    first, second = out.removeprefix("--- tier 1 ---\n").split(
+        "--- tier 2 example (Demographics) ---"
+    )
+    tier1, tier2 = json.loads(first), json.loads(second)
+    assert tier1["model"] == "clef:cloud" and tier1["state"]["name"] == "PID"
+    question = tier1["questions"]["option"]
+    assert question["type"] == "choice"
+    assert list(question["criteria"]) == ["demographics", "health", "survey", "other"]
+    assert list(tier2["questions"]["option"]["criteria"]) == ["age", "gender"]
+    assert stub.calls == []
+
+
+def run_json(out):
+    return json.loads((out / "run.json").read_text())
+
+
+def test_a_tiered_run_records_its_method_paths_and_requests_by_tier(
+    tmp_path, variables_path, capsys
+):
+    from test_runner import tiered_answer
+
+    out = tmp_path / "o"
+    assert tag(variables_path, out, StubProvider(tiered_answer), "--method", "tiered") == 0
+    run = run_json(out)
+    assert run["settings"]["method"] == "tiered"
+    assert run["settings"]["descend_at"] == 0.5 and run["settings"]["max_areas"] == 3
+    assert run["counts"]["requests_by_tier"] == [3, 3]
+    for r in records(out):
+        assert r["method"] == "tiered" and r["path"] == [["health", 0.8]]
+    text = capsys.readouterr().out
+    assert "Requests by tier: 1: 3, 2: 3" in text
+    assert "Groups followed per variable: 1.0" in text
+
+
+def test_a_flat_run_records_one_tier(tmp_path, variables_path, capsys):
+    out = tmp_path / "o"
+    assert tag(variables_path, out, StubProvider(answer("smoking", 0.7))) == 0
+    run = run_json(out)
+    assert run["settings"]["method"] == "flat" and "descend_at" not in run["settings"]
+    assert run["counts"]["requests_by_tier"] == [run["counts"]["requests"]]
+    assert all(r["method"] == "flat" and "path" not in r for r in records(out))
+    assert "Requests by tier" not in capsys.readouterr().out
+
+
+def test_a_clef_run_records_keep_at(tmp_path, variables_path):
+    tag(variables_path, tmp_path / "o", DecisionStub(), *clef())
+    assert run_json(tmp_path / "o")["settings"]["keep_at"] == 0.3
+
+
+def test_switching_method_redoes_every_variable(tmp_path, variables_path, capsys):
+    from test_runner import tiered_answer
+
+    out = tmp_path / "o"
+    tag(variables_path, out, StubProvider(answer("smoking", 0.7)))
+    stub = StubProvider(tiered_answer)
+    tag(variables_path, out, stub, "--method", "tiered")
+    assert run_json(out)["counts"]["todo"] == 60 and stub.calls
+    capsys.readouterr()
+    stub = StubProvider(tiered_answer)
+    tag(variables_path, out, stub, "--method", "tiered")
+    assert "60 already tagged, 0 to do" in capsys.readouterr().err and not stub.calls
+
+
+# --- Reports and statistics for one and three tiers (feature 005, US1) ------------------
+
+
+@pytest.mark.parametrize(
+    ("name", "method", "expect"),
+    [("scheme_1tier.toml", "flat", "Housing"), ("scheme_3tier.toml", "tiered", "Health")],
+)
+def test_a_run_with_one_or_three_tiers_writes_its_report(
+    tmp_path, variables_path, name, method, expect
+):
+    from test_runner import tiered_answer
+
+    out = tmp_path / "o"
+    stub = StubProvider(answer("housing", 0.7) if method == "flat" else tiered_answer)
+    code = tag(variables_path, out, stub, "--scheme", str(FIXTURES / name), "--method", method)
+    assert code == 0
+    assert expect in (out / "report.html").read_text()
+    assert main(["report", str(out)]) == 0
+
+
+# --- Decision models flat; refusals stop the run (feature 005, US2) ---------------------
+
+import threading  # noqa: E402
+
+from topic_tagger.providers import OptionLimitError  # noqa: E402
+
+
+def test_a_decision_model_tags_flat(tmp_path, variables_path):
+    stub = DecisionStub(lambda state, o: 0.9 if o == "smoking" else 0.01)
+    out = tmp_path / "o"
+    assert tag(variables_path, out, stub, *clef("--method", "flat")) == 0
+    recs = records(out)
+    assert len(recs) == 60
+    assert all(r["method"] == "flat" and "path" not in r for r in recs)
+    assert all(r["topics"] == [["smoking", 0.9]] for r in recs)
+    assert len(stub.calls) == 60 and all(len(o) == 8 for _, o in stub.calls)
+    run = run_json(out)
+    assert run["settings"]["method"] == "flat" and run["counts"]["requests"] == 60
+
+
+class RefusingStub(DecisionStub):
+    """Refuses questions with more than ``limit`` options; ``hold`` names variables whose
+    answers wait until a refusal has been sent, so they are in flight beside it."""
+
+    def __init__(self, limit, probability=lambda state, o: 0.6, hold=()):
+        super().__init__(probability)
+        self.limit = limit
+        self.hold = set(hold)
+        self.refused = threading.Event()
+        self.held = threading.Event()
+
+    def decide(self, state, instructions, options):
+        if len(options) > self.limit:
+            if self.hold:
+                self.held.wait(5)  # refuse only once the held batch is really in flight
+            self.calls.append((state, options))
+            self.refused.set()
+            raise OptionLimitError(400, "too many options for choice question", len(options))
+        if state["name"] in self.hold:
+            self.held.set()
+            self.refused.wait(5)
+        return super().decide(state, instructions, options)
+
+
+def test_a_refusal_stops_a_flat_run_with_exit_5(tmp_path, variables_path, capsys):
+    out = tmp_path / "o"
+    stub = RefusingStub(limit=5)
+    assert tag(variables_path, out, stub, *clef("--method", "flat", "--workers", "1")) == 5
+    err = capsys.readouterr().err
+    assert "The model clef:cloud refused a question with 8 options" in err
+    assert "(every topic, asked flat)" in err
+    assert "HTTP 400: too many options for choice question" in err
+    assert "Tag tiered" in err
+    run = run_json(out)
+    assert "refused a question with 8 options" in run["stop_reason"]
+    assert run["counts"]["failed"] == 0 and run["counts"]["retries"] == 0
+    assert len(stub.calls) == 1
+
+
+def six_in_health(tmp_path):
+    topics = "".join(
+        f'\n  [[domains.topics]]\n  id = "h{i}"\n  label = "H{i}"\n  description = "H{i}."\n'
+        for i in range(6)
+    )
+    path = tmp_path / "six.toml"
+    path.write_text(
+        'name = "Six"\nversion = 1\nfallback_topic = "other"\nguidance = "G"\n\n'
+        '[[domains]]\nid = "demographics"\nlabel = "Demographics"\ndescription = "Who."\n'
+        '\n  [[domains.topics]]\n  id = "age"\n  label = "Age"\n  description = "Age."\n'
+        '\n  [[domains.topics]]\n  id = "gender"\n  label = "Gender"\n  description = "Sex."\n'
+        '\n[[domains]]\nid = "health"\nlabel = "Health"\ndescription = "Health."\n'
+        + topics
+        + '\n[[domains]]\nid = "misc"\nlabel = "Misc"\ndescription = "Misc."\n'
+        '\n  [[domains.topics]]\n  id = "other"\n  label = "Other"\n  description = "None."\n'
+    )
+    return path
+
+
+def test_a_refusal_at_a_group_stops_the_run_and_keeps_what_was_tagged(
+    tmp_path, variables_path, capsys
+):
+    from topic_tagger.variables import read_variables
+
+    names = [v.variable for v in read_variables(variables_path)]
+    first, second = names[:2], names[2:4]  # batches 1 and 2, sent together
+
+    def prob(state, option):
+        if state["name"] in first:  # the first batch goes to health: 6 options, refused
+            return 0.9 if option in ("health", "h0") else 0.01
+        return 0.9 if option in ("demographics", "age") else 0.01
+
+    out = tmp_path / "o"
+    scheme = str(six_in_health(tmp_path))
+    stub = RefusingStub(limit=5, probability=prob, hold=second)
+    opts = ("--scheme", scheme, "--workers", "2", "--batch-size", "2")
+    assert tag(variables_path, out, stub, *clef(*opts)) == 5
+    assert 'the categories in group health, "Health", tier 1' in capsys.readouterr().err
+    stored = {r["variable"] for r in records(out)}
+    assert stored == set(second)  # in flight beside the refusal: kept; nothing new started
+
+    # The same scheme with a model that takes more options carries on from there.
+    more = DecisionStub(prob)
+    assert tag(variables_path, out, more, *clef(*opts)) == 0
+    assert {s["name"] for s, _ in more.calls}.isdisjoint(second)
+    assert len(records(out)) == 60
+
+
+def test_tiered_with_one_tier_tags_flat_and_says_so(tmp_path, variables_path, capsys):
+    out = tmp_path / "o"
+    scheme = str(FIXTURES / "scheme_1tier.toml")
+    stub = StubProvider(answer("housing", 0.7))
+    assert tag(variables_path, out, stub, "--scheme", scheme, "--method", "tiered") == 0
+    assert "This taxonomy has one tier: tagging flat." in capsys.readouterr().err
+    assert all(r["method"] == "flat" for r in records(out))
+    assert run_json(out)["settings"]["method"] == "flat"
+
+
+# --- The scheme's [run] table controls the run (feature 005, US3) -----------------------
+
+RUN = str(FIXTURES / "scheme_run.toml")
+
+
+def test_the_run_table_sets_the_run_and_its_sources_are_recorded(tmp_path, variables_path, capsys):
+    out = tmp_path / "o"
+    assert tag(variables_path, out, DecisionStub(), "--scheme", RUN) == 0
+    run = run_json(out)
+    s = run["settings"]
+    assert s["provider"] == "ollama-decision" and s["model"] == "fake-decision"
+    assert s["method"] == "tiered" and s["descend_at"] == 0.3
+    assert s["max_follow"] == 2 and s["max_areas"] == 2 and s["keep_at"] == 0.2
+    assert run["settings_source"] == {
+        "provider": "file",
+        "model": "file",
+        "method": "file",
+        "descend_at": "file",
+        "max_follow": "file",
+        "keep_at": "file",
+    }
+    assert run["tiers"] == 2
+    text = capsys.readouterr().out
+    assert "Method: tiered with ollama-decision:fake-decision, 2 tiers" in text
+    assert "Requests by tier: 1: " in text
+
+
+def test_the_command_line_overrides_the_run_table(tmp_path, variables_path):
+    out = tmp_path / "o"
+    assert tag(variables_path, out, DecisionStub(), "--scheme", RUN, "--method", "flat") == 0
+    run = run_json(out)
+    assert run["settings"]["method"] == "flat" and run["settings_source"]["method"] == "cli"
+    assert run["settings_source"]["model"] == "file"
+
+
+def test_max_areas_is_still_accepted_for_max_follow(tmp_path, variables_path):
+    out = tmp_path / "o"
+    assert tag(variables_path, out, DecisionStub(), "--scheme", RUN, "--max-areas", "1") == 0
+    assert run_json(out)["settings"]["max_follow"] == 1
+    assert run_json(out)["settings_source"]["max_follow"] == "cli"
+
+
+def test_a_bad_run_value_exits_2_naming_it(tmp_path, variables_path, capsys):
+    path = tmp_path / "bad.toml"
+    path.write_text(
+        (FIXTURES / "scheme_run.toml").read_text().replace("descend_at = 0.3", "descend_at = 1.5")
+    )
+    stub = DecisionStub()
+    assert tag(variables_path, tmp_path / "o", stub, "--scheme", str(path)) == 2
+    err = capsys.readouterr().err
+    assert "run.descend_at" in err and "bad.toml" in err and stub.calls == []
+
+
+def test_a_flat_chat_run_says_what_it_used(tmp_path, variables_path, capsys):
+    assert tag(variables_path, tmp_path / "o", StubProvider(answer("smoking", 0.7))) == 0
+    assert "Method: flat with ollama:gpt-oss:20b, 2 tiers" in capsys.readouterr().out
+
+
+# --- The guidance and questions reach the model (feature 005, US4) ----------------------
+
+
+class InstructionStub(DecisionStub):
+    def __init__(self):
+        super().__init__()
+        self.instructions = []
+
+    def decide(self, state, instructions, options):
+        self.instructions.append(instructions)
+        return super().decide(state, instructions, options)
+
+
+def test_a_decision_run_sends_the_guidance_and_the_files_questions(tmp_path, variables_path):
+    stub = InstructionStub()
+    assert tag(variables_path, tmp_path / "o", stub, "--scheme", RUN, "--limit", "3") == 0
+    assert all(
+        i.startswith("Tag each variable with the topics it measures.\n\n")
+        for i in stub.instructions
+    )
+    assert any(i.endswith("Which topic within Health?") for i in stub.instructions)
+
+
+# --- What each run will ask (feature 005, US5) ------------------------------------------
+
+THREE = str(FIXTURES / "scheme_3tier.toml")
+
+
+def test_check_scheme_reports_tiers_and_the_largest_question_at_each(capsys):
+    assert main(["check-scheme", THREE]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith("Three tiers (version 1): 3 tiers, hash ")
+    assert lines[1:] == [
+        "  tier 1: 3 categories (2 groups, 1 leaf)",
+        "  tier 2: 5 categories (2 groups, 3 leaves)",
+        "  tier 3: 5 categories (5 leaves)",
+        "  9 leaves; fallback: other",
+        "  largest question, flat: 9 options (every leaf)",
+        "  largest question, tier 1: 3 options (2 groups and the fallback exit)",
+        '  largest question, tier 2: 3 options (in health, "Health")',
+        '  largest question, tier 3: 3 options (in physical_health, "Physical health")',
+    ]
+
+
+def test_check_scheme_prints_the_files_run_settings(capsys):
+    assert main(["check-scheme", RUN]) == 0
+    out = capsys.readouterr().out
+    assert (
+        "  run settings: provider ollama-decision, model fake-decision, method tiered, "
+        "descend_at 0.3, max_follow 2, keep_at 0.2 (from the file)"
+    ) in out
+
+
+def test_a_decision_dry_run_prints_every_tier(tmp_path, variables_path, capsys):
+    stub = DecisionStub()
+    assert tag(variables_path, tmp_path / "o", stub, *clef("--scheme", THREE, "--dry-run")) == 0
+    out = capsys.readouterr().out
+    heads = [
+        "--- tier 1 ---",
+        "--- tier 2 example (Health) ---",
+        "--- tier 3 example (Physical health) ---",
+    ]
+    assert [line for line in out.splitlines() if line.startswith("---")] == heads
+    bodies = [json.loads(part) for part in re.split(r"^--- .* ---$", out, flags=re.M)[1:]]
+    criteria = [list(b["questions"]["option"]["criteria"]) for b in bodies]
+    assert criteria == [
+        ["health", "demographics", "other"],
+        ["physical_health", "mental_health", "smoking"],
+        ["respiratory", "cardiac", "diabetes"],
+    ]
+    assert stub.calls == []
+
+
+def test_a_chat_dry_run_prints_every_tier(tmp_path, variables_path, capsys):
+    stub = StubProvider(answer())
+    opts = ("--scheme", THREE, "--method", "tiered", "--dry-run")
+    assert tag(variables_path, tmp_path / "o", stub, *opts) == 0
+    out = capsys.readouterr().out
+    assert out.count("Options. Use only these ids:") == 3
+    assert "--- tier 3 example (Physical health) ---" in out and stub.calls == []
+
+
+@pytest.mark.parametrize("decision", [True, False])
+def test_a_flat_dry_run_prints_one_request(tmp_path, variables_path, capsys, decision):
+    stub = DecisionStub() if decision else StubProvider(answer())
+    opts = ("--scheme", THREE, "--method", "flat", "--dry-run")
+    assert tag(variables_path, tmp_path / "o", stub, *(clef(*opts) if decision else opts)) == 0
+    out = capsys.readouterr().out
+    assert "--- tier" not in out
+    if decision:
+        assert len(json.loads(out)["questions"]["option"]["criteria"]) == 9
+    assert stub.calls == []

@@ -27,3 +27,6 @@ test-results/
 
 # Supplied metadata: never committed (no study data in the repository)
 /CLS_studies_metadata.csv
+
+# Ad hoc development work and local data: never committed
+/adhoc/

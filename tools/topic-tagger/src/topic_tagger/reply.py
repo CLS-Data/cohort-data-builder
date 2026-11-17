@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from functools import lru_cache
 from typing import Literal
 
@@ -47,9 +48,22 @@ def output_parser(scheme: Scheme) -> PydanticOutputParser:
     return _parser(tuple(scheme.topic_ids))
 
 
-@lru_cache(maxsize=8)
+@lru_cache(maxsize=64)
 def _parser(topic_ids: tuple[str, ...]) -> PydanticOutputParser:
     return PydanticOutputParser(pydantic_object=_model(topic_ids))
+
+
+def options_parser(option_ids: Sequence[str]) -> PydanticOutputParser:
+    """LangChain's parser for a reply whose ``topic`` may only be one of ``option_ids``.
+
+    Used for one tier of tiered tagging, where the options are a node's children.
+    """
+    return _parser(tuple(option_ids))
+
+
+def options_schema(option_ids: Sequence[str]) -> dict:
+    """The JSON schema of a reply limited to ``option_ids``."""
+    return _model(tuple(option_ids)).model_json_schema()
 
 
 def parse_reply(text: str, scheme: Scheme, batch_size: int) -> dict[int, list[tuple[str, float]]]:
@@ -69,8 +83,28 @@ def parse_reply(text: str, scheme: Scheme, batch_size: int) -> dict[int, list[tu
         ReplyError: If the reply is not valid JSON, names a topic outside the scheme, gives
             a confidence outside 0–1, or an id outside the batch.
     """
+    return parse_options_reply(text, scheme.topic_ids, batch_size, scheme.topic_number)
+
+
+def parse_options_reply(
+    text: str, option_ids: Sequence[str], batch_size: int, order: Callable[[str], int]
+) -> dict[int, list[tuple[str, float]]]:
+    """Check a reply whose topics may only be ``option_ids``, and return each variable's.
+
+    Args:
+        text: The reply's text.
+        option_ids: The ids the reply may use (a scheme's topics, or a node's children).
+        batch_size: How many variables were sent; ids must be below it.
+        order: Gives each option's position, to break ties between equal confidences.
+
+    Returns:
+        As ``parse_reply``.
+
+    Raises:
+        ReplyError: As ``parse_reply``, for ids outside ``option_ids``.
+    """
     try:
-        reply = output_parser(scheme).parse(text)
+        reply = options_parser(option_ids).parse(text)
     except OutputParserException as e:
         cause = e.__cause__
         if isinstance(cause, ValidationError):
@@ -90,5 +124,5 @@ def parse_reply(text: str, scheme: Scheme, batch_size: int) -> dict[int, list[tu
         for t in v.topics:
             best[t.topic] = max(best.get(t.topic, 0.0), round(t.confidence, 2))
         if best:
-            tags[v.id] = sorted(best.items(), key=lambda kv: (-kv[1], scheme.topic_number(kv[0])))
+            tags[v.id] = sorted(best.items(), key=lambda kv: (-kv[1], order(kv[0])))
     return tags

@@ -14,16 +14,25 @@ from rich.console import Console
 
 from topic_tagger.clock import SystemClock
 from topic_tagger.display import RunView
-from topic_tagger.prompt import build_messages
+from topic_tagger.prompt import build_messages, build_option_messages
 from topic_tagger.providers import Provider, ProviderError, get_provider
 from topic_tagger.report import render_report
+from topic_tagger.run_settings import DECISION, KEYS, resolve
 from topic_tagger.runner import Runner, Settings, install_stop_handler
 from topic_tagger.scheme import SchemeError, bundled_scheme_text, load_scheme, scheme_from_json
 from topic_tagger.stats import compute_stats
 from topic_tagger.store import LockedError, StaleLockError, TagStore
+from topic_tagger.tiered import (
+    DecisionDecider,
+    build_tree,
+    decision_request,
+    flat_tree,
+    question_sizes,
+    refusal_message,
+)
 from topic_tagger.variables import InputError, read_variables
 
-OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED, STOPPED = 0, 1, 2, 3, 4, 130
+OK, SOME_FAILED, BAD_INPUT, NO_HOST, LOCKED, REFUSED, STOPPED = 0, 1, 2, 3, 4, 5, 130
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 SUMMARY_TOP = 10  # files or groups listed in the end-of-run summary
 
@@ -81,13 +90,44 @@ def _parser() -> argparse.ArgumentParser:
     tag.add_argument(
         "--group-by", default="sweep", help="input field the statistics are grouped by"
     )
-    tag.add_argument("--provider", default="ollama", help="the model host")
+    tag.add_argument(
+        "--provider",
+        choices=["ollama", "ollama-decision"],
+        help="the model host: ollama (chat models) or ollama-decision (decision models, "
+        "e.g. --model clef:cloud); default ollama, or the scheme's [run] provider",
+    )
     tag.add_argument(
         "--base-url",
         default=os.environ.get("TOPIC_TAGGER_BASE_URL", DEFAULT_BASE_URL),
         help="where the host's API is (also TOPIC_TAGGER_BASE_URL)",
     )
-    tag.add_argument("--model", default="gpt-oss:20b", help="model name on the host")
+    tag.add_argument(
+        "--model", help="model name on the host (default gpt-oss:20b, or the scheme's [run])"
+    )
+    tag.add_argument(
+        "--method",
+        choices=["flat", "tiered"],
+        help="flat: every topic in one request; tiered: one tier at a time, top down "
+        "(default flat; tiered for ollama-decision; or the scheme's [run])",
+    )
+    tag.add_argument(
+        "--descend-at",
+        type=float,
+        help="tiered: follow a group at this confidence or above (default 0.5)",
+    )
+    tag.add_argument(
+        "--keep-at",
+        type=float,
+        help="decision models (--provider ollama-decision): keep a topic at this probability "
+        "or above; 0 keeps every topic (default 0.3)",
+    )
+    tag.add_argument(
+        "--max-follow",
+        "--max-areas",
+        dest="max_follow",
+        type=int,
+        help="tiered: follow at most this many groups per question; 0 for no cap (default 3)",
+    )
     tag.add_argument("--batch-size", type=int, default=20, help="variables per request")
     tag.add_argument("--workers", type=int, default=2, help="requests in flight at once")
     tag.add_argument(
@@ -131,17 +171,23 @@ def _err(message: str) -> None:
 
 def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
     try:
-        variables = read_variables(args.variables)
         scheme = load_scheme(args.scheme)
+    except SchemeError as e:
+        _err(str(e))
+        return BAD_INPUT
+    problem = _settle(args, scheme)
+    if problem:
+        _err(problem)
+        return BAD_INPUT
+    try:
+        variables = read_variables(args.variables)
         provider = factory(args)
-    except (InputError, SchemeError, ProviderError) as e:
+    except (InputError, ProviderError) as e:
         _err(str(e))
         return BAD_INPUT
 
     if args.dry_run:
-        batch = variables[: args.batch_size]
-        system, user = build_messages(scheme, batch)
-        print(system["content"], user["content"], sep="\n\n---\n\n")
+        _print_requests(args, scheme, variables)
         return OK
 
     store = TagStore(args.out)
@@ -156,13 +202,90 @@ def _tag(args: argparse.Namespace, factory, clock, runner_created) -> int:
         store.unlock()
 
 
+def _settle(args: argparse.Namespace, scheme) -> str | None:
+    """Settle the run's settings: the command line, then the scheme's ``[run]``, then defaults.
+
+    Sets each setting on ``args``, with ``args.settings_source`` saying where it came from,
+    and prints any notes. The file's values were checked when it was loaded.
+
+    Returns:
+        What is wrong with the command-line values, or None.
+    """
+    given = {key: getattr(args, key) for key in KEYS}
+    for key in ("descend_at", "keep_at"):
+        if given[key] is not None and not 0 <= given[key] <= 1:
+            return f"--{key.replace('_', '-')} must be between 0 and 1"
+    if given["max_follow"] is not None and given["max_follow"] < 0:
+        return "--max-follow must be 0 (no cap) or more"
+    settled = resolve(given, scheme.run)
+    values, sources = settled.values, settled.sources
+    if given["keep_at"] is not None and values["provider"] != DECISION:
+        return "--keep-at needs --provider ollama-decision"
+    tiered_options = [k for k in ("descend_at", "max_follow") if sources[k] == "cli"]
+    if values["method"] == "flat" and tiered_options:
+        return "--descend-at and --max-follow need --method tiered"
+    for note in settled.notes:
+        _err(note)
+    if values["method"] == "tiered" and scheme.tiers == 1:
+        _err("This taxonomy has one tier: tagging flat.")
+        values["method"] = "flat"
+    if values["method"] == "flat":  # the tiered settings do not apply, so are not recorded
+        for key in ("descend_at", "max_follow"):
+            sources.pop(key)
+    for key, value in settled.values.items():
+        setattr(args, key, value)
+    args.settings_source = settled.sources
+    return None
+
+
+def _print_requests(args, scheme, variables) -> None:
+    """Print what the run would send first, at every tier, without sending anything.
+
+    Flat: one request. Tiered: the tier-1 request, then one example at each tier below,
+    following the first group down to the leaves. A decision model's requests are
+    ``/v1/systemone`` bodies for the first variable; a chat model's are the messages for the
+    first batch.
+    """
+    decision = args.provider == DECISION
+    batch = variables[: args.batch_size]
+
+    def show(node) -> None:
+        if decision:
+            body = decision_request(args.model, node, variables[0], scheme.guidance)
+            print(json.dumps(body, indent=1))
+        else:
+            system, user = build_option_messages(scheme.guidance, node, batch)
+            print(system["content"], user["content"], sep="\n\n---\n\n")
+
+    if args.method == "flat":
+        if decision:
+            show(flat_tree(scheme))
+        else:
+            system, user = build_messages(scheme, batch)
+            print(system["content"], user["content"], sep="\n\n---\n\n")
+        return
+    node, tier = build_tree(scheme), 1
+    print("--- tier 1 ---")
+    while True:
+        show(node)
+        node = next((c for c in node.children if not c.is_leaf), None)
+        if node is None:
+            return
+        tier += 1
+        print(f"\n--- tier {tier} example ({node.label}) ---")
+
+
 def _run(args, variables, scheme, provider, store, clock, runner_created) -> int:
     store.load()
     chosen = variables
     if args.files:
         wanted = {f.strip() for f in args.files.split(",")}
         chosen = [v for v in chosen if v.file in wanted]
-    todo = [v for v in chosen if args.retag or store.state(v.key, scheme.hash) != "current"]
+
+    def current(v) -> bool:
+        return store.state(v.key, scheme.hash, args.method) == "current"
+
+    todo = [v for v in chosen if args.retag or not current(v)]
     skipped = len(chosen) - len(todo)
     if args.limit is not None:
         todo = todo[: args.limit]
@@ -184,9 +307,17 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
         workers=args.workers,
         retries=args.retries,
         model=f"{args.provider}:{args.model}",
+        method=args.method,
+        descend_at=args.descend_at,
+        max_follow=args.max_follow,
     )
     view = RunView(len(variables), len(todo), scheme, clock)
-    runner = Runner(scheme, provider, store, settings, clock, on_event=view.on_event)
+    decider = None
+    if args.provider == "ollama-decision":
+        decider = DecisionDecider(provider, keep_at=args.keep_at, guidance=scheme.guidance)
+    runner = Runner(
+        scheme, provider, store, settings, clock, on_event=view.on_event, decider=decider
+    )
     if runner_created:
         runner_created(runner)
     started = clock.now()
@@ -213,13 +344,21 @@ def _run(args, variables, scheme, provider, store, clock, runner_created) -> int
         f"Tagged {result.tagged} of {len(todo)} variables in "
         f"{result.requests} requests; {len(result.failed)} failed."
     )
+    tiers = f"{scheme.tiers} tier" + ("s" if scheme.tiers > 1 else "")
+    print(f"Method: {args.method} with {args.provider}:{args.model}, {tiers}")
     print(_summary(run, stats, scheme, store.folder))
-    if result.stopped:
+    if args.method == "tiered":
+        print(_tier_lines(result))
+    if result.refusal is not None:
+        _err(refusal_message(args.model, result.refusal))
+    elif result.stopped:
         _err("Stopped. Run the same command again to carry on.")
     if result.failed:
         _err("Could not tag:\n  " + "\n  ".join(result.failed))
         if result.last_error:
             _err(f"Last error: {result.last_error}")
+    if result.refusal is not None:
+        return REFUSED
     if result.stopped:
         return STOPPED
     return SOME_FAILED if result.failed else OK
@@ -240,6 +379,17 @@ def _run_record(args, scheme, started, ended, result, total, todo, skipped) -> d
             "provider": args.provider,
             "base_url": args.base_url,
             "model": args.model,
+            "method": args.method,
+            **(
+                {
+                    "descend_at": args.descend_at,
+                    "max_follow": args.max_follow,
+                    "max_areas": args.max_follow,  # its 004 name, for readers that know it
+                }
+                if args.method == "tiered"
+                else {}
+            ),
+            **({"keep_at": args.keep_at} if args.provider == "ollama-decision" else {}),
             "batch_size": args.batch_size,
             "workers": args.workers,
             "timeout": args.timeout,
@@ -259,10 +409,18 @@ def _run_record(args, scheme, started, ended, result, total, todo, skipped) -> d
             "skipped": skipped,
             "failed": len(result.failed),
             "requests": result.requests,
+            "requests_by_tier": result.requests_by_tier or [result.requests],
             "retries": result.retries,
             "singles": result.singles,
         },
+        "settings_source": args.settings_source,
+        "tiers": scheme.tiers,
         "failed": result.failed,
+        **(
+            {"stop_reason": refusal_message(args.model, result.refusal)}
+            if result.refusal is not None
+            else {}
+        ),
     }
 
 
@@ -274,6 +432,13 @@ def _save(folder: Path, run: dict, records, variables, scheme, group_by: str) ->
     text = json.dumps({**run, "stats": stats}, ensure_ascii=False, indent=1)
     (folder / "run.json").write_text(text + "\n", encoding="utf-8")
     return stats
+
+
+def _tier_lines(result) -> str:
+    """Requests per tier and groups followed per variable, for a tiered run's summary."""
+    tiers = ", ".join(f"{i}: {n}" for i, n in enumerate(result.requests_by_tier, 1))
+    mean = result.groups_followed / result.tagged if result.tagged else 0
+    return f"Requests by tier: {tiers or 'none'}\nGroups followed per variable: {mean:.1f}"
 
 
 def _summary(run: dict, stats: dict, scheme, folder: Path) -> str:
@@ -352,11 +517,50 @@ def _check_scheme(path: Path) -> int:
     except SchemeError as e:
         _err(str(e))
         return BAD_INPUT
-    print(
-        f"{scheme.name} (version {scheme.version}): {len(scheme.domains)} domains, "
-        f"{len(scheme.topic_ids)} topics, hash {scheme.hash}"
-    )
+    for line in _scheme_lines(scheme):
+        print(line)
     return OK
+
+
+def _scheme_lines(scheme) -> list[str]:
+    """What ``check-scheme`` prints: tiers, sizes and the largest question at each tier."""
+
+    def count(n: int, one: str, many: str) -> str:
+        return f"{n} {one if n == 1 else many}"
+
+    tiers = count(scheme.tiers, "tier", "tiers")
+    lines = [f"{scheme.name} (version {scheme.version}): {tiers}, hash {scheme.hash}"]
+    level = list(scheme.root.children)
+    for tier in range(1, scheme.tiers + 1):
+        groups = sum(not c.is_leaf for c in level)
+        leaves = len(level) - groups
+        parts = [count(groups, "group", "groups")] if groups else []
+        parts += [count(leaves, "leaf", "leaves")] if leaves else []
+        lines.append(
+            f"  tier {tier}: {count(len(level), 'category', 'categories')} ({', '.join(parts)})"
+        )
+        level = [k for c in level for k in c.children]
+    leaves = len(scheme.topic_ids)
+    lines.append(f"  {count(leaves, 'leaf', 'leaves')}; fallback: {scheme.fallback_topic}")
+    lines.append(f"  largest question, flat: {leaves} options (every leaf)")
+    # A one-tier taxonomy is always tagged flat, so only the flat question is asked.
+    sizes = question_sizes(build_tree(scheme)) if scheme.tiers > 1 else {}
+    for tier, (n, node) in sorted(sizes.items()):
+        if tier == 1:
+            groups = sum(not c.is_leaf for c in node.children)
+            leaves = len(node.children) - groups - 1
+            parts = [count(groups, "group", "groups")] if groups else []
+            parts += [count(leaves, "leaf", "leaves")] if leaves else []
+            where = f"{', '.join(parts)} and the fallback exit" if parts else "the fallback exit"
+        else:
+            where = f'in {node.id}, "{node.label}"'
+        lines.append(f"  largest question, tier {tier}: {n} options ({where})")
+    if scheme.run is not None:
+        given = {k: v for k, v in vars(scheme.run).items() if v is not None}
+        if given:
+            settings = ", ".join(f"{k} {v}" for k, v in given.items())
+            lines.append(f"  run settings: {settings} (from the file)")
+    return lines
 
 
 def _init_scheme(path: Path) -> int:
