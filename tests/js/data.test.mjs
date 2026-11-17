@@ -49,3 +49,23 @@ test("a failed load throws with the URL and HTTP status", async () => {
     /data\/datasets\.json.*404/,
   );
 });
+
+test("a network failure is passed on to the caller", async () => {
+  const offline = async () => {
+    throw new TypeError("Failed to fetch");
+  };
+  await assert.rejects(loadCatalogue(offline), /Failed to fetch/);
+});
+
+test("a missing file is reported with its URL and status", async () => {
+  await assert.rejects(loadCohort(fixtureFetch(), "nosuch"), /data\/nosuch\/.*HTTP 404/);
+});
+
+test("a file that is not JSON is reported, not returned", async () => {
+  const garbled = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => JSON.parse("<html>"),
+  });
+  await assert.rejects(loadCatalogue(garbled), SyntaxError);
+});

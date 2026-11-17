@@ -293,3 +293,20 @@ test("Stata value labels are defined per column", () => {
   assert.ok(d.includes("label values tenure5 tenure5"));
   assert.ok(!d.includes("label define weight10"));
 });
+
+test("an empty selection still gives a project with the identifier only", () => {
+  const p = build({}, []);
+  assert.equal(p.name, PROJECT);
+  assert.ok(p.files.length > 0);
+  const rows = file(p, "codebook.csv").trim().split("\n");
+  assert.equal(rows.length, 2, "header and the identifier row only");
+  assert.match(rows[1], /PID/);
+});
+
+test("no languages chosen gives no code files", () => {
+  const p = build({ languages: [] });
+  assert.ok(
+    !p.files.some(([path]) => /\.(R|py|do)$/.test(path)),
+    p.files.map(([f]) => f).join("\n"),
+  );
+});

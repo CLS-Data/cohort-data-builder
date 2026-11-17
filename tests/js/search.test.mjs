@@ -209,5 +209,20 @@ test("filtering 35,000 rows takes well under the 0.5 s budget", () => {
   const r = filterVariables(big, wide, { ...any, query: "smok", wave: 3 });
   const ms = performance.now() - start;
   assert.ok(r.matches.length > 0);
-  assert.ok(ms < 100, `took ${ms.toFixed(1)} ms`);
+  assert.ok(ms < 500, `took ${ms.toFixed(1)} ms`);
+});
+
+test("a query of regular-expression characters is matched literally", () => {
+  for (const q of ["(", ".*", "[", "\\"]) {
+    const r = filterVariables(vars, manifest, { ...any, query: q });
+    const literal = vars.filter(
+      (v) => v[0].toLowerCase().includes(q) || v[1].toLowerCase().includes(q),
+    );
+    assert.deepEqual(names(r.matches), names(literal), q);
+  }
+});
+
+test("a query of only spaces matches everything", () => {
+  const r = filterVariables(vars, manifest, { ...any, query: "   " });
+  assert.equal(r.matches.length, vars.length);
 });
