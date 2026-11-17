@@ -13,6 +13,10 @@ specific to one machine.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from topic_tagger.scheme import Scheme
 
 #: The providers a ``[run]`` table may name.
 PROVIDERS = ("ollama", "ollama-decision")
@@ -102,6 +106,47 @@ def resolve(cli: dict, file: RunSettings | None) -> Resolved:
         if cli.get("keep_at") is None and file.keep_at is not None:
             notes.append("keep_at in the scheme applies to decision models only; ignored.")
     return Resolved(values, sources, notes)
+
+
+def settle(given: dict, scheme: Scheme, label: str = "cli") -> Resolved:
+    """Settle a run's settings and check them, as the command line and the API both do.
+
+    Each setting is the one given, else the scheme's ``[run]``, else the default
+    (``resolve``). Then the given values are checked, and a one-tier taxonomy asked to tag
+    tiered tags flat instead. Messages name the command-line options (``--keep-at``); the
+    API's keyword arguments have the same names with underscores.
+
+    Args:
+        given: ``{setting: value or None}`` with every key in ``KEYS``.
+        scheme: The loaded scheme; its ``[run]`` and number of tiers are used.
+        label: The source recorded for a given setting: ``cli`` or ``call``.
+
+    Returns:
+        The values, their sources and any notes to show the user.
+
+    Raises:
+        ValueError: If a given value is out of range or does not fit the others.
+    """
+    for key in ("descend_at", "keep_at"):
+        if given.get(key) is not None and not 0 <= given[key] <= 1:
+            raise ValueError(f"--{key.replace('_', '-')} must be between 0 and 1")
+    if given.get("max_follow") is not None and given["max_follow"] < 0:
+        raise ValueError("--max-follow must be 0 (no cap) or more")
+    settled = resolve(given, scheme.run)
+    values, sources = settled.values, settled.sources
+    if given.get("keep_at") is not None and values["provider"] != DECISION:
+        raise ValueError("--keep-at needs --provider ollama-decision")
+    tiered_options = [k for k in ("descend_at", "max_follow") if sources[k] == "cli"]
+    if values["method"] == "flat" and tiered_options:
+        raise ValueError("--descend-at and --max-follow need --method tiered")
+    if values["method"] == "tiered" and scheme.tiers == 1:
+        settled.notes.append("This taxonomy has one tier: tagging flat.")
+        values["method"] = "flat"
+    if values["method"] == "flat":  # the tiered settings do not apply, so are not recorded
+        for key in ("descend_at", "max_follow"):
+            sources.pop(key)
+    settled.sources = {k: (label if v == "cli" else v) for k, v in sources.items()}
+    return settled
 
 
 def validate_run(raw, problem) -> RunSettings | None:

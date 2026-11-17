@@ -13,16 +13,24 @@ import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from topic_tagger.prompt import build_messages, reply_schema
 from topic_tagger.providers import OptionLimitError, Provider, ProviderError
 from topic_tagger.reply import ReplyError, parse_reply
 from topic_tagger.scheme import Scheme
-from topic_tagger.store import TagStore, make_record
+from topic_tagger.store import make_record
 from topic_tagger.tiered import ChatDecider, Decider, build_tree, flat_tree, walk
 from topic_tagger.variables import Variable
 
 Tags = list[tuple[str, float]]
+
+
+class RecordSink(Protocol):
+    """Where a run's records go: a ``TagStore`` for the command line, memory for the API."""
+
+    def append(self, records: list[dict]) -> None:
+        """Keep these records (lines of ``tags.jsonl``)."""
 
 
 @dataclass
@@ -97,7 +105,7 @@ class Runner:
         self,
         scheme: Scheme,
         provider: Provider,
-        store: TagStore,
+        store: RecordSink,
         settings: Settings,
         clock,
         on_event: Callable[[str, dict], None] = lambda kind, data: None,

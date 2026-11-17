@@ -28,13 +28,13 @@ contracts/api.md and quickstart.md.
 
 ## Phase 1: Setup
 
-- [ ] T001 Add provider-object fakes to `tests/conftest.py`, with a docstring each:
+- [x] T001 Add provider-object fakes to `tests/conftest.py`, with a docstring each:
   - `FakeDecisionModel(probability=None, remote=False, refuse_over=None)`:
     - methods `check()`, `is_remote()` and `decide(state, instructions, options)`;
     - `probability(state, option) -> float` defaults to 0.9 for the first option and shares the rest equally;
     - `refuse_over=n` raises `OptionLimitError(400, "too many options", len(options))` when more than `n` options are offered;
     - it records `calls` (each `(state, instructions, options)`) and `checks` (a count).
-  - `FakeChatModel(...)`: a `StubProvider` subclass with `is_remote()` taking a `remote` flag and counting `checks`.
+  - `FakeChatModel(...)`: not needed. `StubProvider` already has `remote` and counts `checked`; the `fake_chat` fixture is `StubProvider(first_option)`, a reply that depends only on the request. Both fakes count host checks in `checked`.
   - Pytest fixtures `fake_decision` and `fake_chat`.
 
   No production code changes in this task.
@@ -45,12 +45,12 @@ contracts/api.md and quickstart.md.
 
 **Purpose**: move the logic the API needs out of the CLI, with no change in behaviour (research R2, R4, R5; data-model "Internal changes").
 
-- [ ] T002 [P] Write failing tests in `tests/test_scheme.py`:
+- [x] T002 [P] Write failing tests in `tests/test_scheme.py`:
   1. `parse_scheme(text)` on the text of `closer.toml`, `scheme_small.toml` and `scheme_3tier.toml` gives the same `hash` as `load_scheme` on the file (`closer.toml`: `"3c9f6b4b4ef9"`), and an equal `root`.
   2. `parse_scheme("name = 1")` raises `SchemeError` whose message starts with `<text>`. `parse_scheme(bad, source="mine.toml")` starts with `mine.toml`.
   3. `parse_scheme("not toml [")` raises `SchemeError` containing `not valid TOML`.
   4. `load_scheme` accepts a `str` path as well as a `Path`.
-- [ ] T003 [P] Write failing tests in `tests/test_run_settings.py` for `settle(given, scheme, label="cli")`:
+- [x] T003 [P] Write failing tests in `tests/test_run_settings.py` for `settle(given, scheme, label="cli")`:
   1. It returns `Resolved` with the same values and sources as `resolve`, with sources labelled `label` instead of `cli` (try `label="call"`).
   2. It raises `ValueError` with the CLI's exact wording:
      - `--descend-at must be between 0 and 1` for `descend_at=1.5`;
@@ -61,14 +61,14 @@ contracts/api.md and quickstart.md.
   3. With `scheme_1tier.toml` and `method="tiered"`, `values["method"] == "flat"` and `notes` contains `This taxonomy has one tier: tagging flat.`
   4. With flat, `descend_at` and `max_follow` are dropped from `sources`.
   5. The file `keep_at` note from `resolve` is still in `notes`.
-- [ ] T004 [P] Write failing tests in `tests/test_variables.py`: `variable_from_dict` accepts a valid `variables.jsonl` line as a dict, giving the same `Variable` that `read_variables` gives for that line. It raises `ValueError` with the same messages for a missing `file`, an empty `variable`, and bad `values`.
-- [ ] T005 Run T002–T004 and see them fail. Commit as `test(tagger): parse_scheme, settle and variable_from_dict`.
-- [ ] T006 [P] In `src/topic_tagger/scheme.py`, add `parse_scheme(text: str, source: str = "<text>") -> Scheme`:
+- [x] T004 [P] Write failing tests in `tests/test_variables.py`: `variable_from_dict` accepts a valid `variables.jsonl` line as a dict, giving the same `Variable` that `read_variables` gives for that line. It raises `ValueError` with the same messages for a missing `file`, an empty `variable`, and bad `values`.
+- [x] T005 Run T002–T004 and see them fail. Commit as `test(tagger): parse_scheme, settle and variable_from_dict`.
+- [x] T006 [P] In `src/topic_tagger/scheme.py`, add `parse_scheme(text: str, source: str = "<text>") -> Scheme`:
   - it holds the TOML parsing, validation, hash and `Scheme` construction now in `load_scheme`;
   - error messages start with `source`.
 
   `load_scheme(path)` reads the file (keeping its `cannot read` error) and calls `parse_scheme(text, str(path))`. Docstrings on both.
-- [ ] T007 [P] In `src/topic_tagger/run_settings.py`, add `settle(given: dict, scheme: Scheme, label: str = "cli") -> Resolved`. It moves the following from `cli._settle`, unchanged:
+- [x] T007 [P] In `src/topic_tagger/run_settings.py`, add `settle(given: dict, scheme: Scheme, label: str = "cli") -> Resolved`. It moves the following from `cli._settle`, unchanged:
   - the range checks;
   - the `--keep-at` check;
   - the tiered-options check;
@@ -77,8 +77,8 @@ contracts/api.md and quickstart.md.
   - dropping `descend_at`/`max_follow` sources when flat.
 
   It renames the `cli` source to `label`. It raises `ValueError(message)`. Avoid a circular import: import `Scheme` only under `TYPE_CHECKING`.
-- [ ] T008 [P] In `src/topic_tagger/variables.py`, rename `_parse`'s dict half to a public `variable_from_dict(data: dict) -> Variable`. `_parse` keeps the JSON decoding and calls it. Docstring.
-- [ ] T009 In `src/topic_tagger/cli.py`, make `_settle` call `run_settings.settle(given, scheme)`:
+- [x] T008 [P] In `src/topic_tagger/variables.py`, rename `_parse`'s dict half to a public `variable_from_dict(data: dict) -> Variable`. `_parse` keeps the JSON decoding and calls it. Docstring.
+- [x] T009 In `src/topic_tagger/cli.py`, make `_settle` call `run_settings.settle(given, scheme)`:
   - print each note with `_err`;
   - return the `ValueError`'s message as the problem;
   - set `args` from the values and `args.settings_source` from the sources, as now.

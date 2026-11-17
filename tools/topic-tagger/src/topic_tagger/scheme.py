@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import tomllib
 from dataclasses import dataclass, field
@@ -278,7 +279,7 @@ def bundled_scheme_text() -> str:
     return (resources.files("topic_tagger") / "schemes" / "closer.toml").read_text(encoding="utf-8")
 
 
-def load_scheme(path: Path) -> Scheme:
+def load_scheme(path: str | os.PathLike) -> Scheme:
     """Load a scheme file.
 
     Args:
@@ -288,18 +289,36 @@ def load_scheme(path: Path) -> Scheme:
         The scheme.
 
     Raises:
-        SchemeError: If the file cannot be read or parsed.
+        SchemeError: If the file cannot be read or parsed, or breaks a rule.
     """
     try:
         text = Path(path).read_text(encoding="utf-8")
-        raw = tomllib.loads(text)
     except OSError as e:
         raise SchemeError(f"cannot read {path}: {e.strerror}") from e
+    return parse_scheme(text, str(path))
+
+
+def parse_scheme(text: str, source: str = "<text>") -> Scheme:
+    """Load a scheme from its TOML text, with the same checks and hash as a file.
+
+    Args:
+        text: The scheme, as TOML.
+        source: What to call it in error messages: a path, or ``<text>``.
+
+    Returns:
+        The scheme.
+
+    Raises:
+        SchemeError: If the text is not TOML or breaks a rule; the message starts with
+            ``source``.
+    """
+    try:
+        raw = tomllib.loads(text)
     except tomllib.TOMLDecodeError as e:
-        raise SchemeError(f"{path}: not valid TOML: {e}") from e
+        raise SchemeError(f"{source}: not valid TOML: {e}") from e
     problems = validate(raw)
     if problems:
-        raise SchemeError(f"{path} has {len(problems)} problem(s):", problems)
+        raise SchemeError(f"{source} has {len(problems)} problem(s):", problems)
 
     # The hash is over the parsed content, so comments and layout do not change it. It leaves
     # out [run]: a model or threshold is how a run is made, not what the tags mean, so
