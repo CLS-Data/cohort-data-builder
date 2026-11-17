@@ -402,3 +402,40 @@ def test_the_api_never_prints_prompts_exits_or_opens_files():
     source = Path(topic_tagger.api.__file__).read_text(encoding="utf-8")
     for call in ("print(", "input(", "sys.exit", "open("):
         assert call not in source, call
+
+
+# --- US4: reuse one tagger ----------------------------------------------------------------
+
+
+def test_one_tagger_checks_the_host_once(scheme_run_path, fake_decision):
+    from topic_tagger import Tagger
+
+    t = Tagger(scheme_run_path, provider=fake_decision)
+    t.tag(["a", "b"])
+    t.tag(["c"])
+    t.classify("d")
+    assert fake_decision.checked == 1
+
+
+def test_one_tagger_gives_what_separate_calls_give(scheme_run_path):
+    from conftest import FakeDecisionModel
+    from topic_tagger import Tagger, tag
+
+    def probability(state, option):
+        return (len(state["label"]) * 7 + len(option)) % 10 / 10 + 0.05
+
+    t = Tagger(scheme_run_path, provider=FakeDecisionModel(probability))
+    reused = [t.tag(["Do you smoke?", "Age"]), t.tag(["Weight in kg"])]
+    separate = [
+        tag(["Do you smoke?", "Age"], scheme_run_path, provider=FakeDecisionModel(probability)),
+        tag(["Weight in kg"], scheme_run_path, provider=FakeDecisionModel(probability)),
+    ]
+    for a, b in zip(reused, separate, strict=True):
+        assert [(r.tags, r.path) for r in a] == [(r.tags, r.path) for r in b]
+
+
+def test_check_false_never_checks(scheme_run_path, fake_decision):
+    from topic_tagger import Tagger
+
+    Tagger(scheme_run_path, provider=fake_decision, check=False).tag(["a"])
+    assert fake_decision.checked == 0

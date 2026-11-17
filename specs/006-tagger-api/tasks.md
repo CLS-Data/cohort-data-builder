@@ -216,12 +216,12 @@ contracts/api.md and quickstart.md.
 
 **Independent test**: a tagger called twice checks the host once and matches two one-call results.
 
-- [ ] T020 [US4] Write failing tests in `tests/test_api.py`:
+- [x] T020 [US4] Write failing tests in `tests/test_api.py`:
   1. `t = Tagger(scheme_run_path, provider=fake_decision)`. `t.tag(a)`, then `t.tag(b)`, gives `fake_decision.checks == 1`.
   2. The results equal `tag(a, …)` and `tag(b, …)` made separately: same topics and confidences.
   3. `check=False` makes no `check()` call at all.
   4. `t.classify(x)` reuses the same check.
-- [ ] T021 [US4] Run T020.
+- [x] T021 [US4] Run T020.
   - If any test fails: commit the tests as `test(tagger): one tagger, many calls`, make them pass in `src/topic_tagger/api.py`, and commit that as `feat(tagger): …`.
   - If all pass (T012 already checks the host once): no code change follows. Commit the tests as `test(tagger): one tagger, many calls (regression)`, with the commit body saying T012 already covers it.
 
