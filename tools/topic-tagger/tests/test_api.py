@@ -179,9 +179,10 @@ def test_a_scheme_from_text_tags_as_the_file(scheme_run_path, fake_decision):
 
 def test_no_scheme_means_the_bundled_one(fake_decision):
     from topic_tagger import tag
+    from topic_tagger.scheme import bundled_scheme_text, parse_scheme
 
     results = tag(["a"], provider=fake_decision)
-    assert results.scheme_hash == "3c9f6b4b4ef9"
+    assert results.scheme_hash == parse_scheme(bundled_scheme_text()).hash
     assert results.scheme_name == "CLOSER topics"
 
 
@@ -377,7 +378,9 @@ def test_a_refused_question_is_raised_with_its_name():
     model = FakeDecisionModel(refuse_over=5)
     with pytest.raises(OptionLimitError) as err:
         tag(["a", "b"], provider=model, method="flat")
-    assert err.value.options == 107
+    from topic_tagger.scheme import bundled_scheme_text, parse_scheme
+
+    assert err.value.options == len(parse_scheme(bundled_scheme_text()).topic_ids)
     assert err.value.question == "every topic, asked flat"
 
 

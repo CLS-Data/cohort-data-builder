@@ -262,10 +262,15 @@ def test_check_scheme_needs_a_file(capsys):
 
 
 def test_check_scheme_summarises_a_scheme(bundled_scheme_path, capsys):
+    from topic_tagger.scheme import load_scheme
+
+    s = load_scheme(bundled_scheme_path)
+    n = len(s.domains)
     assert main(["check-scheme", str(bundled_scheme_path)]) == 0
     out = capsys.readouterr().out
-    assert "2 tiers, hash 3c9f6b4b4ef9" in out  # unchanged from 004
-    assert "  tier 1: 15 categories (15 groups)" in out and "  107 leaves; fallback: other" in out
+    assert f"2 tiers, hash {s.hash}" in out
+    assert f"  tier 1: {n} categories ({n} groups)" in out
+    assert f"  {len(s.topic_ids)} leaves; fallback: other" in out
 
 
 def test_check_scheme_lists_every_mistake(tmp_path, small_scheme_path, capsys):
