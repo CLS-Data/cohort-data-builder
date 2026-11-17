@@ -24,15 +24,24 @@ unchanged (FR-016).
 ```python
 from topic_tagger import tag
 
+
 class Fake:  # a decision model that always prefers the first option
-    def check(self): pass
-    def is_remote(self): return False
+    def check(self):
+        pass
+
+    def is_remote(self):
+        return False
+
     def decide(self, state, instructions, options):
         first = next(iter(options))
         return {o: (0.9 if o == first else 0.1 / (len(options) - 1)) for o in options}
 
-results = tag(["Do you smoke?", "Household income"],
-              "src/topic_tagger/schemes/example-3-tier.toml", provider=Fake())
+
+results = tag(
+    ["Do you smoke?", "Household income"],
+    "src/topic_tagger/schemes/example-3-tier.toml",
+    provider=Fake(),
+)
 print([r.topics for r in results], results.settings["method"], results.sources)
 ```
 
@@ -55,6 +64,7 @@ With the one-tier example (`example-1-tier.toml`) and `method="tiered"`, expecte
 ```python
 from pathlib import Path
 from topic_tagger import parse_scheme, load_scheme
+
 p = Path("src/topic_tagger/schemes/closer.toml")
 assert parse_scheme(p.read_text()).hash == load_scheme(p).hash == "3c9f6b4b4ef9"
 ```

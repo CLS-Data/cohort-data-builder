@@ -5,9 +5,20 @@ Anything else in the package is internal and may change without notice.
 
 ```python
 from topic_tagger import (
-    tag, classify, Tagger, Result, Results, Tag,
-    Variable, Scheme, load_scheme, parse_scheme,
-    SchemeError, ProviderError, OptionLimitError, RemoteModelError,
+    tag,
+    classify,
+    Tagger,
+    Result,
+    Results,
+    Tag,
+    Variable,
+    Scheme,
+    load_scheme,
+    parse_scheme,
+    SchemeError,
+    ProviderError,
+    OptionLimitError,
+    RemoteModelError,
 )
 ```
 
