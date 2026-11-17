@@ -13,7 +13,7 @@ from topic_tagger.providers import OptionLimitError, ProviderError
 from topic_tagger.scheme import Scheme, SchemeError, load_scheme, parse_scheme
 from topic_tagger.variables import Variable
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "OptionLimitError",
