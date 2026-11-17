@@ -128,6 +128,12 @@ def comparable(df):
     return df.sort_values("PID").reset_index(drop=True)
 
 
+def swap(text, old, new):
+    """Replace one setting in a generated script, failing if the script no longer has it."""
+    assert old in text, f"{old!r} is not in the script"
+    return text.replace(old, new)
+
+
 def project_with_data(tmp_path, name, ext, **kwargs):
     project = generate(tmp_path / name, **kwargs)
     write_data(fabricate(), project / "data", ext)
@@ -244,17 +250,9 @@ def test_selected_column_absent_from_data_is_warned_and_skipped(tmp_path, lang):
 
 
 def labels_of(path):
-    if path.suffix == ".sav":
-        _, meta = pyreadstat.read_sav(str(path), metadataonly=True)
-        return meta.column_names_to_labels, meta.variable_value_labels
-    with pd.io.stata.StataReader(path) as reader:
-        variable = reader.variable_labels()
-        value_sets = reader.value_labels()
-        reader.read(convert_categoricals=False)
-        lbl = reader._lbllist
-        names = reader._varlist
-    values = {n: value_sets[lbl[i]] for i, n in enumerate(names) if lbl[i] in value_sets}
-    return variable, values
+    reader = pyreadstat.read_sav if path.suffix == ".sav" else pyreadstat.read_dta
+    _, meta = reader(str(path), metadataonly=True)
+    return meta.column_names_to_labels, meta.variable_value_labels
 
 
 @pytest.mark.needs_r
@@ -283,13 +281,13 @@ def test_settings_at_the_top_change_behaviour_without_regenerating(tmp_path, lan
     script = project / ("R/merge.R" if lang == "r" else "python/merge.py")
     text = script.read_text()
     if lang == "r":
-        text = text.replace('DATA_DIR <- "data"', 'DATA_DIR <- "elsewhere"')
-        text = text.replace('OUTPUT_FORMAT <- "csv"', 'OUTPUT_FORMAT <- "dta"')
-        text = text.replace("MISSING_TO_NA <- FALSE", "MISSING_TO_NA <- TRUE")
+        text = swap(text, 'DATA_DIR <- "data"', 'DATA_DIR <- "elsewhere"')
+        text = swap(text, 'OUTPUT_FORMAT <- "csv"', 'OUTPUT_FORMAT <- "dta"')
+        text = swap(text, "MISSING_TO_NA <- FALSE", "MISSING_TO_NA <- TRUE")
     else:
-        text = text.replace('HERE.parent / "data"', 'HERE.parent / "elsewhere"')
-        text = text.replace('OUTPUT_FORMAT = "csv"', 'OUTPUT_FORMAT = "dta"')
-        text = text.replace("MISSING_TO_NA = False", "MISSING_TO_NA = True")
+        text = swap(text, 'HERE.parent / "data"', 'HERE.parent / "elsewhere"')
+        text = swap(text, 'OUTPUT_FORMAT = "csv"', 'OUTPUT_FORMAT = "dta"')
+        text = swap(text, "MISSING_TO_NA = False", "MISSING_TO_NA = True")
     script.write_text(text)
     run_ok(project, lang)
     merged = read(project / "output" / "merged.dta")
@@ -393,3 +391,29 @@ def test_stata_sav_output_writes_dta_with_a_note(tmp_path):
         2: "Rented",
         -1: "Not applicable",
     }
+
+
+@pytest.mark.needs_r
+@pytest.mark.parametrize("lang", ["r", "python"])
+def test_a_file_without_the_identifier_stops_naming_it(tmp_path, lang):
+    project = generate(tmp_path / lang, langs=lang)
+    frames = fabricate()
+    frames["mini_age5"] = frames["mini_age5"].drop(columns="PID")
+    write_data(frames, project / "data", "csv")
+    done = run(project, lang)
+    said = done.stdout + done.stderr
+    assert done.returncode != 0, said
+    assert "mini_age5" in said and "PID" in said, said
+
+
+@pytest.mark.needs_r
+@pytest.mark.parametrize("lang", ["r", "python"])
+def test_files_with_no_rows_give_an_empty_output(tmp_path, lang):
+    project = generate(tmp_path / lang, langs=lang)
+    frames = {name: df.iloc[0:0] for name, df in fabricate().items()}
+    write_data(frames, project / "data", "csv")
+    run_ok(project, lang)
+    merged = read(project / "output" / "merged.csv")
+    assert len(merged) == 0
+    # With no rows the grid has no repeated people, so it joins like any other file.
+    assert list(merged.columns) == COLUMNS + ["hhrel"]
