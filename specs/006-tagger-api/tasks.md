@@ -158,7 +158,7 @@ contracts/api.md and quickstart.md.
 
 **Independent test**: the same scheme tagged with and without `method="flat"` records both methods, with `sources["method"]` `file` and `call`.
 
-- [ ] T014 [US2] Write failing tests in `tests/test_api.py`:
+- [x] T014 [US2] Write failing tests in `tests/test_api.py`:
   1. With `scheme_run.toml`:
      - `method="flat"` gives `settings["method"] == "flat"` and `sources["method"] == "call"`;
      - every `path is None`;
@@ -174,8 +174,8 @@ contracts/api.md and quickstart.md.
   10. With `topic_tagger.api.get_provider` monkeypatched to record its arguments and return `fake_decision`: `Tagger(provider="ollama-decision", base_url="http://h:1/v1", timeout=7, api_key="k")` passes `base_url`, `timeout`, `model` and `api_key` through. With no `api_key` and `TOPIC_TAGGER_API_KEY=env` set, it passes `"env"`.
   11. With `fake_chat` and `scheme_small.toml` flat, `batch_size=1` over 3 inputs sends 3 requests (`len(fake_chat.calls) == 3`), and the default sends 1. A `[run]` table cannot set `batch_size`: it is rejected by the scheme check, as on the command line.
   12. A provider object without `is_remote`, or with neither `decide` nor `complete`, raises `TypeError` at `Tagger(...)`, naming the missing method.
-- [ ] T015 [US2] Run T014 and see it fail. Commit as `test(tagger): settings, schemes and providers from code`.
-- [ ] T016 [US2] In `src/topic_tagger/api.py`, make T014 pass:
+- [x] T015 [US2] Run T014 and see it fail. Commit as `test(tagger): settings, schemes and providers from code`.
+- [x] T016 [US2] In `src/topic_tagger/api.py`, make T014 pass. *(Done: this code went in with T012, ahead of its tests, so T014 passed on its first run. Each part was checked by removing it and seeing a T014 test fail. The tests were committed as regression tests.)*
   - a provider object counts as `ollama-decision` if `hasattr(obj, "decide")`, else `ollama` (check for `check`, `is_remote`, and `decide` or `complete`; else `TypeError` naming what is missing), when settling;
   - `model` defaults to `"custom"` for objects;
   - everything else should already follow from `settle` (verify the one-tier note reaches `Results.notes`).

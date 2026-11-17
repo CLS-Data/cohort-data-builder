@@ -146,3 +146,164 @@ def test_every_public_name_imports_and_is_documented():
     assert set(topic_tagger.__all__) == expected
     for name in topic_tagger.__all__:
         assert getattr(topic_tagger, name).__doc__, name
+
+
+# --- US2: choose the model, provider and method in code ----------------------------------
+
+
+def test_a_call_argument_overrides_the_file(scheme_run_path, fake_decision):
+    from topic_tagger import tag
+
+    results = tag(["a", "b"], scheme_run_path, provider=fake_decision, method="flat")
+    assert results.settings["method"] == "flat" and results.sources["method"] == "call"
+    assert all(r.path is None and r.method == "flat" for r in results)
+    n_leaves = len(load_scheme(scheme_run_path).topics)
+    assert [len(options) for _, _, options in fake_decision.calls] == [n_leaves, n_leaves]
+
+
+def test_tiered_settings_from_the_call(scheme_run_path, fake_decision):
+    from topic_tagger import tag
+
+    results = tag(["a"], scheme_run_path, provider=fake_decision, descend_at=0.9, max_follow=1)
+    assert (results.settings["descend_at"], results.settings["max_follow"]) == (0.9, 1)
+    assert results.sources["descend_at"] == results.sources["max_follow"] == "call"
+
+
+def test_a_scheme_from_text_tags_as_the_file(scheme_run_path, fake_decision):
+    from topic_tagger import parse_scheme, tag
+
+    from_text = tag(["a"], parse_scheme(scheme_run_path.read_text()), provider=fake_decision)
+    from_file = tag(["a"], scheme_run_path, provider=fake_decision)
+    assert from_text.scheme_hash == from_file.scheme_hash
+    assert from_text[0].tags == from_file[0].tags
+
+
+def test_no_scheme_means_the_bundled_one(fake_decision):
+    from topic_tagger import tag
+
+    results = tag(["a"], provider=fake_decision)
+    assert results.scheme_hash == "3c9f6b4b4ef9"
+    assert results.scheme_name == "CLOSER topics"
+
+
+def test_a_provider_object_is_a_decision_or_a_chat_model(
+    small_scheme_path, fake_decision, fake_chat
+):
+    from topic_tagger import Tagger
+
+    decision = Tagger(small_scheme_path, provider=fake_decision)
+    assert decision.settings["provider"] == "ollama-decision"
+    assert decision.settings["method"] == "tiered" and decision.settings["keep_at"] == 0.3
+    chat = Tagger(small_scheme_path, provider=fake_chat)
+    assert chat.settings["provider"] == "ollama"
+    assert chat.settings["method"] == "flat" and chat.settings["keep_at"] is None
+    assert decision.sources["provider"] == chat.sources["provider"] == "call"
+
+
+@pytest.mark.parametrize("method", ["flat", "tiered"])
+def test_a_chat_model_tags_flat_and_tiered(small_scheme_path, fake_chat, method):
+    from topic_tagger import tag
+
+    results = tag(["a", "b"], small_scheme_path, provider=fake_chat, method=method)
+    allowed = leaves(load_scheme(small_scheme_path))
+    assert all(r.tags and set(r.topics) <= allowed for r in results)
+    assert all((r.path is None) == (method == "flat") for r in results)
+
+
+def test_a_one_tier_taxonomy_tags_flat_with_a_note(fixtures_dir, fake_decision):
+    from topic_tagger import tag
+
+    results = tag(["a"], fixtures_dir / "scheme_1tier.toml", provider=fake_decision)
+    assert results.settings["method"] == "flat"
+    assert results.notes == ["This taxonomy has one tier: tagging flat."]
+
+
+def test_the_model_label_for_a_provider_object(small_scheme_path, fake_decision):
+    from topic_tagger import classify
+
+    named = classify("a", small_scheme_path, provider=fake_decision, model="my-model")
+    assert named.model == "ollama-decision:my-model"
+    assert classify("a", small_scheme_path, provider=fake_decision).model == (
+        "ollama-decision:custom"
+    )
+
+
+def test_a_tagger_shows_its_settings_before_any_call(scheme_run_path, fake_decision):
+    from topic_tagger import Tagger
+
+    t = Tagger(scheme_run_path, provider=fake_decision)
+    assert t.settings["model"] == "fake-decision" and t.sources["model"] == "file"
+    assert t.notes == [] and fake_decision.checked == 0 and fake_decision.calls == []
+
+
+def test_host_settings_reach_the_provider(monkeypatch, small_scheme_path, fake_decision):
+    from topic_tagger import Tagger
+
+    made = []
+
+    def get_provider(name, **kwargs):
+        made.append((name, kwargs))
+        return fake_decision
+
+    monkeypatch.setattr("topic_tagger.api.get_provider", get_provider)
+    Tagger(
+        small_scheme_path,
+        provider="ollama-decision",
+        model="clef",
+        base_url="http://h:1/v1",
+        timeout=7,
+        api_key="k",
+    )
+    assert made[-1] == (
+        "ollama-decision",
+        {"base_url": "http://h:1/v1", "model": "clef", "timeout": 7, "api_key": "k"},
+    )
+    monkeypatch.setenv("TOPIC_TAGGER_API_KEY", "env")
+    Tagger(small_scheme_path, provider="ollama-decision")
+    assert made[-1][1]["api_key"] == "env"
+
+
+def test_batch_size_sets_how_many_variables_share_a_request(small_scheme_path, fake_chat):
+    from conftest import StubProvider, first_option
+    from topic_tagger import tag
+
+    tag(["a", "b", "c"], small_scheme_path, provider=fake_chat, batch_size=1)
+    assert len(fake_chat.calls) == 3
+    one = StubProvider(first_option)
+    tag(["a", "b", "c"], small_scheme_path, provider=one)
+    assert len(one.calls) == 1
+
+
+def test_a_scheme_cannot_set_batch_size(small_scheme_path):
+    from topic_tagger import SchemeError, parse_scheme
+
+    text = small_scheme_path.read_text() + "\n[run]\nbatch_size = 5\n"
+    with pytest.raises(SchemeError) as err:
+        parse_scheme(text)
+    assert "run.batch_size" in str(err.value.problems[0])
+
+
+class NoRemote:
+    def check(self):
+        pass
+
+    def decide(self, state, instructions, options):
+        return {}
+
+
+class NeitherKind:
+    def check(self):
+        pass
+
+    def is_remote(self):
+        return False
+
+
+@pytest.mark.parametrize(
+    ("obj", "missing"), [(NoRemote(), "is_remote"), (NeitherKind(), "decide or complete")]
+)
+def test_a_provider_object_must_have_what_is_needed(small_scheme_path, obj, missing):
+    from topic_tagger import Tagger
+
+    with pytest.raises(TypeError, match=missing):
+        Tagger(small_scheme_path, provider=obj)
