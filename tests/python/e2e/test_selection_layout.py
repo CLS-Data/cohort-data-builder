@@ -4,11 +4,9 @@ import re
 from pathlib import Path
 
 import pytest
-from axe_playwright_python.sync_playwright import Axe
 from playwright.sync_api import expect
 
 SITE = Path(__file__).resolve().parents[3] / "site"
-AXE = Axe()
 
 
 def select_285(page):
@@ -84,7 +82,7 @@ def test_a_blocked_download_says_why_and_shows_the_problem(bcs70):
     assert in_viewport(page, "#basket-cols .col-input[aria-invalid='true']")
 
 
-def test_on_a_phone_the_download_bar_sticks_to_the_bottom(bcs70):
+def test_on_a_phone_the_download_bar_sticks_to_the_bottom(bcs70, serious):
     page = bcs70
     page.set_viewport_size({"width": 390, "height": 844})
     select_285(page)
@@ -94,5 +92,4 @@ def test_on_a_phone_the_download_bar_sticks_to_the_bottom(bcs70):
     expect(page.get_by_label("R", exact=True)).to_be_hidden()
     page.get_by_role("button", name="Download options").click()
     expect(page.get_by_label("R", exact=True)).to_be_visible()
-    found = AXE.run(page).response["violations"]
-    assert [v["id"] for v in found if v["impact"] in ("serious", "critical")] == []
+    assert serious(page) == []

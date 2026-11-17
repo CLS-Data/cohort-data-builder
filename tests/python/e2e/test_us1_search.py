@@ -1,17 +1,9 @@
 import re
 from pathlib import Path
 
-import pytest
 from playwright.sync_api import expect
 
 SITE = Path(__file__).resolve().parents[3] / "site"
-
-
-@pytest.fixture
-def mini(page, serve, mini_site):
-    page.goto(serve(mini_site))
-    expect(page.locator("#result-count")).to_have_text("16 variables")
-    return page
 
 
 def row(page, name):
@@ -141,6 +133,9 @@ def test_real_bcs70_search_paging_and_details(page, serve):
 
     page.get_by_label("Search variables").fill("smoke")
     expect(page.locator("#result-count")).not_to_have_text("37,562 variables")
+    expect(page.locator("#result-count")).to_have_text(re.compile(r"^[\d,]+ variables?$"))
+    for text in page.locator("#results .vrow").all_inner_texts()[:20]:
+        assert "smoke" in text.lower(), text
     page.locator("#spine-track [data-wave]:not(.is-empty)").nth(2).click()
     page.locator("#results .v-expand").first.click()
     more = page.locator("#results .vrow-more").first

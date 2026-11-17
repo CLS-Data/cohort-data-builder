@@ -4,10 +4,8 @@ and every control on it works."""
 import re
 
 import pytest
-from axe_playwright_python.sync_playwright import Axe
 from playwright.sync_api import expect
 
-AXE = Axe()
 PREFIX = "/cohort-data-builder/"
 
 
@@ -158,7 +156,7 @@ def test_confidence_filter_hides_less_certain_topics(tutorial):
     page.get_by_role("button", name="30%").click()
     expect(off).to_have_count(0)
     page.get_by_role("button", name="90%").click()
-    assert off.count() > 0
+    expect(off).not_to_have_count(0)
 
 
 def test_topics_section_names_closer_and_points_to_the_tagger(tutorial):
@@ -178,14 +176,12 @@ def test_does_not_name_cls(tutorial):
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
-def test_no_serious_accessibility_problems(page, base, theme):
+def test_no_serious_accessibility_problems(page, base, theme, serious):
     page.emulate_media(color_scheme=theme)
     page.goto(base + "tutorial/")
     expect(page.locator("#t-total")).to_have_text("16")
     page.get_by_role("button", name="Show details for bd7smoke").click()
-    found = AXE.run(page).response["violations"]
-    serious = [v["id"] for v in found if v["impact"] in ("serious", "critical")]
-    assert serious == []
+    assert serious(page) == []
 
 
 def test_fits_a_phone(page, base):

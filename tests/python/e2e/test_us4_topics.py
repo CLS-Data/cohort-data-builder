@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -7,13 +8,6 @@ import pytest
 from playwright.sync_api import expect
 
 FIXTURE_DATA = Path(__file__).resolve().parents[2] / "fixtures" / "data"
-
-
-@pytest.fixture
-def mini(page, serve, mini_site):
-    page.goto(serve(mini_site))
-    expect(page.locator("#result-count")).to_have_text("16 variables")
-    return page
 
 
 def open_topics(page):
@@ -123,8 +117,8 @@ def test_details_list_every_topic_dim_those_below_and_filter_on_click(mini):
     row(mini, "smoke5").get_by_role("button", name="Show details for smoke5").click()
     tags = row(mini, "smoke5").locator(".vm-topic")
     expect(tags).to_have_text(["Smoking 95%", "Alcohol 55%"])
-    expect(tags.nth(0)).not_to_have_class("vm-topic is-below")
-    expect(tags.nth(1)).to_have_class("vm-topic is-below")
+    expect(tags.nth(0)).not_to_have_class(re.compile(r"\bis-below\b"))
+    expect(tags.nth(1)).to_have_class(re.compile(r"\bis-below\b"))
     tags.nth(0).click()
     count(mini, "1 variable")
     expect(mini.locator("#active-filters .chip-topic")).to_have_text("Smoking ✕")

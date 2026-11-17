@@ -2,15 +2,7 @@ import datetime
 import re
 import zipfile
 
-import pytest
 from playwright.sync_api import expect
-
-
-@pytest.fixture
-def mini(page, serve, mini_site):
-    page.goto(serve(mini_site))
-    expect(page.locator("#result-count")).to_have_text("16 variables")
-    return page
 
 
 def pick(page, name, nth=0):
@@ -160,12 +152,13 @@ def test_download_produces_the_project_zip(mini, tmp_path):
     for name in ("smoke5", "quote5", "hhrel"):
         pick(mini, name)
     review(mini)
+    before = datetime.date.today().isoformat()
     with mini.expect_download() as info:
         download_button(mini).click()
     download = info.value
-    today = datetime.date.today().isoformat()
-    project = f"mini-merge-{today}"
-    assert download.suggested_filename == f"{project}.zip"
+    after = datetime.date.today().isoformat()  # the clock may pass midnight meanwhile
+    assert download.suggested_filename in {f"mini-merge-{d}.zip" for d in (before, after)}
+    project = download.suggested_filename.removesuffix(".zip")
     path = tmp_path / download.suggested_filename
     download.save_as(path)
     with zipfile.ZipFile(path) as z:
