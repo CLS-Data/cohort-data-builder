@@ -283,6 +283,9 @@ class Tagger:
         self.settings: dict = settled.values
         self.sources: dict[str, str] = settled.sources
         self.notes: list[str] = settled.notes
+        for name, value in (("batch_size", batch_size), ("workers", workers)):
+            if value < 1:
+                raise ValueError(f"{name} must be at least 1, not {value}")
         self._batch_size, self._workers, self._retries = batch_size, workers, retries
         self._allow_remote, self._check, self._checked = allow_remote, check, False
         if given_object:

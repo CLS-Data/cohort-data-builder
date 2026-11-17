@@ -37,6 +37,17 @@ DEFAULT_BASE_URL = "http://localhost:11434/v1"
 SUMMARY_TOP = 10  # files or groups listed in the end-of-run summary
 
 
+def _at_least_one(text: str) -> int:
+    """An argparse type: a whole number of 1 or more."""
+    try:
+        n = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number") from None
+    if n < 1:
+        raise argparse.ArgumentTypeError(f"must be at least 1, not {n}")
+    return n
+
+
 def main(
     argv: list[str] | None = None,
     provider_factory: Callable[[argparse.Namespace], Provider] | None = None,
@@ -128,8 +139,8 @@ def _parser() -> argparse.ArgumentParser:
         type=int,
         help="tiered: follow at most this many groups per question; 0 for no cap (default 3)",
     )
-    tag.add_argument("--batch-size", type=int, default=20, help="variables per request")
-    tag.add_argument("--workers", type=int, default=2, help="requests in flight at once")
+    tag.add_argument("--batch-size", type=_at_least_one, default=20, help="variables per request")
+    tag.add_argument("--workers", type=_at_least_one, default=2, help="requests in flight at once")
     tag.add_argument(
         "--timeout", type=float, default=120, help="seconds before a request is retried"
     )
