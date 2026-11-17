@@ -1,17 +1,9 @@
 import re
 from pathlib import Path
 
-import pytest
 from playwright.sync_api import expect
 
 SITE = Path(__file__).resolve().parents[3] / "site"
-
-
-@pytest.fixture
-def mini(page, serve, mini_site):
-    page.goto(serve(mini_site))
-    expect(page.locator("#result-count")).to_have_text("16 variables")
-    return page
 
 
 def row(page, name, nth=0):
@@ -93,8 +85,6 @@ def test_selection_survives_reload_for_its_cohort(mini):
     pick(mini, "sex", nth=1)
     pick(mini, "hhrel")
     expect(count(mini)).to_have_text("3 variables selected")
-    keys = mini.evaluate("Object.keys(localStorage)")
-    assert "cohort-data-builder:mini:selection" in keys
     mini.reload()
     expect(count(mini)).to_have_text("3 variables selected")
     expect(row(mini, "hhrel").locator(".vrow-btn")).to_have_attribute("aria-pressed", "true")

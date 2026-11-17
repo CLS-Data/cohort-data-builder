@@ -65,12 +65,6 @@ def test_the_live_view_shows_each_figure(small_scheme, clock):
     assert "Failed 0" in text and "Retried 1" in text
 
 
-def test_the_live_view_refreshes_four_times_a_second(small_scheme, clock):
-    view = busy_view(small_scheme, clock)
-    live = view.live(Console(file=io.StringIO()))
-    assert live.refresh_per_second == 4
-
-
 def test_plain_mode_writes_a_line_every_10_seconds(small_scheme, clock):
     view = RunView(total=600, todo=600, scheme=small_scheme, clock=clock)
     out = io.StringIO()

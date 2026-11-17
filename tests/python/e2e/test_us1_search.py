@@ -1,17 +1,9 @@
 import re
 from pathlib import Path
 
-import pytest
 from playwright.sync_api import expect
 
 SITE = Path(__file__).resolve().parents[3] / "site"
-
-
-@pytest.fixture
-def mini(page, serve, mini_site):
-    page.goto(serve(mini_site))
-    expect(page.locator("#result-count")).to_have_text("16 variables")
-    return page
 
 
 def row(page, name):
@@ -141,8 +133,19 @@ def test_real_bcs70_search_paging_and_details(page, serve):
 
     page.get_by_label("Search variables").fill("smoke")
     expect(page.locator("#result-count")).not_to_have_text("37,562 variables")
+    expect(page.locator("#result-count")).to_have_text(re.compile(r"^[\d,]+ variables?$"))
+    for text in page.locator("#results .vrow").all_inner_texts()[:20]:
+        assert "smoke" in text.lower(), text
     page.locator("#spine-track [data-wave]:not(.is-empty)").nth(2).click()
     page.locator("#results .v-expand").first.click()
     more = page.locator("#results .vrow-more").first
     expect(more.locator(".vm-meta")).to_be_visible()
     expect(more.locator(".vm-values, .vm-note").first).to_be_visible()
+
+
+def test_a_dictionary_that_fails_to_load_is_explained_in_the_details(mini):
+    mini.route("**/dict/mini_age5.json", lambda route: route.fulfill(status=500))
+    mini.get_by_role("button", name="Show details for smoke5").click()
+    warning = row(mini, "smoke5").locator(".vm-warn")
+    expect(warning).to_contain_text("mini_age5.json")
+    expect(warning).to_contain_text("HTTP 500")

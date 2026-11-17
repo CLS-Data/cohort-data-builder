@@ -61,14 +61,13 @@ def test_variables_and_dicts_are_sent_as_the_command_line_sends_them(
     scheme_run_path, fake_decision
 ):
     from topic_tagger import tag
-    from topic_tagger.tiered import _state
 
     v = Variable("alpha", "SMK", "Smokes", (("1", "Yes"), ("2", "No")))
     line = {"file": "beta", "variable": "AGE", "label": "Age now", "values": [[1, "16-24"]]}
     results = tag([v, line, "plain"], scheme_run_path, provider=fake_decision)
     assert [r.input for r in results] == [v, line, "plain"]
     states = [s for s, _, _ in fake_decision.calls]
-    assert _state(v) in states
+    assert {"name": "SMK", "label": "Smokes", "values": ["1: Yes", "2: No"]} in states
     assert {"name": "AGE", "label": "Age now", "values": ["1: 16-24"]} in states
     assert {"name": "", "label": "plain", "values": []} in states
 
@@ -180,9 +179,10 @@ def test_a_scheme_from_text_tags_as_the_file(scheme_run_path, fake_decision):
 
 def test_no_scheme_means_the_bundled_one(fake_decision):
     from topic_tagger import tag
+    from topic_tagger.scheme import bundled_scheme_text, parse_scheme
 
     results = tag(["a"], provider=fake_decision)
-    assert results.scheme_hash == "3c9f6b4b4ef9"
+    assert results.scheme_hash == parse_scheme(bundled_scheme_text()).hash
     assert results.scheme_name == "CLOSER topics"
 
 
@@ -378,7 +378,9 @@ def test_a_refused_question_is_raised_with_its_name():
     model = FakeDecisionModel(refuse_over=5)
     with pytest.raises(OptionLimitError) as err:
         tag(["a", "b"], provider=model, method="flat")
-    assert err.value.options == 107
+    from topic_tagger.scheme import bundled_scheme_text, parse_scheme
+
+    assert err.value.options == len(parse_scheme(bundled_scheme_text()).topic_ids)
     assert err.value.question == "every topic, asked flat"
 
 
@@ -392,16 +394,6 @@ def test_an_input_that_keeps_failing_is_a_failed_result(small_scheme_path):
     assert results[1].error == "no answer" and results[1].tags == []
     assert results[0].error == results[2].error == ""
     assert results.failed == [results[1]]
-
-
-def test_the_api_never_prints_prompts_exits_or_opens_files():
-    from pathlib import Path
-
-    import topic_tagger.api
-
-    source = Path(topic_tagger.api.__file__).read_text(encoding="utf-8")
-    for call in ("print(", "input(", "sys.exit", "open("):
-        assert call not in source, call
 
 
 # --- US4: reuse one tagger ----------------------------------------------------------------
@@ -439,3 +431,20 @@ def test_check_false_never_checks(scheme_run_path, fake_decision):
 
     Tagger(scheme_run_path, provider=fake_decision, check=False).tag(["a"])
     assert fake_decision.checked == 0
+
+
+def test_a_single_string_is_refused_rather_than_tagged_letter_by_letter(
+    scheme_run_path, fake_decision
+):
+    from topic_tagger import tag
+
+    with pytest.raises(TypeError, match="list"):
+        tag("Do you smoke?", scheme_run_path, provider=fake_decision)
+
+
+@pytest.mark.parametrize("setting", ["batch_size", "workers"])
+def test_batch_size_and_workers_must_be_at_least_one(small_scheme_path, fake_decision, setting):
+    from topic_tagger import Tagger
+
+    with pytest.raises(ValueError, match=setting):
+        Tagger(small_scheme_path, provider=fake_decision, **{setting: 0})

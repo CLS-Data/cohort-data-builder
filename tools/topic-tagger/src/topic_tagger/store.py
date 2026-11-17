@@ -96,9 +96,10 @@ class TagStore:
             for line in fh:
                 try:
                     r = json.loads(line)
-                except json.JSONDecodeError:
-                    continue  # cut off by a crash; that variable is simply tagged again
-                self.records[_key(r["file"], r["variable"])] = r
+                    key = _key(r["file"], r["variable"])
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    continue  # cut off by a crash or not a record; that variable is tagged again
+                self.records[key] = r
 
     def state(self, key: str, scheme_hash: str, method: str = "flat") -> str:
         """``missing``, ``stale`` (made with another scheme or method) or ``current``.

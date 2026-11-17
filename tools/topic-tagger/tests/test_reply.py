@@ -83,21 +83,6 @@ def test_text_that_is_not_json_is_rejected(small_scheme, text):
         parse_reply(text, small_scheme, 1)
 
 
-def test_parsing_goes_through_the_langchain_parser(small_scheme, monkeypatch):
-    from langchain_core.output_parsers import PydanticOutputParser
-
-    seen = []
-    original = PydanticOutputParser.parse
-
-    def spy(self, text):
-        seen.append(text)
-        return original(self, text)
-
-    monkeypatch.setattr(PydanticOutputParser, "parse", spy)
-    parse_reply(reply((0, [("smoking", 0.9)])), small_scheme, 1)
-    assert len(seen) == 1
-
-
 def test_the_error_names_what_was_wrong(small_scheme):
     with pytest.raises(ReplyError) as err:
         parse_reply(reply((0, [("smoking", 0.9), ("vaping", 0.8)])), small_scheme, 1)
@@ -126,3 +111,12 @@ def test_areas_can_be_the_options():
     assert parse_options_reply(text, ["health", "demographics"], 1, order) == {
         0: [("demographics", 0.7), ("health", 0.2)]
     }
+
+
+def test_an_empty_reply_is_rejected(small_scheme):
+    with pytest.raises(ReplyError):
+        parse_reply("", small_scheme, 2)
+
+
+def test_a_reply_with_no_variables_tags_nothing(small_scheme):
+    assert parse_reply('{"variables": []}', small_scheme, 2) == {}

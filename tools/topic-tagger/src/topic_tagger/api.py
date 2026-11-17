@@ -283,6 +283,9 @@ class Tagger:
         self.settings: dict = settled.values
         self.sources: dict[str, str] = settled.sources
         self.notes: list[str] = settled.notes
+        for name, value in (("batch_size", batch_size), ("workers", workers)):
+            if value < 1:
+                raise ValueError(f"{name} must be at least 1, not {value}")
         self._batch_size, self._workers, self._retries = batch_size, workers, retries
         self._allow_remote, self._check, self._checked = allow_remote, check, False
         if given_object:
@@ -313,6 +316,8 @@ class Tagger:
             OptionLimitError: The model refused a question for having too many options.
                 Nothing is returned: the same call would be refused again.
         """
+        if isinstance(inputs, (str, bytes, dict, Variable)):
+            raise TypeError("tag takes a list of inputs; wrap one input in a list or use classify")
         items = list(inputs)
         variables = [_to_variable(i, item) for i, item in enumerate(items)]
         s = self.settings

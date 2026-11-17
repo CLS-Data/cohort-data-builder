@@ -382,14 +382,12 @@ def three_tier():
 
 
 def test_the_tree_keeps_three_tiers_and_offers_the_fallback_at_tier_1():
-    from topic_tagger.tiered import _height
-
     root = build_tree(three_tier())
     assert [c.id for c in root.children] == ["health", "demographics", "other"]
     physical = root.find("physical_health")
     assert [c.id for c in physical.children] == ["respiratory", "cardiac", "diabetes"]
     assert root.find("smoking").is_leaf and root.find("other").is_leaf
-    assert _height(root) == 3
+    assert all(c.is_leaf for c in physical.children)  # three tiers, no more
 
 
 def test_moving_the_fallback_prunes_groups_left_empty_up_the_tree(tmp_path):

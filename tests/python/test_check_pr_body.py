@@ -40,44 +40,47 @@ def test_filled_section_passes(check):
     assert check.problems(FILLED) == []
 
 
-def test_missing_heading_is_one_problem(check):
-    body = "## Summary\n\nAdds search.\n"
-    assert len(check.problems(body)) == 1
+def only(found):
+    """The single problem reported; the checker reports one at a time."""
+    assert len(found) == 1, found
+    return found[0]
 
 
-def test_none_is_treated_as_empty_body(check):
-    assert len(check.problems(None)) == 1
+@pytest.mark.parametrize("body", [None, "", "## Summary\n\nAdds search.\n"])
+def test_a_missing_section_asks_for_one(check, body):
+    assert 'Add a "## How to review" section' in only(check.problems(body))
 
 
-def test_empty_section_is_one_problem(check):
+def test_an_empty_section_says_it_is_empty(check):
     body = "## How to review\n\n## Checklist\n\n- [x] CI green\n"
-    assert len(check.problems(body)) == 1
+    assert "is empty" in only(check.problems(body))
 
 
-def test_section_with_only_html_comments_is_one_problem(check):
+def test_a_section_with_only_html_comments_counts_as_empty(check):
     body = "## How to review\n\n<!-- steps go here -->\n\n## Checklist\n"
-    assert len(check.problems(body)) == 1
+    assert "is empty" in only(check.problems(body))
 
 
-@pytest.mark.parametrize("placeholder", ["~N min", "<branch>"])
-def test_template_placeholder_is_one_problem(check, placeholder):
-    body = (
-        FILLED.replace("~10 min", placeholder)
-        if placeholder == "~N min"
-        else FILLED.replace("001-us1-search", placeholder)
-    )
-    assert len(check.problems(body)) == 1
+@pytest.mark.parametrize(
+    ("placeholder", "replaces"), [("~N min", "~10 min"), ("<branch>", "001-us1-search")]
+)
+def test_a_template_placeholder_is_named(check, placeholder, replaces):
+    problem = only(check.problems(FILLED.replace(replaces, placeholder)))
+    assert "placeholders" in problem and placeholder in problem
 
 
-def test_section_without_numbered_step_is_one_problem(check):
+def test_a_section_without_numbered_steps_asks_for_them(check):
     body = "## How to review\n\nJust look at it.\n\n## Checklist\n"
-    assert len(check.problems(body)) == 1
+    assert "numbered steps" in only(check.problems(body))
 
 
-def test_section_ends_at_next_heading(check):
-    # A numbered step under a later heading does not count for How to review.
+def test_a_numbered_step_under_a_later_heading_does_not_count(check):
     body = "## How to review\n\nLook at it.\n\n## Checklist\n\n1. CI green\n"
-    assert len(check.problems(body)) == 1
+    assert "numbered steps" in only(check.problems(body))
+
+
+def test_windows_line_endings_are_accepted(check):
+    assert check.problems(FILLED.replace("\n", "\r\n")) == []
 
 
 def test_unedited_template_fails(check):
@@ -87,7 +90,7 @@ def test_unedited_template_fails(check):
 def test_main_exits_1_and_lists_problems(check, monkeypatch, capsys):
     monkeypatch.setenv("PR_BODY", "## Summary\n")
     assert check.main() == 1
-    assert capsys.readouterr().out.strip()
+    assert "How to review" in capsys.readouterr().out
 
 
 def test_main_reports_ok(check, monkeypatch, capsys):
@@ -103,9 +106,3 @@ def test_dependabot_pull_requests_skip_the_description_check():
     """A bot cannot write review steps, so its pull requests skip the check."""
     workflow = (ROOT / ".github" / "workflows" / "pr-description.yml").read_text()
     assert "if: github.event.pull_request.user.login != 'dependabot[bot]'" in workflow
-
-
-def test_dependabot_targets_main():
-    """Feature 001 has merged, so updates go to main, not its old integration branch."""
-    config = (ROOT / ".github" / "dependabot.yml").read_text()
-    assert "target-branch" not in config

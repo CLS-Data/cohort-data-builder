@@ -2,21 +2,7 @@
 view, in either theme."""
 
 import pytest
-from axe_playwright_python.sync_playwright import Axe
 from playwright.sync_api import expect
-
-AXE = Axe()
-
-
-def serious(page):
-    """Return the serious and critical violations axe finds, one readable line each."""
-    found = AXE.run(page).response["violations"]
-    return [
-        f"{v['id']} ({v['impact']}): {v['help']} — "
-        + "; ".join(n["target"][0] for n in v["nodes"][:5])
-        for v in found
-        if v["impact"] in ("serious", "critical")
-    ]
 
 
 @pytest.fixture(params=["light", "dark"])
@@ -29,7 +15,7 @@ def themed(request, page, serve, mini_site):
     return page
 
 
-def test_variables_view_with_topics_open_and_a_row_expanded(themed):
+def test_variables_view_with_topics_open_and_a_row_expanded(themed, serious):
     page = themed
     page.locator("#tgrid-toggle").click()
     page.get_by_role("button", name="Show the topics in Health").click()
@@ -39,7 +25,7 @@ def test_variables_view_with_topics_open_and_a_row_expanded(themed):
     assert serious(page) == []
 
 
-def test_selection_view(themed):
+def test_selection_view(themed, serious):
     page = themed
     page.locator("#results .vrow-btn").nth(2).click()
     page.locator("#results .vrow-btn").nth(3).click()

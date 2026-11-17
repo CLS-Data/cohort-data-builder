@@ -37,8 +37,8 @@ def test_bcs70_is_usable_within_3s_and_search_answers_within_half_a_second(page,
     loaded = time.perf_counter() - start
     assert loaded < 3, f"first view took {loaded:.2f} s"
 
-    page.get_by_label("Search variables").fill("smok")
     start = time.perf_counter()
+    page.get_by_label("Search variables").fill("smok")
     expect(page.locator("#result-count")).not_to_have_text("37,562 variables", timeout=5_000)
     answered = time.perf_counter() - start
     assert answered < 0.5, f"search took {answered:.2f} s"

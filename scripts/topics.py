@@ -137,9 +137,10 @@ def _records(path: Path) -> dict[tuple[str, str], dict]:
             continue
         try:
             r = json.loads(line)
-        except json.JSONDecodeError:
-            continue  # a line cut off when a run was killed
-        out[(r["file"].lower(), r["variable"].lower())] = r
+            key = (r["file"].lower(), r["variable"].lower())
+        except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+            continue  # a line cut off when a run was killed, or not a record
+        out[key] = r
     return out
 
 

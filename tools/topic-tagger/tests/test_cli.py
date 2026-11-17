@@ -132,6 +132,9 @@ def test_help_lists_every_option(capsys):
         "--yes",
         "--plain",
         "--force",
+        "--method",
+        "--descend-at",
+        "--max-areas",
     ):
         assert opt in out
 
@@ -262,10 +265,15 @@ def test_check_scheme_needs_a_file(capsys):
 
 
 def test_check_scheme_summarises_a_scheme(bundled_scheme_path, capsys):
+    from topic_tagger.scheme import load_scheme
+
+    s = load_scheme(bundled_scheme_path)
+    n = len(s.domains)
     assert main(["check-scheme", str(bundled_scheme_path)]) == 0
     out = capsys.readouterr().out
-    assert "2 tiers, hash 3c9f6b4b4ef9" in out  # unchanged from 004
-    assert "  tier 1: 15 categories (15 groups)" in out and "  107 leaves; fallback: other" in out
+    assert f"2 tiers, hash {s.hash}" in out
+    assert f"  tier 1: {n} categories ({n} groups)" in out
+    assert f"  {len(s.topic_ids)} leaves; fallback: other" in out
 
 
 def test_check_scheme_lists_every_mistake(tmp_path, small_scheme_path, capsys):
@@ -436,26 +444,37 @@ def test_method_defaults_to_flat_and_tiered_tags_every_variable(tmp_path, variab
 
 
 @pytest.mark.parametrize(
-    "extra",
+    ("extra", "says"),
     [
-        ("--method", "tiered", "--descend-at", "1.5"),
-        ("--method", "tiered", "--max-areas", "-1"),
-        ("--descend-at", "0.5"),
-        ("--max-areas", "2"),
+        (("--method", "tiered", "--descend-at", "1.5"), "--descend-at"),
+        (("--method", "tiered", "--max-areas", "-1"), "--max-follow must be 0 (no cap) or more"),
+        (("--descend-at", "0.5"), "need --method tiered"),
+        (("--max-areas", "2"), "need --method tiered"),
     ],
 )
-def test_tiered_settings_are_checked(tmp_path, variables_path, capsys, extra):
+def test_tiered_settings_are_checked(tmp_path, variables_path, capsys, extra, says):
     stub = StubProvider(answer())
     assert tag(variables_path, tmp_path / "out", stub, *extra) == 2
     assert stub.calls == []
-    assert capsys.readouterr().err
+    assert says in capsys.readouterr().err
 
 
 def test_max_areas_zero_means_no_cap(tmp_path, variables_path):
-    from test_runner import tiered_answer
+    def every_option(messages, schema):
+        """Picks every listed option, so each tier-1 group is worth following."""
+        head = messages[0]["content"].split("Rules:")[0]
+        opts = [line[2:].split(":")[0] for line in head.splitlines() if line.startswith("- ")]
+        rows = [json.loads(x) for x in messages[1]["content"].split("\n") if x.startswith("{")]
+        topics = [{"topic": o, "confidence": 0.8} for o in opts]
+        return json.dumps({"variables": [{"id": r["id"], "topics": topics} for r in rows]})
 
-    stub = StubProvider(tiered_answer)
-    assert tag(variables_path, tmp_path / "o", stub, "--method", "tiered", "--max-areas", "0") == 0
+    def calls_with(cap):
+        stub = StubProvider(every_option)
+        out = tmp_path / f"o{cap}"
+        assert tag(variables_path, out, stub, "--method", "tiered", "--max-areas", cap) == 0
+        return len(stub.calls)
+
+    assert calls_with("0") > calls_with("1")
 
 
 def test_tiered_dry_run_prints_tier_1_and_a_tier_2_example(tmp_path, variables_path, capsys):
@@ -467,14 +486,6 @@ def test_tiered_dry_run_prints_tier_1_and_a_tier_2_example(tmp_path, variables_p
     assert "- age: Age" in tier2 and "- smoking:" not in tier2
     assert '"name": "A01AGE"' in tier1 and '"name": "A01AGE"' in tier2
     assert stub.calls == [] and stub.checked == 0
-
-
-def test_help_lists_the_tiered_options(capsys):
-    with pytest.raises(SystemExit):
-        main(["tag", "--help"])
-    out = capsys.readouterr().out
-    for opt in ("--method", "--descend-at", "--max-areas"):
-        assert opt in out
 
 
 class DecisionStub:
@@ -901,3 +912,24 @@ def test_a_flat_dry_run_prints_one_request(tmp_path, variables_path, capsys, dec
     if decision:
         assert len(json.loads(out)["questions"]["option"]["criteria"]) == 9
     assert stub.calls == []
+
+
+@pytest.mark.parametrize("option", ["--batch-size", "--workers"])
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_batch_size_and_workers_must_be_at_least_one(
+    tmp_path, variables_path, capsys, option, value
+):
+    stub = StubProvider(answer())
+    with pytest.raises(SystemExit) as e:
+        tag(variables_path, tmp_path / "out", stub, option, value)
+    assert e.value.code == 2 and option in capsys.readouterr().err
+    assert stub.calls == []
+
+
+def test_an_empty_variables_file_tags_nothing_and_succeeds(tmp_path, capsys):
+    empty = tmp_path / "variables.jsonl"
+    empty.write_text("", encoding="utf-8")
+    stub = StubProvider(answer())
+    assert tag(empty, tmp_path / "out", stub) == 0
+    assert stub.calls == []
+    assert "0 already tagged, 0 to do" in capsys.readouterr().err

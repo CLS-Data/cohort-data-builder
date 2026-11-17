@@ -178,8 +178,10 @@ def test_nothing_else_changes(cohort, tmp_path):
 
 def test_files_are_written_compactly(cohort, tmp_path):
     merge(cohort, tag_folder(cohort, tmp_path))
-    text = (cohort / "manifest.json").read_text(encoding="utf-8")
-    assert "\n" not in text.strip() and ", " not in text.split('"description"')[0]
+    for path in (cohort / "manifest.json", cohort / "index.json"):
+        text = path.read_text(encoding="utf-8").rstrip("\n")
+        compact = json.dumps(json.loads(text), separators=(",", ":"), ensure_ascii=False)
+        assert text == compact, path.name
 
 
 def test_exit_1_when_the_checks_find_problems(cohort, tmp_path, capsys):
@@ -211,3 +213,33 @@ def test_only_newline_ends_a_tags_line(cohort, tmp_path, capsys):
     with (tags / "tags.jsonl").open("a", encoding="utf-8") as f:
         f.write(json.dumps(odd, ensure_ascii=False) + "\n")
     assert merge(cohort, tags).unknown == ["mini_age5/odd\u2028name"]
+
+
+def test_an_empty_tags_file_leaves_every_variable_untagged(cohort, tmp_path):
+    tags = tag_folder(cohort, tmp_path)
+    (tags / "tags.jsonl").write_text("", encoding="utf-8")
+    result = merge(cohort, tags)
+    assert result.unknown == [] and result.stale == []
+    not_id = [k for k in index_of(cohort) if k[1].lower() != "pid"]
+    assert sorted(result.untagged) == sorted(f"{f}/{v}" for f, v in not_id)
+    assert all(
+        "topics" not in v for v in variables_of(cohort).values() if v["variable"].lower() != "pid"
+    )
+    assert check_data(cohort.parent) == []
+
+
+@pytest.mark.parametrize("line", ["{cut off", '{"variable": "nofile"}', "[1, 2]"])
+def test_a_line_that_is_not_a_record_is_skipped(cohort, tmp_path, line):
+    tags = tag_folder(cohort, tmp_path)
+    with (tags / "tags.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(line + "\n")
+    result = merge(cohort, tags)
+    assert result.unknown == [] and result.stale == []
+    assert "topics" in variables_of(cohort)[("mini_age5", "smoke5")]
+
+
+def test_a_confidence_over_one_is_caught_by_the_checks(cohort, tmp_path, capsys):
+    over = {"file": "mini_age5", "variable": "smoke5", "topics": [["smoking", 1.5]]}
+    tags = tag_folder(cohort, tmp_path, extra=[{**over, "scheme": SCHEME["hash"]}])
+    assert main(["merge", str(cohort), "--tags", str(tags)]) == 1
+    assert "between 0 and 1" in capsys.readouterr().err

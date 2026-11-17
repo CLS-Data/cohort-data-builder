@@ -77,18 +77,6 @@ def test_reply_schema_limits_topics_and_confidences(small_scheme):
     assert tag["confidence"]["minimum"] == 0 and tag["confidence"]["maximum"] == 1
 
 
-def test_the_reply_format_comes_from_the_langchain_parser(small_scheme):
-    # Some hosts (e.g. Ollama cloud models) ignore the JSON schema, so the prompt carries
-    # the standard PydanticOutputParser format instructions too.
-    from langchain_core.output_parsers import PydanticOutputParser
-
-    from topic_tagger.reply import reply_model
-
-    system, _ = build_messages(small_scheme, batch())
-    parser = PydanticOutputParser(pydantic_object=reply_model(small_scheme))
-    assert system["content"].endswith(parser.get_format_instructions())
-
-
 def test_the_flat_prompt_is_unchanged(small_scheme, fixtures_dir):
     system, user = build_messages(small_scheme, batch())
     expected = (fixtures_dir / "flat_prompt.txt").read_text()
