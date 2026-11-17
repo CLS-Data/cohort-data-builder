@@ -132,6 +132,9 @@ def test_help_lists_every_option(capsys):
         "--yes",
         "--plain",
         "--force",
+        "--method",
+        "--descend-at",
+        "--max-areas",
     ):
         assert opt in out
 
@@ -483,14 +486,6 @@ def test_tiered_dry_run_prints_tier_1_and_a_tier_2_example(tmp_path, variables_p
     assert "- age: Age" in tier2 and "- smoking:" not in tier2
     assert '"name": "A01AGE"' in tier1 and '"name": "A01AGE"' in tier2
     assert stub.calls == [] and stub.checked == 0
-
-
-def test_help_lists_the_tiered_options(capsys):
-    with pytest.raises(SystemExit):
-        main(["tag", "--help"])
-    out = capsys.readouterr().out
-    for opt in ("--method", "--descend-at", "--max-areas"):
-        assert opt in out
 
 
 class DecisionStub:
@@ -929,3 +924,12 @@ def test_batch_size_and_workers_must_be_at_least_one(
         tag(variables_path, tmp_path / "out", stub, option, value)
     assert e.value.code == 2 and option in capsys.readouterr().err
     assert stub.calls == []
+
+
+def test_an_empty_variables_file_tags_nothing_and_succeeds(tmp_path, capsys):
+    empty = tmp_path / "variables.jsonl"
+    empty.write_text("", encoding="utf-8")
+    stub = StubProvider(answer())
+    assert tag(empty, tmp_path / "out", stub) == 0
+    assert stub.calls == []
+    assert "0 already tagged, 0 to do" in capsys.readouterr().err
