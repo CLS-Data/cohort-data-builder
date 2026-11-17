@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 
@@ -78,3 +79,27 @@ def test_bad_lines_are_named(tmp_path, line, words):
 def test_a_missing_file_is_an_input_error(tmp_path):
     with pytest.raises(InputError):
         read_variables(tmp_path / "nope.jsonl")
+
+
+# --- One line as a dict (feature 006) ----------------------------------------------------
+
+from topic_tagger.variables import variable_from_dict  # noqa: E402
+
+
+def test_a_dict_gives_the_variable_its_line_gives(tmp_path):
+    line = {"file": "a", "variable": "x", "label": "X", "values": [[1, "One"]], "sweep": "5y"}
+    (from_file,) = read_variables(write(tmp_path, [json.dumps(line)]))
+    assert variable_from_dict(line) == from_file
+
+
+@pytest.mark.parametrize(
+    ("data", "message"),
+    [
+        ({"variable": "x"}, "'file' is missing or empty"),
+        ({"file": "a", "variable": ""}, "'variable' is missing or empty"),
+        ({"file": "a", "variable": "x", "values": [[1]]}, "'values' must be a list"),
+    ],
+)
+def test_a_bad_dict_is_a_value_error(data, message):
+    with pytest.raises(ValueError, match=re.escape(message)):
+        variable_from_dict(data)

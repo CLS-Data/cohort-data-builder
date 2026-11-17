@@ -443,3 +443,42 @@ def test_every_tier_up_to_the_depth_may_have_a_question(tmp_path):
     path = tmp_path / "s.toml"
     path.write_text(text.replace("[[categories]]", questions + "[[categories]]", 1))
     assert set(load_scheme(path).questions) == {"flat", "tier1", "tier2", "tier3"}
+
+
+# --- Schemes from text (feature 006) ----------------------------------------------------
+
+from topic_tagger.scheme import parse_scheme  # noqa: E402
+
+
+@pytest.mark.parametrize("name", ["scheme_small.toml", "scheme_3tier.toml", "scheme_run.toml"])
+def test_text_and_file_load_the_same_scheme(fixtures_dir, name):
+    path = fixtures_dir / name
+    from_text = parse_scheme(path.read_text(encoding="utf-8"))
+    from_file = load_scheme(path)
+    assert from_text.hash == from_file.hash
+    assert from_text.root == from_file.root
+    assert from_text.run == from_file.run
+
+
+def test_the_bundled_scheme_from_text_keeps_its_hash():
+    from topic_tagger.scheme import bundled_scheme_text
+
+    assert parse_scheme(bundled_scheme_text()).hash == "3c9f6b4b4ef9"
+
+
+def test_errors_from_text_name_their_source():
+    with pytest.raises(SchemeError) as err:
+        parse_scheme("name = 1")
+    assert str(err.value).startswith("<text>")
+    with pytest.raises(SchemeError) as err:
+        parse_scheme("name = 1", source="mine.toml")
+    assert str(err.value).startswith("mine.toml")
+
+
+def test_text_that_is_not_toml_is_a_scheme_error():
+    with pytest.raises(SchemeError, match="not valid TOML"):
+        parse_scheme("not toml [")
+
+
+def test_load_scheme_takes_a_string_path(small_scheme_path, small_scheme):
+    assert load_scheme(str(small_scheme_path)).hash == small_scheme.hash
