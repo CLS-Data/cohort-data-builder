@@ -178,8 +178,10 @@ def test_nothing_else_changes(cohort, tmp_path):
 
 def test_files_are_written_compactly(cohort, tmp_path):
     merge(cohort, tag_folder(cohort, tmp_path))
-    text = (cohort / "manifest.json").read_text(encoding="utf-8")
-    assert "\n" not in text.strip() and ", " not in text.split('"description"')[0]
+    for path in (cohort / "manifest.json", cohort / "index.json"):
+        text = path.read_text(encoding="utf-8").rstrip("\n")
+        compact = json.dumps(json.loads(text), separators=(",", ":"), ensure_ascii=False)
+        assert text == compact, path.name
 
 
 def test_exit_1_when_the_checks_find_problems(cohort, tmp_path, capsys):
