@@ -109,7 +109,7 @@ stdout or stderr.
    machine, **Then** a `RemoteModelError` is raised without sending anything. Allowing it
    is one argument, the equivalent of `--yes`.
 6. **Given** a variable that still fails after the retries, **Then** the call does not
-   raise; that variable's result is marked failed, with the last error.
+   raise; that variable's result is marked failed, with the call's last error message.
 
 ---
 
@@ -139,7 +139,8 @@ the same results as two one-call tags.
   in one call.
 - **Long value lists**: very long value lists are cut as on the command line (30 values).
 - **Partial refusal**: with a refusal part way through a call, nothing already tagged is
-  returned; the exception says how far the call got.
+  returned; the exception names the refused question and what to change. The same call
+  is refused again in the same way, so there is nothing to resume.
 
 ## Requirements *(mandatory)*
 
@@ -168,7 +169,8 @@ the same results as two one-call tags.
   - the input;
   - its tags (topic id, topic label, confidence), strongest first;
   - for tiered tagging, its path of groups;
-  - whether it failed, and if so the last error.
+  - whether it failed, and if so the call's last error message (errors are not tracked
+    per input).
 - **FR-010**: Each call MUST also give:
   - the settings used and their sources;
   - any notes;

@@ -96,6 +96,7 @@ contracts/api.md and quickstart.md.
 **Independent test**: with `fake_decision`, tag three strings with `scheme_run.toml` (decision, tiered). Each result has leaf topics, confidences and a path; `tmp_path` stays empty; `capsys` captures nothing.
 
 - [ ] T010 [US1] Write failing tests in the new `tests/test_api.py`:
+  0. An autouse fixture in `tests/test_api.py`: `monkeypatch.chdir(tmp_path)` before each test. After it, assert `list(tmp_path.iterdir()) == []` and `capsys.readouterr() == ("", "")`. Tests that expect an exception still pass through it (SC-003).
   1. `tag(["Do you smoke?", "Weight in kg", "Do you smoke?"], scheme_run_path, provider=fake_decision)` returns 3 results in input order:
      - each `input` is the string passed;
      - `tags` are strongest first, and every `topic` is a leaf id of the scheme;
@@ -103,16 +104,15 @@ contracts/api.md and quickstart.md.
      - `failed` is False;
      - duplicates are tagged separately.
   2. Each string reaches the model as the state `{"name": "", "label": text, "values": []}`.
-  3. A `Variable` input reaches the model as `{"name": …, "label": …, "values": [...]}`, exactly as `tiered._state` makes it. A dict in the `variables.jsonl` form behaves the same. Strings, variables and dicts mix in one call.
+  3. A `Variable` input reaches the model as `{"name": …, "label": …, "values": [...]}`, exactly as `tiered._state` makes it. A dict in the `variables.jsonl` form behaves the same. Strings, variables and dicts mix in one call. A `Variable` with 40 value labels reaches the model with 30 of them, then `"… and 10 more"`.
   4. `classify("Do you smoke?", scheme_run_path, provider=fake_decision)` returns one `Result`, not a list.
   5. `Results`:
      - supports `len`, indexing and iteration;
      - `settings["method"] == "tiered"`, with `sources["method"] == "file"`;
      - `scheme_hash` equals `load_scheme(scheme_run_path).hash`;
      - `requests_by_tier` is non-empty.
-  6. With `monkeypatch.chdir(tmp_path)`, after a call `tmp_path` is empty and `capsys.readouterr()` is `("", "")`.
-  7. `tag([], …)` returns empty `Results`, and `fake_decision.calls == []` and `checks == 0`.
-  8. `Result.topics` lists the topic ids. `Result.to_dict()` has `topics`, `method`, `model`, `scheme`, `failed` and `error`, plus `path` when tiered.
+  6. `tag([], …)` returns empty `Results`, and `fake_decision.calls == []` and `checks == 0`.
+  7. `Result.topics` lists the topic ids. `Result.to_dict()` has `topics`, `method`, `model`, `scheme`, `failed` and `error`, plus `path` when tiered.
 - [ ] T011 [US1] Run T010 and see it fail. Commit as `test(tagger): tag and classify in one call`.
 - [ ] T012 [US1] Create `src/topic_tagger/api.py` with Google-style docstrings throughout:
   - `Tag(topic, label, confidence)`: frozen dataclass.
@@ -171,9 +171,12 @@ contracts/api.md and quickstart.md.
   7. With `scheme_1tier.toml` and `method="tiered"`, `notes == ["This taxonomy has one tier: tagging flat."]` and the method is `flat`.
   8. `model="my-model"` with a provider object is stored in `to_dict()["model"]` as `ollama-decision:my-model`. Without it, the model is `ollama-decision:custom`.
   9. `Tagger(...)` exposes `settings`, `sources` and `notes` before any call, with no `check()` made.
+  10. With `topic_tagger.api.get_provider` monkeypatched to record its arguments and return `fake_decision`: `Tagger(provider="ollama-decision", base_url="http://h:1/v1", timeout=7, api_key="k")` passes `base_url`, `timeout`, `model` and `api_key` through. With no `api_key` and `TOPIC_TAGGER_API_KEY=env` set, it passes `"env"`.
+  11. With `fake_chat` and `scheme_small.toml` flat, `batch_size=1` over 3 inputs sends 3 requests (`len(fake_chat.calls) == 3`), and the default sends 1. A `[run]` table cannot set `batch_size`: it is rejected by the scheme check, as on the command line.
+  12. A provider object without `is_remote`, or with neither `decide` nor `complete`, raises `TypeError` at `Tagger(...)`, naming the missing method.
 - [ ] T015 [US2] Run T014 and see it fail. Commit as `test(tagger): settings, schemes and providers from code`.
 - [ ] T016 [US2] In `src/topic_tagger/api.py`, make T014 pass:
-  - a provider object counts as `ollama-decision` if `hasattr(obj, "decide")`, else `ollama` (it must have `complete`, or `TypeError`), when settling;
+  - a provider object counts as `ollama-decision` if `hasattr(obj, "decide")`, else `ollama` (check for `check`, `is_remote`, and `decide` or `complete`; else `TypeError` naming what is missing), when settling;
   - `model` defaults to `"custom"` for objects;
   - everything else should already follow from `settle` (verify the one-tier note reaches `Results.notes`).
 
@@ -187,14 +190,14 @@ contracts/api.md and quickstart.md.
 
 **Independent test**: each row of quickstart.md step 5 raises its exception, and `capsys` stays empty.
 
-- [ ] T017 [US3] Write failing tests in `tests/test_api.py`, each also asserting `capsys.readouterr() == ("", "")`:
+- [ ] T017 [US3] Write failing tests in `tests/test_api.py` (the autouse fixture from T010 checks that nothing is printed or written):
   1. A broken scheme path raises `SchemeError` listing every problem. `parse_scheme` of bad text raises it too.
   2. `descend_at=1.5` raises `ValueError("--descend-at must be between 0 and 1")`. `keep_at=0.4` with `fake_chat` raises a `ValueError` about `--keep-at`. Neither touches the provider.
   3. `tag([42], …)` raises `TypeError` naming input 0. A dict without `file` raises `ValueError` starting `input 0:`.
   4. A provider whose `check()` raises `ProviderError("model missing")` makes `tag` raise that error before any `decide`.
   5. `FakeDecisionModel(remote=True)` without `allow_remote` raises `RemoteModelError` (a `ProviderError` subclass) whose message names the model and says to pass `allow_remote=True`. `calls` and `checks` are both 0. With `allow_remote=True` it tags.
   6. `FakeDecisionModel(refuse_over=5)` with the bundled scheme flat raises `OptionLimitError`, with `.options == 107` and `.question == "every topic, asked flat"`.
-  7. A decision model that raises `ProviderError` for one input's state every time gives that `Result` `failed=True` and `error` containing the message. The others are tagged, and the call does not raise.
+  7. A decision model that raises `ProviderError("no answer")` for one input's state every time gives that `Result` `failed=True` and `error == "no answer"` (the only error in the call). The others are tagged, with `failed=False` and `error == ""`, and the call does not raise.
   8. Search `src/topic_tagger/api.py`: it contains no `print(`, `input(`, `sys.exit` or `open(`. Test this by reading the source.
 - [ ] T018 [US3] Run T017 and see it fail. Commit as `test(tagger): errors from the API`.
 - [ ] T019 [US3] In `src/topic_tagger/api.py`:
@@ -218,15 +221,18 @@ contracts/api.md and quickstart.md.
   2. The results equal `tag(a, …)` and `tag(b, …)` made separately: same topics and confidences.
   3. `check=False` makes no `check()` call at all.
   4. `t.classify(x)` reuses the same check.
-- [ ] T021 [US4] Run T020 and see it fail (or, if T012 already passes it, record that in the commit message). Commit as `test(tagger): one tagger, many calls`. Make it pass in `src/topic_tagger/api.py` and commit as `feat(tagger): …` if any change was needed.
+- [ ] T021 [US4] Run T020.
+  - If any test fails: commit the tests as `test(tagger): one tagger, many calls`, make them pass in `src/topic_tagger/api.py`, and commit that as `feat(tagger): …`.
+  - If all pass (T012 already checks the host once): no code change follows. Commit the tests as `test(tagger): one tagger, many calls (regression)`, with the commit body saying T012 already covers it.
 
 ---
 
 ## Phase 7: Polish and cross-cutting
 
 - [ ] T022 Write failing `tests/test_api.py::test_the_api_and_the_cli_give_the_same_tags` (SC-002, FR-014). For each of the four combinations (chat or decision model, flat or tiered) on `tests/fixtures/variables.jsonl`:
-  - run `cli.main([...], provider_factory=lambda args: model, clock=FakeClock())` into `tmp_path` with `--yes --plain`;
-  - run `tag(read_variables(path), …, provider=model)` with the same settings and `batch_size`/`workers=1`;
+  - run `cli.main([...], provider_factory=lambda args: model, clock=FakeClock())` into `tmp_path` with `--yes --plain --batch-size 20 --workers 1`;
+  - run `tag(read_variables(path), …, provider=model, batch_size=20, workers=1)`;
+  - with one worker, the batches are the same and in the same order on both sides;
   - assert each variable's topics, confidences and path are equal.
 
   Use `scheme_small.toml`. For chat, use a deterministic `FakeChatModel` whose reply depends only on the request, not on call order. Fix any difference found in `api.py`. Commit the test, then the fix.

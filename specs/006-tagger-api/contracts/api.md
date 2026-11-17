@@ -50,6 +50,12 @@ def tag(
 - `ProviderError`: host unreachable or model missing;
 - `OptionLimitError`: model refused a question.
 
+**Provider objects** must have `check()` and `is_remote()`, plus either
+`decide(state, instructions, options) -> dict[str, float]` (a decision model) or
+`complete(messages, schema) -> str` (a chat model). These are the `DecisionProvider` and
+`Provider` protocols in `topic_tagger.providers`. An object missing any of them raises
+`TypeError` when the `Tagger` is made, naming what is missing.
+
 ## `classify`
 
 ```python
