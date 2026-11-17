@@ -4,10 +4,6 @@ import sys
 import topic_tagger
 
 
-def test_the_package_has_a_version():
-    assert topic_tagger.__version__ == "0.2.0"  # 0.2.0: the first with a Python API
-
-
 def test_the_version_agrees_with_pyproject():
     import tomllib
     from pathlib import Path

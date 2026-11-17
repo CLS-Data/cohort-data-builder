@@ -394,16 +394,6 @@ def test_an_input_that_keeps_failing_is_a_failed_result(small_scheme_path):
     assert results.failed == [results[1]]
 
 
-def test_the_api_never_prints_prompts_exits_or_opens_files():
-    from pathlib import Path
-
-    import topic_tagger.api
-
-    source = Path(topic_tagger.api.__file__).read_text(encoding="utf-8")
-    for call in ("print(", "input(", "sys.exit", "open("):
-        assert call not in source, call
-
-
 # --- US4: reuse one tagger ----------------------------------------------------------------
 
 

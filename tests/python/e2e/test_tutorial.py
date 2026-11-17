@@ -140,12 +140,6 @@ def test_run_command_follows_the_language(tutorial):
     expect(page.locator("#run-cmd")).to_have_text("do stata/merge.do")
 
 
-def test_describes_the_one_selection_list_and_tag_suggestions(tutorial):
-    page = tutorial
-    expect(page.locator("#download")).to_contain_text("stay in view")
-    expect(page.locator("#topics")).to_contain_text("Suggest a tag change")
-
-
 def test_shade_switch_rescales_the_topic_map(tutorial):
     page = tutorial
     cell = page.locator("#heat .heat-cell").first

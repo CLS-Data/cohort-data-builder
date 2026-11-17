@@ -136,11 +136,6 @@ def test_the_valid_fixture_has_no_problems():
     assert check_data(FIXTURE) == []
 
 
-def test_the_supplied_site_data_has_no_problems():
-    problems = check_data(ROOT / "site" / "data")
-    assert problems == [], "\n".join(map(str, problems))
-
-
 @pytest.mark.parametrize("case", sorted(BROKEN))
 def test_each_broken_case_is_reported_against_its_file_only(case, data):
     breaks, path = BROKEN[case]

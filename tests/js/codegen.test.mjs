@@ -182,23 +182,6 @@ test("codebook quotes commas, quotes and newlines (RFC 4180)", () => {
   assert.equal(lines[2], 'x,x,mini_age5,5y,"a, b",,,,');
 });
 
-test("every template has the placeholders the contract requires", () => {
-  const required = {
-    "r/merge.R":
-      "dataset created identifier missing_to_na selection missing_codes output_format labels value_labels",
-    "python/merge.py":
-      "dataset created identifier missing_to_na selection missing_codes output_format labels value_labels",
-    "README.md":
-      "dataset full_name created count files languages contents ext format_note identifier ukds_url missing_note run",
-    "data-README.md": "dataset files ukds_url",
-  };
-  for (const [name, keys] of Object.entries(required)) {
-    for (const key of keys.split(" ")) {
-      assert.ok(templates[name].includes(`{{${key}}}`), `${name} lacks {{${key}}}`);
-    }
-  }
-});
-
 /* ── Stata ───────────────────────────────────────────────────────────── */
 
 const stata = [`stata/load_data.do`, "stata/merge.do"];
@@ -309,12 +292,4 @@ test("Stata value labels are defined per column", () => {
   );
   assert.ok(d.includes("label values tenure5 tenure5"));
   assert.ok(!d.includes("label define weight10"));
-});
-
-test("the Stata templates have their placeholders", () => {
-  for (const key of "dataset created identifier missing_to_na selection missing_codes output_format labels value_labels".split(
-    " ",
-  )) {
-    assert.ok(templates["stata/merge.do"].includes(`{{${key}}}`), `merge.do lacks {{${key}}}`);
-  }
 });

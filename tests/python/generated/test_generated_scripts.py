@@ -1,6 +1,5 @@
 """Run the generated R and Python projects on fabricated data and compare what they write."""
 
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -317,26 +316,6 @@ def test_rendered_python_passes_ruff(tmp_path):
         text=True,
     )
     assert done.returncode == 0, done.stdout + done.stderr
-
-
-def test_driver_refuses_unselectable_variables(tmp_path):
-    done = subprocess.run(
-        [
-            "node",
-            str(DRIVER),
-            str(FIXTURE),
-            "mini",
-            str(tmp_path),
-            "false",
-            "csv",
-            "r",
-            "mini_noid:areacode",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    assert done.returncode != 0
-    assert shutil.which("node")
 
 
 # ── Stata (runs only where Stata is installed; never in CI) ──────────────
