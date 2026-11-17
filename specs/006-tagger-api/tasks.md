@@ -190,7 +190,7 @@ contracts/api.md and quickstart.md.
 
 **Independent test**: each row of quickstart.md step 5 raises its exception, and `capsys` stays empty.
 
-- [ ] T017 [US3] Write failing tests in `tests/test_api.py` (the autouse fixture from T010 checks that nothing is printed or written):
+- [x] T017 [US3] Write failing tests in `tests/test_api.py` (the autouse fixture from T010 checks that nothing is printed or written):
   1. A broken scheme path raises `SchemeError` listing every problem. `parse_scheme` of bad text raises it too.
   2. `descend_at=1.5` raises `ValueError("--descend-at must be between 0 and 1")`. `keep_at=0.4` with `fake_chat` raises a `ValueError` about `--keep-at`. Neither touches the provider.
   3. `tag([42], …)` raises `TypeError` naming input 0. A dict without `file` raises `ValueError` starting `input 0:`.
@@ -199,10 +199,10 @@ contracts/api.md and quickstart.md.
   6. `FakeDecisionModel(refuse_over=5)` with the bundled scheme flat raises `OptionLimitError`, with `.options == 107` and `.question == "every topic, asked flat"`.
   7. A decision model that raises `ProviderError("no answer")` for one input's state every time gives that `Result` `failed=True` and `error == "no answer"` (the only error in the call). The others are tagged, with `failed=False` and `error == ""`, and the call does not raise.
   8. Search `src/topic_tagger/api.py`: it contains no `print(`, `input(`, `sys.exit` or `open(`. Test this by reading the source.
-- [ ] T018 [US3] Run T017 and see it fail. Commit as `test(tagger): errors from the API`.
-- [ ] T019 [US3] In `src/topic_tagger/api.py`:
+- [x] T018 [US3] Run T017 and see it fail. Commit as `test(tagger): errors from the API`.
+- [x] T019 [US3] In `src/topic_tagger/api.py`:
   - define `class RemoteModelError(ProviderError)` with a docstring;
-  - in `Tagger.tag`, before the host check, raise it when `provider.is_remote() and not allow_remote`;
+  - in `Tagger.tag`, before the host check, raise it when `provider.is_remote() and not allow_remote`. (`RemoteModelError` was already defined in `api.py` with T012, so `__init__.py` needed no stub.)
   - if `RunResult.refusal` is set after the run, raise it (its `question` and `advice` are already filled in by the walk);
   - replace the `RemoteModelError` stub in `__init__.py`.
 

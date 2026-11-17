@@ -308,13 +308,21 @@ class Tagger:
 
         Raises:
             TypeError, ValueError: An input is not one of the forms above, or a bad dict.
+            RemoteModelError: The model is in the cloud and ``allow_remote`` is not set.
             ProviderError: The host cannot be reached or lacks the model.
+            OptionLimitError: The model refused a question for having too many options.
+                Nothing is returned: the same call would be refused again.
         """
         items = list(inputs)
         variables = [_to_variable(i, item) for i, item in enumerate(items)]
         s = self.settings
         if not variables:
             return self._results([], None)
+        if not self._allow_remote and self._provider.is_remote():
+            raise RemoteModelError(
+                f"{s['model']} runs in the cloud: the variables' metadata would leave this "
+                "machine. Pass allow_remote=True to allow it."
+            )
         self._check_host()
         settings = Settings(
             batch_size=self._batch_size,
@@ -331,6 +339,8 @@ class Tagger:
         sink = _MemorySink()
         runner = Runner(self.scheme, self._provider, sink, settings, SystemClock(), decider=decider)
         run = runner.run(variables)
+        if run.refusal is not None:
+            raise run.refusal  # its question and advice were filled in by the walk
         labels = {t.id: t.label for t in self.scheme.topics}
         failed = {int(key.split("/", 1)[0]) for key in run.failed}
         results = []
