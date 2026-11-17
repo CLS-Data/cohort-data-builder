@@ -111,3 +111,12 @@ def test_areas_can_be_the_options():
     assert parse_options_reply(text, ["health", "demographics"], 1, order) == {
         0: [("demographics", 0.7), ("health", 0.2)]
     }
+
+
+def test_an_empty_reply_is_rejected(small_scheme):
+    with pytest.raises(ReplyError):
+        parse_reply("", small_scheme, 2)
+
+
+def test_a_reply_with_no_variables_tags_nothing(small_scheme):
+    assert parse_reply('{"variables": []}', small_scheme, 2) == {}

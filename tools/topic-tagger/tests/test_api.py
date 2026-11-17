@@ -438,3 +438,11 @@ def test_a_single_string_is_refused_rather_than_tagged_letter_by_letter(
 
     with pytest.raises(TypeError, match="list"):
         tag("Do you smoke?", scheme_run_path, provider=fake_decision)
+
+
+@pytest.mark.parametrize("setting", ["batch_size", "workers"])
+def test_batch_size_and_workers_must_be_at_least_one(small_scheme_path, fake_decision, setting):
+    from topic_tagger import Tagger
+
+    with pytest.raises(ValueError, match=setting):
+        Tagger(small_scheme_path, provider=fake_decision, **{setting: 0})

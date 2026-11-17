@@ -901,3 +901,15 @@ def test_a_flat_dry_run_prints_one_request(tmp_path, variables_path, capsys, dec
     if decision:
         assert len(json.loads(out)["questions"]["option"]["criteria"]) == 9
     assert stub.calls == []
+
+
+@pytest.mark.parametrize("option", ["--batch-size", "--workers"])
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_batch_size_and_workers_must_be_at_least_one(
+    tmp_path, variables_path, capsys, option, value
+):
+    stub = StubProvider(answer())
+    with pytest.raises(SystemExit) as e:
+        tag(variables_path, tmp_path / "out", stub, option, value)
+    assert e.value.code == 2 and option in capsys.readouterr().err
+    assert stub.calls == []
