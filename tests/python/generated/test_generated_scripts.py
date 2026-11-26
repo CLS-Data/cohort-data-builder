@@ -417,3 +417,100 @@ def test_files_with_no_rows_give_an_empty_output(tmp_path, lang):
     assert len(merged) == 0
     # With no rows the grid has no repeated people, so it joins like any other file.
     assert list(merged.columns) == COLUMNS + ["hhrel"]
+
+
+# ── Several cohorts in one download (feature 007, contracts/multi-cohort-download.md) ──
+
+MINI2_PICKS = ["mini2_age3:play3", "mini2_age11:smok11", "mini2_age11:vape11"]
+
+
+def fabricate_mini2():
+    """mini2's files as deposited: invented CID values, fixed seed."""
+    rng = np.random.default_rng(2002)
+    people = [f"C{i:03d}" for i in range(1, 21)]
+    age3 = pd.DataFrame(
+        {"CID": people[:15], "sex": rng.choice([1, 2], 15), "play3": rng.choice([1, 2, 3], 15)}
+    )
+    age11 = pd.DataFrame(
+        {
+            "CID": people[5:],
+            "sex": rng.choice([1, 2], 15),
+            "smok11": rng.choice([1, 2], 15),
+            "vape11": rng.choice([1, 2, -9], 15),
+        }
+    )
+    return {"mini2_age3": age3, "mini2_age11": age11}
+
+
+def generate_bundle(out, picks, langs="r,python"):
+    """Write a several-cohort download's folders and README into out."""
+    subprocess.run(
+        ["node", str(DRIVER), "--bundle", str(FIXTURE), str(out), "false", "csv", langs] + picks,
+        check=True,
+    )
+    return out
+
+
+def generate_one(out, cohort, picks, langs="r,python"):
+    """Write one cohort's own download into out."""
+    subprocess.run(
+        ["node", str(DRIVER), str(FIXTURE), cohort, str(out), "false", "csv", langs] + picks,
+        check=True,
+    )
+    return out
+
+
+def folder_of(bundle, cohort):
+    """The cohort's project folder inside a bundle."""
+    (found,) = bundle.glob(f"{cohort}-merge-*")
+    return found
+
+
+def fill_mini2(project):
+    """Put mini2's fabricated data, as CSV, in a project's data folder."""
+    (project / "data").mkdir(exist_ok=True)
+    for name, df in fabricate_mini2().items():
+        df.to_csv(project / "data" / f"{name}.csv", index=False)
+
+
+def files_of(folder):
+    """Every file under a folder, by relative path, as bytes."""
+    return {p.relative_to(folder): p.read_bytes() for p in folder.rglob("*") if p.is_file()}
+
+
+def test_each_cohort_folder_is_that_cohorts_own_project(tmp_path):
+    bundle = generate_bundle(
+        tmp_path / "bundle",
+        [f"mini/{p}" for p in PICKS] + [f"mini2/{p}" for p in MINI2_PICKS],
+    )
+    assert (bundle / "README.md").exists()
+    assert files_of(folder_of(bundle, "mini")) == files_of(
+        generate_one(tmp_path / "mini", "mini", PICKS)
+    )
+    assert files_of(folder_of(bundle, "mini2")) == files_of(
+        generate_one(tmp_path / "mini2", "mini2", MINI2_PICKS)
+    )
+
+
+@pytest.mark.parametrize("lang", ["python", pytest.param("r", marks=pytest.mark.needs_r)])
+def test_each_folder_runs_on_its_own_and_matches_its_cohorts_project(tmp_path, lang):
+    langs = "r,python"
+    bundle = generate_bundle(
+        tmp_path / "bundle",
+        [f"mini/{p}" for p in PICKS] + [f"mini2/{p}" for p in MINI2_PICKS],
+        langs,
+    )
+    alone = generate_one(tmp_path / "alone", "mini2", MINI2_PICKS, langs)
+    for project in (folder_of(bundle, "mini2"), alone):
+        fill_mini2(project)
+        run_ok(project, lang)
+    in_bundle = read(folder_of(bundle, "mini2") / "output" / "merged.csv")
+    on_its_own = read(alone / "output" / "merged.csv")
+    pd.testing.assert_frame_equal(in_bundle, on_its_own)
+    assert list(in_bundle.columns) == ["CID", "play3", "smok11", "vape11"]
+    assert "PID" not in in_bundle.columns
+
+    mini = folder_of(bundle, "mini")
+    write_data(fabricate(), mini / "data", "csv")
+    run_ok(mini, lang)
+    assert list(read(mini / "output" / "merged.csv").columns) == COLUMNS

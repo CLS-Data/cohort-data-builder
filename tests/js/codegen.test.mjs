@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { before, test } from "node:test";
-import { buildProject, codebook } from "../../site/js/core/codegen.js";
+import { buildBundle, buildProject, codebook } from "../../site/js/core/codegen.js";
 import { readFixture } from "./helpers.mjs";
 
 const TEMPLATE_FILES = [
@@ -15,6 +15,7 @@ const TEMPLATE_FILES = [
   "python/requirements.txt",
   "stata/load_data.do",
   "stata/merge.do",
+  "cohorts-README.md",
 ];
 const TODAY = "2026-10-26";
 const PROJECT = `mini-merge-${TODAY}`;
@@ -309,4 +310,84 @@ test("no languages chosen gives no code files", () => {
     !p.files.some(([path]) => /\.(R|py|do)$/.test(path)),
     p.files.map(([f]) => f).join("\n"),
   );
+});
+
+/* ── Several cohorts in one download (feature 007, contracts/multi-cohort-download.md) ── */
+
+const BUNDLE_TODAY = "2026-11-26";
+const BUNDLE = `cohorts-merge-${BUNDLE_TODAY}`;
+
+async function mini2Project() {
+  const m2 = await readFixture("mini2/manifest.json");
+  const d2 = {};
+  for (const f of ["mini2_age3", "mini2_age11"]) d2[f] = await readFixture(`mini2/dict/${f}.json`);
+  const pick = (name, file, wave) => {
+    const entry = d2[file].variables.find((v) => v.variable === name);
+    return { name, label: entry.label, file, wave, column: name };
+  };
+  return {
+    selection: [pick("play3", "mini2_age3", "3y"), pick("smok11", "mini2_age11", "11y")],
+    manifest: m2,
+    dicts: d2,
+  };
+}
+
+const miniProject = () => ({
+  selection: [sel("smoke5", "mini_age5", "5y"), sel("alc10", "mini_age10", "10y")],
+  manifest,
+  dicts,
+});
+
+test("buildBundle: one cohort is exactly that cohort's own project", () => {
+  const one = miniProject();
+  assert.deepEqual(
+    buildBundle([one], templates, options(), BUNDLE_TODAY),
+    buildProject(one.selection, manifest, dicts, templates, options(), BUNDLE_TODAY),
+  );
+});
+
+test("buildBundle: several cohorts are their own projects in one folder, unchanged", async () => {
+  const a = miniProject();
+  const b = await mini2Project();
+  const bundle = buildBundle([a, b], templates, options(), BUNDLE_TODAY);
+  assert.equal(bundle.name, BUNDLE);
+  const own = (p) =>
+    buildProject(p.selection, p.manifest, p.dicts, templates, options(), BUNDLE_TODAY).files;
+  const expected = [
+    [`${BUNDLE}/README.md`],
+    ...[...own(a), ...own(b)].map(([path, text]) => [`${BUNDLE}/${path}`, text]),
+  ];
+  assert.deepEqual(
+    bundle.files.map(([path]) => path),
+    expected.map(([path]) => path),
+    "the README, then mini's folder, then mini2's",
+  );
+  for (const [path, text] of expected.slice(1)) {
+    assert.equal(bundle.files.find(([p]) => p === path)[1], text, `${path} is byte-identical`);
+  }
+});
+
+test("buildBundle: the top README says what is in each folder, and that they are not merged", async () => {
+  const bundle = buildBundle(
+    [miniProject(), await mini2Project()],
+    templates,
+    options(),
+    BUNDLE_TODAY,
+  );
+  const readme = bundle.files.find(([p]) => p === `${BUNDLE}/README.md`)[1];
+  assert.match(readme, /4 variables from 2 cohorts/);
+  assert.match(
+    readme,
+    /\*\*Mini\*\* \(Mini Test Cohort\): 2 variables, in `mini-merge-2026-11-26\/`/,
+  );
+  assert.match(
+    readme,
+    /\*\*Mini2\*\* \(Second Mini Test Cohort\): 2 variables, in `mini2-merge-2026-11-26\/`/,
+  );
+  assert.match(readme, /not merged with each other/);
+  assert.doesNotMatch(readme, /\{\{/, "every placeholder filled");
+});
+
+test("buildBundle: nothing to build is an error", () => {
+  assert.throws(() => buildBundle([], templates, options(), BUNDLE_TODAY));
 });
