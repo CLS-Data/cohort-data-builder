@@ -18,7 +18,7 @@ def base(serve, mini_site):
 @pytest.fixture
 def tutorial(page, base):
     page.goto(base + "tutorial/")
-    expect(page.locator("#t-total")).to_have_text("16")
+    expect(page.locator("#t-total")).to_have_text("31")  # mini 16 + mini2 12 + mini3 3
     return page
 
 
@@ -26,7 +26,7 @@ def test_loads_only_its_own_files_the_data_and_the_builders_styles(page, base):
     requested = []
     page.on("request", lambda r: requested.append(r.url))
     page.goto(base + "tutorial/")
-    expect(page.locator("#t-total")).to_have_text("16")
+    expect(page.locator("#t-total")).to_have_text("31")  # mini 16 + mini2 12 + mini3 3
     own = (base + "tutorial/", base + "data/", base + "styles.css")
     outside = [u for u in requested if not u.startswith(own)]
     assert outside == []
@@ -50,7 +50,7 @@ def test_title_and_counts_come_from_the_data(tutorial):
     page = tutorial
     expect(page).to_have_title(re.compile("Tutorial"))
     expect(page.get_by_role("heading", level=1)).to_be_visible()
-    expect(page.locator("#t-cohorts")).to_have_text("1")
+    expect(page.locator("#t-cohorts")).to_have_text("3")
     expect(page.locator("#t-topics")).to_have_text("3")
     expect(page.locator("#t-domains")).to_have_text("2")
     expect(page.locator("#t-cohort-list")).to_contain_text("Mini")
@@ -179,7 +179,7 @@ def test_does_not_name_cls(tutorial):
 def test_no_serious_accessibility_problems(page, base, theme, serious):
     page.emulate_media(color_scheme=theme)
     page.goto(base + "tutorial/")
-    expect(page.locator("#t-total")).to_have_text("16")
+    expect(page.locator("#t-total")).to_have_text("31")  # mini 16 + mini2 12 + mini3 3
     page.get_by_role("button", name="Show details for bd7smoke").click()
     assert serious(page) == []
 
@@ -187,7 +187,7 @@ def test_no_serious_accessibility_problems(page, base, theme, serious):
 def test_fits_a_phone(page, base):
     page.set_viewport_size({"width": 390, "height": 844})
     page.goto(base + "tutorial/")
-    expect(page.locator("#t-total")).to_have_text("16")
+    expect(page.locator("#t-total")).to_have_text("31")  # mini 16 + mini2 12 + mini3 3
     width = page.evaluate("document.documentElement.scrollWidth")
     assert width <= 390
 
@@ -198,4 +198,4 @@ def test_the_builder_links_to_it(page, base):
     link = page.locator("header").get_by_role("link", name="Tutorial")
     expect(link).to_have_attribute("href", "tutorial/")
     link.click()
-    expect(page.locator("#t-total")).to_have_text("16")
+    expect(page.locator("#t-total")).to_have_text("31")  # mini 16 + mini2 12 + mini3 3

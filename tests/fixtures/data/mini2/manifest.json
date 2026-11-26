@@ -1,0 +1,94 @@
+{
+ "key": "mini2",
+ "name": "Mini2",
+ "fullName": "Second Mini Test Cohort",
+ "description": "A second tiny fictional cohort for tests.",
+ "identifier": "CID",
+ "ukdsUrl": "https://example.org/mini2",
+ "built": "2026-11-26",
+ "wave": {
+  "term": "wave",
+  "plural": "waves",
+  "list": [
+   {
+    "key": "3y",
+    "label": "Age 3"
+   },
+   {
+    "key": "w2",
+    "label": "Wave 2",
+    "age": 7
+   },
+   {
+    "key": "11y",
+    "label": "Age 11"
+   },
+   {
+    "key": "extra",
+    "label": "Linked records"
+   }
+  ]
+ },
+ "levels": [
+  "ORDINAL",
+  "NOMINAL"
+ ],
+ "topics": {
+  "name": "Mini topics",
+  "version": 2,
+  "hash": "000000000002",
+  "domains": [
+   {
+    "id": "health",
+    "label": "Health",
+    "description": "Physical and mental health.",
+    "topics": [
+     {
+      "id": "vaping",
+      "label": "Vaping",
+      "description": "E-cigarette use."
+     },
+     {
+      "id": "smoking",
+      "label": "Smoking",
+      "description": "Tobacco use."
+     }
+    ]
+   }
+  ]
+ },
+ "files": [
+  {
+   "name": "mini2_age3",
+   "wave": "3y",
+   "study": "0000",
+   "description": "Age 3 interview",
+   "hasId": true
+  },
+  {
+   "name": "mini2_w2",
+   "wave": "w2",
+   "study": "0000",
+   "description": "Wave 2 interview",
+   "hasId": true
+  },
+  {
+   "name": "mini2_age11",
+   "wave": "11y",
+   "study": "0000",
+   "description": "Age 11 interview",
+   "hasId": true
+  },
+  {
+   "name": "mini2_links",
+   "wave": "extra",
+   "study": "0000",
+   "description": "Linked school records",
+   "hasId": true
+  }
+ ],
+ "counts": {
+  "variables": 12,
+  "files": 4
+ }
+}

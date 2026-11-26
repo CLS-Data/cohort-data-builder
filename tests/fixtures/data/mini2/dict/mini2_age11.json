@@ -1,0 +1,84 @@
+{
+ "file": "mini2_age11",
+ "wave": "11y",
+ "variables": [
+  {
+   "variable": "CID",
+   "label": "Cohort member identifier",
+   "type": "string",
+   "measurement": "NOMINAL"
+  },
+  {
+   "variable": "sex",
+   "label": "Sex of cohort member",
+   "type": "numeric",
+   "measurement": "NOMINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Male"
+    },
+    {
+     "value": "2.0",
+     "label": "Female"
+    }
+   ],
+   "na": {
+    "values": [
+     -9
+    ],
+    "ranges": []
+   }
+  },
+  {
+   "variable": "smok11",
+   "label": "Has ever tried smoking a cigarette",
+   "type": "numeric",
+   "measurement": "NOMINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Yes"
+    },
+    {
+     "value": "2.0",
+     "label": "No"
+    }
+   ],
+   "na": {
+    "values": [
+     -1
+    ],
+    "ranges": []
+   },
+   "topics": [
+    [
+     "smoking",
+     0.9
+    ]
+   ]
+  },
+  {
+   "variable": "vape11",
+   "label": "Has ever used an e-cigarette",
+   "type": "numeric",
+   "measurement": "NOMINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Yes"
+    },
+    {
+     "value": "2.0",
+     "label": "No"
+    }
+   ],
+   "topics": [
+    [
+     "vaping",
+     0.8
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,94 @@
+[
+ [
+  "CID",
+  "Cohort member identifier",
+  0,
+  0,
+  1
+ ],
+ [
+  "sex",
+  "Sex of cohort member",
+  0,
+  0,
+  1
+ ],
+ [
+  "play3",
+  "Plays outside",
+  0,
+  0,
+  0
+ ],
+ [
+  "CID",
+  "Cohort member identifier",
+  1,
+  1,
+  1
+ ],
+ [
+  "sex",
+  "Sex of cohort member",
+  1,
+  1,
+  1
+ ],
+ [
+  "read7",
+  "Reads for pleasure",
+  1,
+  1,
+  0
+ ],
+ [
+  "CID",
+  "Cohort member identifier",
+  2,
+  2,
+  1
+ ],
+ [
+  "sex",
+  "Sex of cohort member",
+  2,
+  2,
+  1
+ ],
+ [
+  "smok11",
+  "Has ever tried smoking a cigarette",
+  2,
+  2,
+  1,
+  [
+   1,
+   90
+  ]
+ ],
+ [
+  "vape11",
+  "Has ever used an e-cigarette",
+  2,
+  2,
+  1,
+  [
+   0,
+   80
+  ]
+ ],
+ [
+  "CID",
+  "Cohort member identifier",
+  3,
+  3,
+  1
+ ],
+ [
+  "linked1",
+  "School record linked",
+  3,
+  3,
+  1
+ ]
+]

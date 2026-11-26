@@ -1,0 +1,28 @@
+{
+ "file": "mini2_links",
+ "wave": "extra",
+ "variables": [
+  {
+   "variable": "CID",
+   "label": "Cohort member identifier",
+   "type": "string",
+   "measurement": "NOMINAL"
+  },
+  {
+   "variable": "linked1",
+   "label": "School record linked",
+   "type": "numeric",
+   "measurement": "NOMINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Yes"
+    },
+    {
+     "value": "2.0",
+     "label": "No"
+    }
+   ]
+  }
+ ]
+}

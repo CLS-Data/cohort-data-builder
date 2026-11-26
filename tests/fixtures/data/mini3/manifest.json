@@ -1,0 +1,35 @@
+{
+ "key": "mini3",
+ "name": "Mini3",
+ "fullName": "Third Mini Test Cohort",
+ "description": "A tiny fictional cohort without topic tags.",
+ "identifier": "KID",
+ "ukdsUrl": "https://example.org/mini3",
+ "built": "2026-11-26",
+ "wave": {
+  "term": "sweep",
+  "plural": "sweeps",
+  "list": [
+   {
+    "key": "16y",
+    "label": "Age 16"
+   }
+  ]
+ },
+ "levels": [
+  "NOMINAL"
+ ],
+ "files": [
+  {
+   "name": "mini3_age16",
+   "wave": "16y",
+   "study": "0000",
+   "description": "Age 16 interview",
+   "hasId": true
+  }
+ ],
+ "counts": {
+  "variables": 3,
+  "files": 1
+ }
+}

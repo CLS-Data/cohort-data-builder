@@ -1,0 +1,54 @@
+{
+ "file": "mini2_age3",
+ "wave": "3y",
+ "variables": [
+  {
+   "variable": "CID",
+   "label": "Cohort member identifier",
+   "type": "string",
+   "measurement": "NOMINAL"
+  },
+  {
+   "variable": "sex",
+   "label": "Sex of cohort member",
+   "type": "numeric",
+   "measurement": "NOMINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Male"
+    },
+    {
+     "value": "2.0",
+     "label": "Female"
+    }
+   ],
+   "na": {
+    "values": [
+     -9
+    ],
+    "ranges": []
+   }
+  },
+  {
+   "variable": "play3",
+   "label": "Plays outside",
+   "type": "numeric",
+   "measurement": "ORDINAL",
+   "values": [
+    {
+     "value": "1.0",
+     "label": "Most days"
+    },
+    {
+     "value": "2.0",
+     "label": "Sometimes"
+    },
+    {
+     "value": "3.0",
+     "label": "Never"
+    }
+   ]
+  }
+ ]
+}
