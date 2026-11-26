@@ -1,7 +1,9 @@
 /* The selection as plain data: what can be picked, adding and removing, output column
    names, and restoring a saved selection. No DOM and no shared state.
 
-   A selection is an array of {name, label, file, wave, column}, in the order picked.
+   A selection is one cohort's array of {name, label, file, wave, column, cohort}, in the
+   order picked. Within it a variable is known by `<file>:<name>` (keyOf); across cohorts by
+   `<cohort>:<file>:<name>` (cohortKeyOf).
    Functions never change the array they are given; they return a new one with how many
    entries changed. */
 
@@ -17,6 +19,13 @@ const NAME_OK = /^[A-Za-z][A-Za-z0-9_.]*$/;
  * @returns {string} `<file>:<name>`.
  */
 export const keyOf = (item) => `${item.file}:${item.name}`;
+
+/**
+ * The key a variable is known by across cohorts.
+ * @param {{cohort: string, file: string, name: string}} item A selection entry.
+ * @returns {string} `<cohort>:<file>:<name>`.
+ */
+export const cohortKeyOf = (item) => `${item.cohort}:${item.file}:${item.name}`;
 
 /**
  * The key an index row is known by in the result list.
@@ -47,7 +56,8 @@ export function canSelect(row, file, identifier) {
  * The selection item for an index row.
  * @param {Array} row An index row.
  * @param {object} manifest The cohort manifest.
- * @returns {{name: string, label: string, file: string, wave: string}} The item.
+ * @returns {{name: string, label: string, file: string, wave: string, cohort: string}}
+ *   The item.
  */
 export function toItem(row, manifest) {
   return {
@@ -55,6 +65,7 @@ export function toItem(row, manifest) {
     label: row[1] || "",
     file: manifest.files[row[2]].name,
     wave: manifest.wave.list[row[3]].key,
+    cohort: manifest.key,
   };
 }
 
@@ -128,7 +139,14 @@ function put(selection, items, manifest) {
     const column = defaultColumn(it.name, wave, claimed);
     claimed.add(column.toLowerCase());
     keys.add(keyOf(it));
-    next.push({ name: it.name, label: it.label || "", file: it.file, wave, column });
+    next.push({
+      name: it.name,
+      label: it.label || "",
+      file: it.file,
+      wave,
+      column,
+      cohort: manifest.key,
+    });
     changed++;
   }
   return { selection: changed ? next : selection, changed, reason };
@@ -243,7 +261,8 @@ export function selectAllState(matches, manifest, selection) {
  * @param {unknown} saved What was stored; anything that is not an array gives [].
  * @param {Array[]} vars The cohort's index rows.
  * @param {object} manifest The cohort manifest.
- * @returns {object[]} The selection.
+ * @returns {object[]} The selection, each entry with `cohort` set to the manifest's key
+ *   (selections are saved without it).
  */
 export function restore(saved, vars, manifest) {
   if (!Array.isArray(saved)) return [];
@@ -258,7 +277,14 @@ export function restore(saved, vars, manifest) {
         ? b.column
         : defaultColumn(b.name, b.wave, claimed);
     claimed.add(column.toLowerCase());
-    out.push({ name: b.name, label: b.label || "", file: b.file, wave: b.wave, column });
+    out.push({
+      name: b.name,
+      label: b.label || "",
+      file: b.file,
+      wave: b.wave,
+      column,
+      cohort: manifest.key,
+    });
   }
   return out;
 }

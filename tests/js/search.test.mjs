@@ -265,7 +265,7 @@ test("searchCohorts gives one result per cohort, each as filterVariables gives i
   }
   assert.deepEqual(
     results.map((r) => r.matches.length),
-    [3, 3, 1],
+    [2, 3, 1],
   );
 });
 

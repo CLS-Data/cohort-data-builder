@@ -180,7 +180,12 @@ def check_manifest_shape(report: _Report, rel: str, m) -> bool:
     if _fields(report, rel, "wave", m["wave"], wave_req):
         for i, w in enumerate(m["wave"]["list"]):
             ok &= _fields(
-                report, rel, f"wave.list[{i}]", w, [_req("key", STR)], [_req("label", STR)]
+                report,
+                rel,
+                f"wave.list[{i}]",
+                w,
+                [_req("key", STR)],
+                [_req("label", STR), ("age", _is_num, "a number"), _req("ageRange", LIST)],
             )
     else:
         ok = False
@@ -323,6 +328,7 @@ def check_manifest(report: _Report, rel: str, key: str, m: dict, index_len: int 
             report.add(rel, f"wave.list[{i}]", "sweep key is empty")
         elif waves.index(w) != i:
             report.add(rel, f"wave.list[{i}]", f"sweep '{w}' is listed twice")
+    check_sweep_ages(report, rel, m["wave"]["list"])
     names = []
     for i, f in enumerate(m["files"]):
         where = f"files[{i}] ({f['name']})"
@@ -344,6 +350,99 @@ def check_manifest(report: _Report, rel: str, key: str, m: dict, index_len: int 
             f"is {m['counts']['variables']} but index.json has {index_len} rows",
         )
     return set(waves)
+
+
+AGE_KEY_RE = re.compile(r"^(\d+(?:\.\d+)?)([ym])$")
+MAX_AGE = 120
+
+
+def sweep_age(wave: dict) -> float | None:
+    """A sweep's age in years: its `age`, else from a `<n>y` or `<n>m` key, else None.
+
+    Args:
+        wave: One entry of `manifest.wave.list`.
+
+    Returns:
+        The age, or None when it is not known. A malformed `age` counts as unknown.
+    """
+    age = wave.get("age")
+    if _is_num(age):
+        return float(age)
+    match = AGE_KEY_RE.match(str(wave.get("key", "")))
+    if not match:
+        return None
+    n = float(match.group(1))
+    return n if match.group(2) == "y" else n / 12
+
+
+def check_sweep_ages(report: _Report, rel: str, waves: list[dict]) -> None:
+    """D3: sweep ages are 0-120, age ranges are ordered and contain the age, ages increase.
+
+    See contracts/sweep-ages.md (feature 007). A sweep with no known age is not a problem
+    here; it is reported by `sweep_age_warnings`.
+
+    Args:
+        report: Where problems go.
+        rel: The manifest's path.
+        waves: `manifest.wave.list`.
+    """
+    last = None
+    for i, w in enumerate(waves):
+        where = f"wave.list[{i}] ({w.get('key')})"
+        age = w.get("age")
+        if age is not None and (not _is_num(age) or not 0 <= age <= MAX_AGE):
+            report.add(rel, where, f"'age' should be a number from 0 to {MAX_AGE}")
+            age = None
+        span = w.get("ageRange")
+        if span is not None:
+            if not (isinstance(span, list) and len(span) == 2 and all(_is_num(x) for x in span)):
+                report.add(rel, where, "'ageRange' should be two numbers, [min, max]")
+            elif span[0] > span[1]:
+                report.add(rel, where, "'ageRange' should have min ≤ max")
+            elif age is not None and not span[0] <= age <= span[1]:
+                report.add(rel, where, f"'ageRange' {span} should contain 'age' {age}")
+        # A malformed age is reported above, not also counted in the order.
+        known = None if w.get("age") is not None and age is None else sweep_age(w)
+        if known is None:
+            continue
+        if last is not None and known <= last:
+            report.add(rel, where, "sweep ages should increase in list order")
+        last = known
+
+
+def sweep_age_warnings(data_dir: Path) -> list[Problem]:
+    """List the sweeps whose age is not known, which the site draws as "age not known".
+
+    Not a failure: the site still works. Each cohort's manifest is read as listed in
+    `datasets.json`; unreadable files are skipped (`check_data` reports them).
+
+    Args:
+        data_dir: The folder holding `datasets.json` and one folder per cohort.
+
+    Returns:
+        One warning per sweep with neither an `age` nor an age-shaped key.
+    """
+    out = []
+    try:
+        datasets = json.loads((data_dir / "datasets.json").read_text(encoding="utf-8"))["datasets"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return out
+    for entry in datasets:
+        rel = f"{entry.get('key')}/manifest.json"
+        try:
+            waves = json.loads((data_dir / rel).read_text(encoding="utf-8"))["wave"]["list"]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        for i, w in enumerate(waves):
+            if isinstance(w, dict) and sweep_age(w) is None:
+                out.append(
+                    Problem(
+                        rel,
+                        f"wave.list[{i}] ('{w.get('key')}')",
+                        "no age: add 'age' to place it on the age axis",
+                    )
+                )
+    return out
 
 
 # ── D4: the index rows ──────────────────────────────────────────────────

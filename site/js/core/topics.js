@@ -1,9 +1,9 @@
 /* Topics: the flattened scheme, a row's tags, the topic filter and the overview counts.
    No DOM and no shared state.
 
-   A selection is a list of items {kind: "d"|"t", i}, each a whole domain (topic area) or
-   one topic. A row matches an item if it carries that topic (or any topic of that domain)
-   at or above the confidence threshold. Items combine by "any" (the union: smoking or
+   A selection is a list of items {kind: "d"|"t", id}, each a whole domain (topic area) or
+   one topic, by id; localSel turns it into one cohort's indices. A row matches an item if
+   it carries that topic (or any topic of that domain) at or above the confidence threshold. Items combine by "any" (the union: smoking or
    alcohol) or "all" (the intersection: smoking and pregnancy). */
 
 /** The confidence thresholds offered, in percent. */
@@ -62,42 +62,114 @@ export function rowTopics(row, minConf) {
  */
 export const rowDomains = (ts, topics) => new Set(ts.map((t) => topics[t].domain));
 
-const same = (a, b) => a.kind === b.kind && a.i === b.i;
-const domainOf = (item, topics) => (item.kind === "d" ? item.i : topics[item.i].domain);
+/* The topic filter is held by id, so one filter applies to every chosen cohort however
+   each cohort's scheme orders its topics (feature 007). */
+const same = (a, b) => a.kind === b.kind && a.id === b.id;
+const domainOf = (item, domainOfTopic) =>
+  item.kind === "d" ? item.id : domainOfTopic.get(item.id);
 
 /**
  * Select an item, or deselect it if it is selected. A domain and its own topics are never
  * selected together: choosing a topic replaces its selected domain, and choosing a domain
  * replaces any of its selected topics.
- * @param {{kind: string, i: number}[]} sel The current selection; not changed.
+ * @param {{kind: string, id: string}[]} sel The current selection; not changed.
  * @param {"d"|"t"} kind Domain or topic.
- * @param {number} i Its index.
- * @param {object[]} topics From {@link flatten}.
- * @returns {{kind: string, i: number}[]} The new selection.
+ * @param {string} id Its id.
+ * @param {Map<string, string>} domainOfTopic Each topic id's domain id
+ *   ({@link schemeIndex}`.domainOf`).
+ * @returns {{kind: string, id: string}[]} The new selection.
  */
-export function toggle(sel, kind, i, topics) {
-  const item = { kind, i };
+export function toggle(sel, kind, id, domainOfTopic) {
+  const item = { kind, id };
   if (sel.some((s) => same(s, item))) return sel.filter((s) => !same(s, item));
-  const d = domainOf(item, topics);
+  const d = domainOf(item, domainOfTopic);
   const clash = (s) =>
-    kind === "t" ? s.kind === "d" && s.i === d : s.kind === "t" && domainOf(s, topics) === d;
+    kind === "t"
+      ? s.kind === "d" && s.id === d
+      : s.kind === "t" && domainOf(s, domainOfTopic) === d;
   return [...sel.filter((s) => !clash(s)), item];
 }
 
 /**
  * Select an item if it is not selected already; never deselects.
- * @param {{kind: string, i: number}[]} sel The current selection; not changed.
+ * @param {{kind: string, id: string}[]} sel The current selection; not changed.
  * @param {"d"|"t"} kind Domain or topic.
- * @param {number} i Its index.
- * @param {object[]} topics From {@link flatten}.
- * @returns {{kind: string, i: number}[]} The new selection, or `sel` itself if unchanged.
+ * @param {string} id Its id.
+ * @param {Map<string, string>} domainOfTopic As for {@link toggle}.
+ * @returns {{kind: string, id: string}[]} The new selection, or `sel` itself if unchanged.
  */
-export const ensure = (sel, kind, i, topics) =>
-  sel.some((s) => same(s, { kind, i })) ? sel : toggle(sel, kind, i, topics);
+export const ensure = (sel, kind, id, domainOfTopic) =>
+  sel.some((s) => same(s, { kind, id })) ? sel : toggle(sel, kind, id, domainOfTopic);
+
+const indexCache = new WeakMap();
+const NO_SCHEME = { topic: new Map(), domain: new Map(), domainOf: new Map() };
+
+/**
+ * A scheme's ids and where they are in it.
+ * @param {{domains: object[]}|undefined} scheme A manifest's `topics`, if any.
+ * @returns {{topic: Map<string, number>, domain: Map<string, number>,
+ *   domainOf: Map<string, string>}} Topic id to its index in {@link flatten}'s list,
+ *   domain id to its index, and topic id to its domain's id. Empty without a scheme.
+ */
+export function schemeIndex(scheme) {
+  if (!scheme) return NO_SCHEME;
+  if (!indexCache.has(scheme)) {
+    const topic = new Map();
+    const domainOfTopic = new Map();
+    flatten(scheme).forEach((t, i) => {
+      topic.set(t.id, i);
+      domainOfTopic.set(t.id, scheme.domains[t.domain].id);
+    });
+    const domain = new Map(scheme.domains.map((d, i) => [d.id, i]));
+    indexCache.set(scheme, { topic, domain, domainOf: domainOfTopic });
+  }
+  return indexCache.get(scheme);
+}
+
+/**
+ * The topic filter in one scheme's indices, as {@link passes} and the tally use them.
+ * @param {{kind: string, id: string}[]} sel The filter, by id.
+ * @param {{domains: object[]}|undefined} scheme One cohort's scheme.
+ * @returns {{kind: string, i: number}[]} The same items by index; -1 where the scheme has no
+ *   such topic or domain, which no row carries.
+ */
+export function localSel(sel, scheme) {
+  const idx = schemeIndex(scheme);
+  return sel.map((s) => ({
+    kind: s.kind,
+    i: (s.kind === "d" ? idx.domain : idx.topic).get(s.id) ?? -1,
+  }));
+}
+
+/**
+ * One scheme holding every domain and topic of several, matched by id: what the overview
+ * lists when several cohorts are chosen.
+ * @param {({domains: object[]}|undefined)[]} schemes The chosen cohorts' schemes.
+ * @returns {{domains: object[]}|undefined} Domains in first-seen order, each with its
+ *   topics in first-seen order; labels and descriptions from the first scheme that has
+ *   them. Undefined when no cohort has a scheme.
+ */
+export function mergeSchemes(schemes) {
+  const present = schemes.filter(Boolean);
+  if (!present.length) return undefined;
+  if (present.length === 1) return present[0];
+  const domains = new Map();
+  for (const scheme of present) {
+    for (const d of scheme.domains) {
+      if (!domains.has(d.id)) domains.set(d.id, { ...d, topics: [] });
+      const into = domains.get(d.id);
+      for (const t of d.topics) {
+        if (!into.topics.some((x) => x.id === t.id)) into.topics.push(t);
+      }
+    }
+  }
+  return { name: present[0].name, domains: [...domains.values()] };
+}
 
 /**
  * Whether a row with these topics passes the topic filter.
- * @param {{kind: string, i: number}[]} sel The selection; empty passes everything.
+ * @param {{kind: string, i: number}[]} sel The selection in this scheme's indices
+ *   ({@link localSel}); empty passes everything.
  * @param {"any"|"all"} mode How several items combine.
  * @param {number[]} ts The row's topics at or above the threshold.
  * @param {Set<number>} ds Their domains.
