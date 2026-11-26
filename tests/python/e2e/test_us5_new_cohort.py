@@ -24,9 +24,13 @@ def site_plus_mini(site_with_data, tmp_path):
 
 def test_an_added_cohort_appears_and_is_searchable(page, serve, site_plus_mini):
     page.goto(serve(site_plus_mini))
-    picker = page.get_by_label("Cohort", exact=True)
-    expect(picker.locator("option")).to_have_text(["NCDS", "BCS70", "Next Steps", "MCS", "Mini"])
-    picker.select_option("mini")
+    picker = page.get_by_role("group", name="Cohorts")
+    expect(picker.get_by_role("button")).to_have_text(
+        ["NCDS", "BCS70", "Next Steps", "MCS", "Mini"]
+    )
+    first = picker.get_by_role("button").first.get_attribute("data-cohort")
+    picker.locator('button[data-cohort="mini"]').click()
+    picker.locator(f'button[data-cohort="{first}"]').click()
     expect(page.locator("#result-count")).to_have_text("16 variables")
     expect(page).to_have_url(page.url.split("#")[0] + "#mini")
     page.get_by_label("Search variables").fill("tenure")

@@ -34,6 +34,15 @@ def test_the_site_works_under_a_subpath(page, serve, mini_site):
     assert failed == []
 
 
+def test_several_cohorts_load_under_a_subpath(page, serve, mini_site):
+    failed = []
+    page.on("response", lambda r: r.status >= 400 and failed.append(f"{r.status} {r.url}"))
+    page.goto(serve(mini_site, prefix=PREFIX) + "#mini+mini2")
+    expect(page.locator("#results .v-group")).to_have_count(2)
+    expect(page.locator("#result-count")).to_contain_text("28 variables")
+    assert failed == []
+
+
 def test_no_file_uses_a_root_relative_url():
     found = []
     for path in SITE.rglob("*"):

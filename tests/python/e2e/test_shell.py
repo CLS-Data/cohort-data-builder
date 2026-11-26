@@ -34,29 +34,40 @@ def test_cohort_name_and_footer_counts(page, mini_url):
     expect(page).to_have_title("Mini · Cohort Data Builder")
 
 
+def cohort_button(page, key):
+    """The header's toggle button for a cohort."""
+    return page.locator(f'.cohorts button[data-cohort="{key}"]')
+
+
 def test_picker_lists_every_cohort(page, real_url):
     keys = [d["key"] for d in json.loads((SITE / "data/datasets.json").read_text())["datasets"]]
     page.goto(real_url)
-    options = page.get_by_label("Cohort").locator("option")
-    expect(options).to_have_count(len(keys))
-    assert [options.nth(i).get_attribute("value") for i in range(len(keys))] == keys
+    buttons = page.get_by_role("group", name="Cohorts").get_by_role("button")
+    expect(buttons).to_have_count(len(keys))
+    assert [buttons.nth(i).get_attribute("data-cohort") for i in range(len(keys))] == keys
 
 
 def test_hash_opens_cohort_and_picker_updates_hash(page, real_url):
     page.goto(real_url + "#next_steps")
     expect(page.locator("#mark-sub")).to_contain_text("Next Steps")
-    expect(page.get_by_label("Cohort")).to_have_value("next_steps")
-    page.get_by_label("Cohort").select_option("bcs70")
+    expect(cohort_button(page, "next_steps")).to_have_attribute("aria-pressed", "true")
+    cohort_button(page, "bcs70").click()
+    expect(page).to_have_url(re.compile(r"#bcs70\+next_steps$"))
+    cohort_button(page, "next_steps").click()
     expect(page).to_have_url(re.compile("#bcs70$"))
     expect(page.locator("#mark-sub")).to_have_text("1970 British Cohort Study")
 
 
 def test_last_cohort_reopens_without_hash(page, real_url):
     page.goto(real_url)
-    page.get_by_label("Cohort").select_option("next_steps")
+    first = page.get_by_role("group", name="Cohorts").get_by_role("button").first
+    first_key = first.get_attribute("data-cohort")
+    cohort_button(page, "next_steps").click()
+    cohort_button(page, first_key).click()
     expect(page).to_have_url(re.compile("#next_steps$"))
     page.goto(real_url)
-    expect(page.get_by_label("Cohort")).to_have_value("next_steps")
+    expect(cohort_button(page, "next_steps")).to_have_attribute("aria-pressed", "true")
+    expect(cohort_button(page, first_key)).to_have_attribute("aria-pressed", "false")
 
 
 def test_missing_data_shows_message(page, serve, site_with_data):
