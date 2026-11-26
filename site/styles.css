@@ -1130,7 +1130,10 @@ body.is-dragging-var .view-tab[data-view="basket"] {
 .v-group .coh-mark { align-self: center; }
 .v-group-n { color: var(--ink-2); font-size: 0.8125rem; }
 .vm-cohort { display: flex; align-items: center; gap: 4px; }
-.count-goto { font: inherit; }
+.count-goto { font: inherit; white-space: nowrap; }
+/* With several cohorts the count lists each one; it wraps between them, never inside one. */
+.fb-count:has(.count-goto) { white-space: normal; min-width: 0; }
+.fb-end:has(.count-goto) { min-width: 0; flex-wrap: wrap; }
 
 /* A cohort's heading in the selected panel and the Selection view. */
 .sel-coh + .sel-coh { margin-top: 14px; }
