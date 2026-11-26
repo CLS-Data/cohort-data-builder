@@ -16,17 +16,10 @@ import { read, storeKey, write } from "../core/storage.js";
 import { esc } from "../core/text.js";
 import { renderAbout } from "./overview.js";
 import { renderPanel, wirePanel } from "./panel.js";
-import {
-  mergeChosen,
-  RETRY_EVENT,
-  refreshSelection,
-  resetFilters,
-  runSearch,
-  wireResults,
-} from "./results.js";
+import { mergeChosen, refreshSelection, resetFilters, runSearch, wireResults } from "./results.js";
 import { wireReview } from "./review.js";
 import { onSelectionChange, restoreOptions, restoreSelection, storage } from "./selected.js";
-import { state } from "./state.js";
+import { RETRY_EVENT, state } from "./state.js";
 import { wireSuggest } from "./suggest.js";
 import { switchView } from "./views.js";
 

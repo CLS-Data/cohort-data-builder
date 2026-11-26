@@ -334,6 +334,31 @@ code, kbd { font-family: var(--mono); font-size: .92em; }
 .node.is-empty .node-age, .node.is-empty .node-n { color: var(--ink-3); }
 
 
+/* Several cohorts (feature 007): the first row is the age axis, then a row of bars per
+   cohort; topic rows get a sub-row per cohort. Columns keep a usable width, so the chart
+   scrolls sideways inside itself, names pinned, rather than the page. */
+.ov-chart.is-several { overflow-x: auto; }
+.ov-chart.is-several .ov-row { min-width: calc(var(--grid-label) + var(--cols, 6) * 24px); }
+.ov-chart.is-several .ov-label { position: sticky; left: 0; z-index: 1; background: var(--paper-2); }
+.ov-chart.is-several .ov-total .ov-label { padding-top: 0; align-self: center; }
+.spine-track.is-axis li {
+  padding: 2px 0; text-align: center;
+  font-family: var(--mono); font-size: 0.6875rem; font-weight: 700; color: var(--ink-2);
+}
+.ov-coh .node { padding: 3px 1px; }
+.ov-coh .node-bar { height: 22px; }
+.ov-coh-name, .tg-sub .ov-coh-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono); font-size: 0.7188rem; font-weight: 700; color: var(--ink);
+}
+.ov-state { margin: 0; padding: 6px 0; font-size: 0.75rem; color: var(--ink-2); }
+.tg-sub .ov-label { padding-left: 24px; }
+.tg-row.is-topic + .tg-sub .ov-label, .tg-sub[data-of^="t:"] .ov-label { padding-left: 44px; }
+.tg-sub .ov-coh-name { font-weight: 400; color: var(--ink-2); }
+.tg-cell.is-none { cursor: default; border: 0; background: none; }
+.tg-cell.is-none:hover { outline: none; }
+.tg-none { margin: 0; padding: 2px 0; font-size: 0.7188rem; color: var(--ink-3); }
+
 .ov-topics { margin-top: 4px; padding-top: 2px; border-top: 1px solid var(--rule); }
 .ov-toggle {
   display: flex; align-items: baseline; gap: 4px; width: 100%;

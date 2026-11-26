@@ -4,6 +4,9 @@
    Several cohorts can be chosen at once (feature 007). Each loaded cohort lives in
    `cohorts`; `chosen` lists the ones being searched, in catalogue order. */
 
+/** The event fired, with a cohort key as detail, when a Retry button is pressed. */
+export const RETRY_EVENT = "cohort-data-builder:retry";
+
 /** MIME type a dragged variable row carries. */
 export const DRAG_MIME = "application/x-cohort-data-builder-variable";
 

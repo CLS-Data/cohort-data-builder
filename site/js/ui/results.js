@@ -37,6 +37,7 @@ import {
   DRAG_MIME,
   listKey,
   manifestOf,
+  RETRY_EVENT,
   readyCohorts,
   selectionOf,
   state,
@@ -65,9 +66,6 @@ const slotOf = (key) =>
 const cohTag = (key) =>
   `<span class="coh-tag" data-coh="${slotOf(key)}">${esc(nameOf(key))}</span>`;
 const variables = (count) => `${n(count)} variable${count === 1 ? "" : "s"}`;
-
-/** The event the list fires, with a cohort key as detail, when Retry is pressed. */
-export const RETRY_EVENT = "cohort-data-builder:retry";
 
 /* ── Searching ───────────────────────────────────────────────────────── */
 
