@@ -26,6 +26,14 @@ the assistant by the user's permission settings), so the sweep keys of the four 
 cohorts were not checked. The first task inventories them (a person runs one command; see
 quickstart.md) and decides per cohort whether `age` must be added.
 
+**Inventory (T002, run 2026-11-26)**: no sweep of the four real cohorts has `age`, and none
+has an age-shaped key: they are numbered (`s0`/`s1` … `s11`), with sub-sweeps such as
+`s10_1` … `s10_4` and a final `xwave`. bcs70 has 16 sweeps, mcs 12, ncds 17, next_steps 14.
+So key parsing gives nothing for the real data: every sweep except `xwave` needs `age`
+(and `ageRange` where fielded across ages) added to its manifest before the shared age
+axis (user story 2) is useful. Until then each cohort's sweeps all fall in "age not known"
+columns. `xwave` keeps no age by design.
+
 ## R2. The shared age axis: ordinal columns, not a linear scale
 
 **Decision**: The axis is the sorted union of the distinct ages of every chosen cohort's
