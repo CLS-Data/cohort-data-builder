@@ -199,3 +199,48 @@ def test_the_builder_links_to_it(page, base):
     expect(link).to_have_attribute("href", "tutorial/")
     link.click()
     expect(page.locator("#t-total")).to_have_text("31")  # mini 16 + mini2 12 + mini3 3
+
+
+# Feature 007, user story 5: several cohorts
+
+
+MARK_COLOUR = """(key) => {
+  const host = document.querySelector(`[data-cohort="${key}"] .coh-mark`);
+  return host && getComputedStyle(host).backgroundColor;
+}"""
+
+
+def test_the_cohort_list_marks_each_cohort_in_the_builders_colour(page, base):
+    page.goto(base + "#mini+mini2")
+    expect(page.locator('.cohorts button[data-cohort="mini2"]')).to_have_attribute(
+        "aria-pressed", "true"
+    )
+    builder = {k: page.evaluate(MARK_COLOUR, k) for k in ("mini", "mini2", "mini3")}
+    page.goto(base + "tutorial/")
+    items = page.locator("#t-cohort-list li")
+    expect(items).to_have_count(3)
+    expect(items.locator(".coh-mark")).to_have_count(3)
+    tutorial = {k: page.evaluate(MARK_COLOUR, k) for k in builder}
+    assert tutorial == builder
+    assert len(set(tutorial.values())) == 3
+
+
+def test_the_intro_says_cohorts_can_be_searched_together(tutorial):
+    expect(tutorial.locator(".t-intro")).to_contain_text("search several cohorts at once")
+
+
+def test_the_download_step_shows_a_folder_per_cohort(tutorial):
+    tree = tutorial.locator("#dl-tree-many")
+    expect(tree).to_contain_text("cohorts-merge-")
+    assert tree.inner_text().count("-merge-") >= 3  # the zip and two cohort folders
+    expect(tutorial.locator("#download")).to_contain_text("a folder per cohort")
+
+
+def test_the_run_step_says_each_cohort_runs_on_its_own(tutorial):
+    run = tutorial.locator("#run")
+    expect(run).to_contain_text("each folder on its own")
+    expect(run).to_contain_text("not merged with each other")
+
+
+def test_the_select_step_mentions_selections_from_several_cohorts(tutorial):
+    expect(tutorial.locator("#select")).to_contain_text("grouped by cohort")
