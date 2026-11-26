@@ -131,13 +131,25 @@ def test_several_cohorts_at_once(data):
     assert waves_of(data, "mini3")[0]["age"] == 16  # its label is "Age 16"
 
 
-def test_ages_out_of_order_fail_the_checks(data, capsys):
+def test_repeated_and_earlier_ages_are_written(data):
+    # As in the real cohorts: sub-sweeps at one age, listed before a younger sweep.
     path = data / "mini" / "manifest.json"
     m = json.loads(path.read_text())
-    m["wave"]["list"][1]["label"] = "Sweep 2: age 4, 1980"  # younger than sweep 1
+    m["wave"]["list"][0]["label"] = "Sweep 1.1: age 63, 2020"
+    m["wave"]["list"][1]["label"] = "Sweep 2: age 61/65, 2020/24"
+    m["wave"]["list"][2]["label"] = "Sweep 1.2: age 63, 2021"
+    path.write_text(json.dumps(m))
+    assert main([str(data / "mini"), "--write"]) == OK
+    assert [w["age"] for w in waves_of(data)] == [63, 61, 63]
+
+
+def test_problems_in_the_data_fail_the_checks(data, capsys):
+    path = data / "mini" / "manifest.json"
+    m = json.loads(path.read_text())
+    m["wave"]["list"][2]["age"] = 200  # kept as it is, and out of range
     path.write_text(json.dumps(m))
     assert main([str(data / "mini"), "--write"]) == CHECKS_FAILED
-    assert "increase" in capsys.readouterr().out
+    assert "0 to 120" in capsys.readouterr().out
 
 
 def test_a_folder_without_a_manifest_is_bad_input(tmp_path, capsys):

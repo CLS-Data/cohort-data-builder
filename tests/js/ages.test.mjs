@@ -78,6 +78,36 @@ test("each cohort's unknown sweeps take their own unknown column, in order", () 
   assert.deepEqual(cells(axis, two), [null, null, 1, 0, 2]);
 });
 
+test("several sweeps of one cohort at one age sit side by side, in list order", () => {
+  // As bcs70's four sub-sweeps at 50, and ncds's at 63 listed before its sweep at 61.
+  const a = {
+    key: "a",
+    wave: {
+      list: [
+        { key: "s1", age: 63 },
+        { key: "s2", age: 61 },
+        { key: "s3", age: 63 },
+      ],
+    },
+  };
+  const b = {
+    key: "b",
+    wave: {
+      list: [
+        { key: "t1", age: 63 },
+        { key: "t2", age: 70 },
+      ],
+    },
+  };
+  const axis = ageAxis([a, b]);
+  assert.deepEqual(
+    axis.columns.map((c) => c.label),
+    ["61", "63", "63", "70"],
+  );
+  assert.deepEqual(cells(axis, a), [1, 0, 2, null]);
+  assert.deepEqual(cells(axis, b), [null, 0, null, 1]);
+});
+
 test("ages that differ only by rounding share a column", () => {
   const a = { key: "a", wave: { list: [{ key: "x", age: 0.75 }] } };
   const b = { key: "b", wave: { list: [{ key: "9m" }] } };

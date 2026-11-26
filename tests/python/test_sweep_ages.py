@@ -68,20 +68,15 @@ def test_age_range_must_be_two_numbers(data):
     assert any("ageRange" in m for m in messages(data(edit)))
 
 
-def test_sweep_ages_must_increase_in_list_order(data):
+def test_ages_need_not_follow_list_order(data):
+    # The real lists are in sweep-number order: sub-sweeps share an age, and one can be
+    # older than the sweep after it (ncds s9_1, 63, before s10, 61). The site sorts by age.
     def edit(waves):
         waves[0]["age"] = 10
         waves[1]["age"] = 5
+        waves[2]["age"] = 5
 
-    found = messages(data(edit))
-    assert any("wave.list[1]" in m and "increase" in m for m in found), found
-
-
-def test_ages_taken_from_age_shaped_keys_count_for_the_order(data):
-    def edit(waves):
-        waves[1]["age"] = 2  # 5y comes first, so 2 is out of order
-
-    assert any("increase" in m for m in messages(data(edit)))
+    assert messages(data(edit)) == []
 
 
 def test_a_sweep_with_no_known_age_is_a_warning_not_a_problem():
