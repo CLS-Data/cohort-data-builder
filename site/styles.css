@@ -29,6 +29,10 @@
   --d-family-social: #755dc0;  --d-education: #0277ba;  --d-employment-income: #d1900b;
   --d-attitudes: #827200;  --d-child-development: #7699fb;  --d-life-events: #af5504;
   --d-omics: #12b0d4;  --d-pregnancy: #ed7668;  --d-administration: #128283;
+  /* Cohorts (feature 007): one colour each, by slot (core/cohorts.js colourSlot). Darker
+     than the topic areas' colours, so neither is mistaken for the other. */
+  --coh-1: #7c2d12;  --coh-2: #134e4a;  --coh-3: #5b21b6;
+  --coh-4: #1e3a8a;  --coh-5: #3f6212;  --coh-6: #9f1239;
 
   --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
@@ -58,6 +62,9 @@
     --d-family-social: #7862bf;  --d-education: #0b7bbd;  --d-employment-income: #c68704;
     --d-attitudes: #857505;  --d-child-development: #7090eb;  --d-life-events: #b2580b;
     --d-omics: #0ea6c8;  --d-pregnancy: #de7063;  --d-administration: #028587;
+    /* Cohorts: the same hues, paler than the topic areas on the dark surface. */
+    --coh-1: #fdba74;  --coh-2: #5eead4;  --coh-3: #c4b5fd;
+    --coh-4: #93c5fd;  --coh-5: #fde047;  --coh-6: #fda4af;
   }
 }
 
@@ -72,6 +79,8 @@
   --d-family-social: #7862bf;  --d-education: #0b7bbd;  --d-employment-income: #c68704;
   --d-attitudes: #857505;  --d-child-development: #7090eb;  --d-life-events: #b2580b;
   --d-omics: #0ea6c8;  --d-pregnancy: #de7063;  --d-administration: #028587;
+  --coh-1: #fdba74;  --coh-2: #5eead4;  --coh-3: #c4b5fd;
+  --coh-4: #93c5fd;  --coh-5: #fde047;  --coh-6: #fda4af;
 }
 :root[data-theme="light"] {
   --paper:   #e9ece7;  --paper-2: #f5f7f3;  --paper-3: #dfe3dc;
@@ -84,6 +93,10 @@
   --d-family-social: #755dc0;  --d-education: #0277ba;  --d-employment-income: #d1900b;
   --d-attitudes: #827200;  --d-child-development: #7699fb;  --d-life-events: #af5504;
   --d-omics: #12b0d4;  --d-pregnancy: #ed7668;  --d-administration: #128283;
+  /* Cohorts (feature 007): one colour each, by slot (core/cohorts.js colourSlot). Darker
+     than the topic areas' colours, so neither is mistaken for the other. */
+  --coh-1: #7c2d12;  --coh-2: #134e4a;  --coh-3: #5b21b6;
+  --coh-4: #1e3a8a;  --coh-5: #3f6212;  --coh-6: #9f1239;
 }
 
 * { box-sizing: border-box; }
@@ -1039,6 +1052,26 @@ body.is-dragging-var .view-tab[data-view="basket"] {
 .dom-swatch {
   display: inline-block; flex: none; width: 9px; height: 9px; margin-right: 6px; border-radius: 2px;
   background: var(--dom, transparent); vertical-align: baseline;
+}
+
+/* ── Cohorts ──────────────────────────────────────────────────────────
+   Each cohort has a colour (data-coh, from core/cohorts.js colourSlot), shown as a tall
+   thin bar or as the edge of a tag that carries the cohort's name: never colour alone,
+   and never the small square that marks a topic area. */
+
+[data-coh="1"] { --coh: var(--coh-1); }
+[data-coh="2"] { --coh: var(--coh-2); }
+[data-coh="3"] { --coh: var(--coh-3); }
+[data-coh="4"] { --coh: var(--coh-4); }
+[data-coh="5"] { --coh: var(--coh-5); }
+[data-coh="6"] { --coh: var(--coh-6); }
+.coh-mark {
+  display: inline-block; flex: none; width: 4px; height: 1.1em; margin-right: 6px;
+  border-radius: 1px; background: var(--coh, var(--ink-3)); vertical-align: -0.15em;
+}
+.coh-tag {
+  display: inline-block; padding: 0 6px; border-left: 4px solid var(--coh, var(--ink-3));
+  font-size: 0.85em; font-weight: 600; color: var(--ink-2); white-space: nowrap;
 }
 
 .topic-chip {

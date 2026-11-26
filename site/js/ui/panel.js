@@ -6,10 +6,10 @@
    Quick with thousands selected: a group draws its first GROUP_SHOWN rows until asked for
    the rest, and a closed group draws none. */
 
-import { keyOf, remove } from "../core/selection.js";
+import { cohortKeyOf } from "../core/selection.js";
 import { capitalise, esc } from "../core/text.js";
-import { saveOptions, setSelection } from "./selected.js";
-import { state } from "./state.js";
+import { clearSelection, removeSelected, saveOptions } from "./selected.js";
+import { allSelected, cohort, manifestOf, state } from "./state.js";
 import { switchView } from "./views.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -22,18 +22,22 @@ const full = new Set(); // groups showing every row
 let filter = "";
 let clearArmed = null; // the timer while "Clear" waits for its second click
 
+/* A sweep's place in time, for ordering groups: its position in its cohort's list. */
+const waveRank = (b) => {
+  const c = cohort(b.cohort);
+  return c?.manifest ? c.manifest.wave.list.findIndex((w) => w.key === b.wave) : 0;
+};
+
 function groupsOf(items) {
   const byFile = state.options.panelGroup === "file";
-  const order = state.manifest.wave.list.map((w) => w.key);
+  const rank = new Map(items.map((b) => [byFile ? b.file : b.wave, waveRank(b)]));
   const groups = new Map();
   for (const b of items) {
     const g = byFile ? b.file : b.wave;
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g).push(b);
   }
-  return [...groups].sort(([a], [b]) =>
-    byFile ? a.localeCompare(b) : order.indexOf(a) - order.indexOf(b),
-  );
+  return [...groups].sort(([a], [b]) => (byFile ? a.localeCompare(b) : rank.get(a) - rank.get(b)));
 }
 
 function rowHtml(b) {
@@ -42,14 +46,15 @@ function rowHtml(b) {
     <span class="sp-name" title="${esc(b.name)}">${esc(b.name)}</span>
     <span class="sp-label" title="${esc(label)}">${esc(label)}</span>
     <span class="sp-meta">${esc(state.options.panelGroup === "file" ? b.wave : b.file)}</span>
-    <button class="sp-x" data-remove="${esc(keyOf(b))}" aria-label="Remove ${esc(b.name)}" title="Remove">✕</button>
+    <button class="sp-x" data-remove="${esc(cohortKeyOf(b))}" aria-label="Remove ${esc(b.name)}" title="Remove">✕</button>
   </li>`;
 }
 
 /** Redraw the panel and the Selection tab's tally from the current selection. */
 export function renderPanel() {
-  if (!state.manifest) return;
-  const count = state.bundle.length;
+  if (!state.chosen.length || cohort(state.chosen[0])?.status !== "ready") return;
+  const selected = allSelected();
+  const count = selected.length;
   $("#sp-toggle").textContent = `Selected (${n(count)})`;
   const tally = $("#basket-tally");
   tally.hidden = !count;
@@ -60,7 +65,7 @@ export function renderPanel() {
   $("#sp-clear").hidden = !count;
   $("#sp-tools").hidden = !count;
   $("#sp-review").hidden = !count;
-  $("#sp-group-wave").textContent = capitalise(state.manifest.wave.term);
+  $("#sp-group-wave").textContent = capitalise(manifestOf(state.chosen[0]).wave.term);
   for (const b of document.querySelectorAll("#spanel [data-group]")) {
     b.setAttribute("aria-pressed", String(b.dataset.group === state.options.panelGroup));
   }
@@ -72,10 +77,10 @@ export function renderPanel() {
   }
   const q = filter.trim().toLowerCase();
   const items = q
-    ? state.bundle.filter(
+    ? selected.filter(
         (b) => b.name.toLowerCase().includes(q) || (b.label || "").toLowerCase().includes(q),
       )
-    : state.bundle;
+    : selected;
   if (!items.length) {
     list.innerHTML = `<p class="sp-empty">None of the ${n(count)} match “${esc(filter.trim())}”.</p>`;
     return;
@@ -111,10 +116,10 @@ function clearClicked() {
     clearTimeout(clearArmed);
     clearArmed = null;
     btn.textContent = "Clear";
-    setSelection([]);
+    clearSelection();
     return;
   }
-  btn.textContent = `Clear all ${n(state.bundle.length)}?`;
+  btn.textContent = `Clear all ${n(allSelected().length)}?`;
   clearArmed = setTimeout(() => {
     clearArmed = null;
     btn.textContent = "Clear";
@@ -157,7 +162,7 @@ export function wirePanel() {
       // Focus moves to the next ✕, so a keyboard user can keep removing.
       const at = [...document.querySelectorAll("#sp-list .sp-x")].indexOf(x);
       const had = document.activeElement === x;
-      setSelection(remove(state.bundle, x.dataset.remove).selection);
+      removeSelected([x.dataset.remove]);
       if (had) {
         const rest = document.querySelectorAll("#sp-list .sp-x");
         (rest[Math.min(at, rest.length - 1)] || $("#sp-list")).focus();

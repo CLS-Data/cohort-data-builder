@@ -3,14 +3,15 @@
    The cohort in view is named in the URL hash (#bcs70), so a link can point at one. */
 
 import { loadCatalogue, loadCohort } from "../core/data.js";
+import { buildLabelIndex } from "../core/search.js";
 import { read, storeKey, write } from "../core/storage.js";
 import { esc } from "../core/text.js";
 import { renderAbout } from "./overview.js";
 import { renderPanel, wirePanel } from "./panel.js";
-import { refreshSelection, resetForCohort, runSearch, wireResults } from "./results.js";
+import { mergeChosen, refreshSelection, resetFilters, runSearch, wireResults } from "./results.js";
 import { wireReview } from "./review.js";
 import { onSelectionChange, restoreOptions, restoreSelection, storage } from "./selected.js";
-import { state } from "./state.js";
+import { manifestOf, state } from "./state.js";
 import { wireSuggest } from "./suggest.js";
 import { switchView } from "./views.js";
 
@@ -32,34 +33,50 @@ function chooseCohort() {
   return keys.includes(last) ? last : keys[0];
 }
 
+/* Load a cohort into state.cohorts, once. */
+async function load(key) {
+  const have = state.cohorts.get(key);
+  if (have?.status === "ready") return;
+  state.cohorts.set(key, { status: "loading" });
+  try {
+    const { manifest, vars } = await loadCohort(fetch, key);
+    state.cohorts.set(key, { status: "ready", manifest, vars, labelIndex: buildLabelIndex(vars) });
+  } catch (err) {
+    state.cohorts.set(key, { status: "failed", error: err.message });
+    throw err;
+  }
+}
+
 /** Load a cohort and show its name and counts. */
 async function openCohort(key) {
-  if (state.manifest?.key === key) return;
+  if (state.chosen.length === 1 && state.chosen[0] === key) return;
   const picker = $("#dataset");
   picker.value = key;
   picker.disabled = true;
   try {
-    Object.assign(state, await loadCohort(fetch, key));
+    await load(key);
   } catch (err) {
     fail(`Could not load the ${key} data.`, err.message);
     return;
   } finally {
     picker.disabled = false;
   }
+  state.chosen = [key];
   if (location.hash.slice(1) !== key) history.replaceState(null, "", `#${key}`);
   write(storage, storeKey("cohort"), key);
 
-  const m = state.manifest;
+  const m = manifestOf(key);
   document.title = `${m.name} · Cohort Data Builder`;
   $("#mark-sub").textContent = m.fullName;
   $("#foot-counts").textContent =
     `${m.counts.variables.toLocaleString("en-GB")} variables · ${m.counts.files} files · ` +
     `${m.wave.list.length} ${m.wave.plural} · built ${m.built}`;
 
-  resetForCohort();
+  resetFilters();
+  mergeChosen();
   renderAbout();
   runSearch();
-  restoreSelection();
+  restoreSelection(key);
 }
 
 /** Restore the stored theme and make the theme button switch it. */

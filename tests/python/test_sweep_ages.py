@@ -9,8 +9,7 @@ import shutil
 from pathlib import Path
 
 import pytest
-
-from scripts.checks import check_data, sweep_age_warnings
+from checks import check_data, sweep_age_warnings
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "data"
 

@@ -9,26 +9,29 @@
    cell narrows to that topic at that sweep. */
 
 import { esc } from "../core/text.js";
-import { shade } from "../core/topics.js";
-import { state } from "./state.js";
+import { schemeIndex, shade } from "../core/topics.js";
+import { manifestOf, state } from "./state.js";
 
 const $ = (sel) => document.querySelector(sel);
 
 /** Write the line saying what the cohort is and how big it is. */
 export function renderAbout() {
-  const m = state.manifest;
+  const m = manifestOf(state.chosen[0]);
   $("#ov-about").innerHTML =
     `<strong>${esc(m.fullName)}</strong>${m.description ? ` — ${esc(m.description)}` : ""} ` +
     `<span class="vm-dim">${m.counts.variables.toLocaleString("en-GB")} variables in ${m.counts.files} files.</span>`;
 }
 
 /**
- * Draw one bar per sweep, in manifest (time) order.
- * @param {number[]} perWave Matching variables per sweep.
+ * Draw one bar per sweep, in manifest (time) order, from the last search.
  * @param {boolean} filtered Whether any filter or query is active.
  */
-export function renderSpine(perWave, filtered) {
-  const waves = state.manifest.wave.list;
+export function renderSpine(filtered) {
+  const r = state.results[0];
+  if (!r) return;
+  const m = manifestOf(r.cohort);
+  const { perWave } = r;
+  const waves = m.wave.list;
   const max = Math.max(1, ...perWave);
   const total = perWave.reduce((a, b) => a + b, 0);
   $("#spine-title").textContent = filtered ? "Matching variables" : "All variables";
@@ -38,9 +41,10 @@ export function renderSpine(perWave, filtered) {
       const n = perWave[i];
       const pct = n ? Math.max(6, Math.round((n / max) * 100)) : 0;
       const what = `${n.toLocaleString("en-GB")} ${n === 1 ? "variable" : "variables"}`;
-      return `<li><button class="node${n ? "" : " is-empty"}" data-wave="${i}"
-          aria-pressed="${state.waveFilter === i}"
-          title="${esc(wave.key)}${wave.label ? ` · ${esc(wave.label)}` : ""} — ${what}. Click to show only this ${esc(state.manifest.wave.term)}.">
+      const on = state.waveFilter?.cohort === r.cohort && state.waveFilter.i === i;
+      return `<li><button class="node${n ? "" : " is-empty"}" data-cohort="${esc(r.cohort)}" data-wave="${i}"
+          aria-pressed="${on}"
+          title="${esc(wave.key)}${wave.label ? ` · ${esc(wave.label)}` : ""} — ${what}. Click to show only this ${esc(m.wave.term)}.">
         <span class="node-bar"><span class="node-fill" style="height:${pct}%"></span></span>
         <span class="node-age">${esc(wave.key)}</span>
         <span class="node-n">${n ? n.toLocaleString("en-GB") : "—"}</span>
@@ -51,38 +55,49 @@ export function renderSpine(perWave, filtered) {
 
 /* ── The topic rows ──────────────────────────────────────────────────── */
 
-const isSelected = (kind, i) => state.topicSel.some((s) => s.kind === kind && s.i === i);
+const isSelected = (kind, id) => state.topicSel.some((s) => s.kind === kind && s.id === id);
 
-function topicRow(kind, i, counts, allMax, expanded) {
-  const item = kind === "d" ? state.domains[i] : state.topics[i];
-  const label = item.label;
-  const on = isSelected(kind, i);
+/* A cohort's per-sweep counts for one topic or domain of the merged scheme, from its tally
+   (which counts by the cohort's own indices); null when the cohort's scheme lacks it. */
+function countsFor(r, kind, id) {
+  const idx = schemeIndex(manifestOf(r.cohort).topics);
+  const i = (kind === "d" ? idx.domain : idx.topic).get(id);
+  if (i === undefined) return null;
+  return (kind === "d" ? r.tally.domains : r.tally.topics)[i];
+}
+
+function topicRow(kind, item, r, allMax, expanded) {
+  const { id, label } = item;
+  const counts = countsFor(r, kind, id) || new Uint32Array(manifestOf(r.cohort).wave.list.length);
+  const on = isSelected(kind, id);
+  const domainOfTopic = schemeIndex(state.scheme).domainOf;
   const partly =
     kind === "d" &&
     !on &&
-    state.topicSel.some((s) => s.kind === "t" && state.topics[s.i].domain === i);
+    state.topicSel.some((s) => s.kind === "t" && domainOfTopic.get(s.id) === id);
   const rowMax = Math.max(1, ...counts);
-  const waves = state.manifest.wave.list;
+  const waves = manifestOf(r.cohort).wave.list;
   const total = counts.reduce((a, b) => a + b, 0);
   const cells = [...counts]
     .map((c, w) => {
       const what = `${esc(label)} at ${esc(waves[w].key)}: ${c.toLocaleString("en-GB")}`;
-      return `<button class="tg-cell${state.waveFilter === w ? " is-col" : ""}"
-          data-l="${shade(c, rowMax, allMax, state.options.gridShade)}" data-cell="${kind}:${i}:${w}"
+      const col = state.waveFilter?.cohort === r.cohort && state.waveFilter.i === w;
+      return `<button class="tg-cell${col ? " is-col" : ""}"
+          data-l="${shade(c, rowMax, allMax, state.options.gridShade)}" data-cell="${kind}:${esc(id)}:${esc(r.cohort)}:${w}"
           title="${what} variable${c === 1 ? "" : "s"}" aria-label="${what}"></button>`;
     })
     .join("");
   const chevron =
     kind === "d"
-      ? `<button class="tg-chev" data-expand="${i}" aria-expanded="${expanded}"
+      ? `<button class="tg-chev" data-expand="${esc(id)}" aria-expanded="${expanded}"
          aria-label="${expanded ? "Hide" : "Show"} the topics in ${esc(label)}">${expanded ? "▾" : "▸"}</button>`
       : "";
   const swatch =
     kind === "d"
-      ? `<span class="dom-swatch" data-domain="${esc(item.id)}" aria-hidden="true"></span>`
+      ? `<span class="dom-swatch" data-domain="${esc(id)}" aria-hidden="true"></span>`
       : "";
   return `<div class="ov-row tg-row${kind === "t" ? " is-topic" : ""}${on ? " is-on" : ""}${partly ? " is-part" : ""}">
-    <div class="ov-label">${chevron}<button class="tg-name" data-row="${kind}:${i}" aria-pressed="${on}"
+    <div class="ov-label">${chevron}<button class="tg-name" data-row="${kind}:${esc(id)}" aria-pressed="${on}"
         title="${esc(item.description || "")}"><span class="tg-box" aria-hidden="true"></span>${swatch}<span class="tg-text">${esc(label)}</span></button>
       <span class="ov-count">${total ? total.toLocaleString("en-GB") : "—"}</span></div>
     <div class="tg-cells">${cells}</div></div>`;
@@ -104,31 +119,32 @@ export function renderTopicGrid() {
   body.hidden = !open;
   if (!open) return;
 
-  const { topics, domains } = state.tally;
-  const allMax = Math.max(1, ...domains.flatMap((r) => [...r]));
+  const r = state.results[0];
+  if (!r) return;
+  const allMax = Math.max(1, ...r.tally.domains.flatMap((row) => [...row]));
   const parts = [];
-  state.domains.forEach((_, di) => {
-    const expanded = state.gridExpanded.has(di);
-    parts.push(topicRow("d", di, domains[di], allMax, expanded));
-    if (!expanded) return;
-    state.topics.forEach((t, ti) => {
-      if (t.domain === di) parts.push(topicRow("t", ti, topics[ti], allMax, false));
-    });
-  });
+  for (const d of state.domains) {
+    const expanded = state.gridExpanded.has(d.id);
+    parts.push(topicRow("d", d, r, allMax, expanded));
+    if (!expanded) continue;
+    for (const t of d.topics) parts.push(topicRow("t", t, r, allMax, false));
+  }
   body.innerHTML = parts.join("");
 }
 
 /**
  * Make clicks in the overview call back. Opening and closing the topic rows is handled here.
- * @param {{onWave: (wave: number) => void, onTopic: (kind: string, i: number) => void,
- *   onCell: (kind: string, i: number, wave: number) => void, onOptions: () => void}} on
- *   Called with a clicked sweep bar, topic name or topic cell, and after the threshold or
- *   shading changes (state.options already updated).
+ * @param {{onWave: (cohort: string, wave: number) => void,
+ *   onTopic: (kind: string, id: string) => void,
+ *   onCell: (kind: string, id: string, cohort: string, wave: number) => void,
+ *   onOptions: () => void}} on Called with a clicked sweep bar (its cohort and sweep index),
+ *   topic name or topic cell, and after the threshold or shading changes (state.options
+ *   already updated).
  */
 export function wireOverview({ onWave, onTopic, onCell, onOptions }) {
   $("#spine-track").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-wave]");
-    if (btn) onWave(Number(btn.dataset.wave));
+    if (btn) onWave(btn.dataset.cohort, Number(btn.dataset.wave));
   });
   $("#tgrid-toggle").addEventListener("click", () => {
     state.options.gridOpen = !state.options.gridOpen;
@@ -145,20 +161,20 @@ export function wireOverview({ onWave, onTopic, onCell, onOptions }) {
   $("#tgrid-body").addEventListener("click", (e) => {
     const exp = e.target.closest("[data-expand]");
     if (exp) {
-      const d = Number(exp.dataset.expand);
+      const d = exp.dataset.expand;
       if (state.gridExpanded.has(d)) state.gridExpanded.delete(d);
       else state.gridExpanded.add(d);
       return renderTopicGrid();
     }
     const name = e.target.closest("[data-row]");
     if (name) {
-      const [kind, i] = name.dataset.row.split(":");
-      return onTopic(kind, Number(i));
+      const [kind, id] = name.dataset.row.split(":");
+      return onTopic(kind, id);
     }
     const cell = e.target.closest("[data-cell]");
     if (cell) {
-      const [kind, i, w] = cell.dataset.cell.split(":");
-      onCell(kind, Number(i), Number(w));
+      const [kind, id, key, w] = cell.dataset.cell.split(":");
+      onCell(kind, id, key, Number(w));
     }
   });
 }

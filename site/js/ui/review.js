@@ -8,12 +8,12 @@
 import { buildProject, FORMATS } from "../core/codegen.js";
 import { fixDots, problems } from "../core/columns.js";
 import { loadDict } from "../core/data.js";
-import { addMany, keyOf, remove } from "../core/selection.js";
+import { keyOf, remove } from "../core/selection.js";
 import { esc } from "../core/text.js";
 import { zip } from "../core/zip.js";
-import { filterToFile } from "./results.js";
-import { onSelectionChange, saveOptions, setSelection } from "./selected.js";
-import { DRAG_MIME, state } from "./state.js";
+import { addDropped, filterToFile } from "./results.js";
+import { onSelectionChange, saveOptions, setSelection as setFor } from "./selected.js";
+import { cohort, DRAG_MIME, manifestOf, selectionOf, state } from "./state.js";
 import { onShow } from "./views.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -35,11 +35,17 @@ const TEMPLATE_FILES = [
 ];
 let templates = null; // fetched on the first download: most visitors never download
 
-const waveOrder = () => state.manifest.wave.list.map((w) => w.key);
+/* The cohort whose selection this view shows. One cohort at a time until the view groups
+   several (feature 007, user story 3). */
+const shownKey = () => state.chosen[0];
+const shownManifest = () => manifestOf(shownKey());
+const shownBundle = () => selectionOf(shownKey());
+const setSelection = (next) => setFor(shownKey(), next);
+const waveOrder = () => shownManifest().wave.list.map((w) => w.key);
 const currentProblems = () =>
   problems(
-    state.bundle,
-    state.manifest.identifier,
+    shownBundle(),
+    shownManifest().identifier,
     state.options.outputFormat,
     state.options.languages,
   );
@@ -49,7 +55,7 @@ const currentProblems = () =>
 /* Drawn only while the view is showing: with thousands selected these panes are the
    slowest thing on the page, and every click in the list would otherwise redraw them. */
 function render() {
-  if (state.view !== "basket" || !state.manifest) return;
+  if (state.view !== "basket" || cohort(shownKey())?.status !== "ready") return;
   renderDetail();
 }
 
@@ -115,8 +121,8 @@ function optionsHtml(languages, format, missingToNa) {
 
 function renderDetail() {
   const el = $("#basket-detail");
-  const m = state.manifest;
-  const count = state.bundle.length;
+  const m = shownManifest();
+  const count = shownBundle().length;
   if (!count) {
     el.innerHTML = emptyHtml(m);
     return;
@@ -124,7 +130,7 @@ function renderDetail() {
   const bad = currentProblems();
   const fileInfo = new Map(m.files.map((f) => [f.name, f]));
   const order = waveOrder();
-  const files = [...new Set(state.bundle.map((b) => b.file))].sort(
+  const files = [...new Set(shownBundle().map((b) => b.file))].sort(
     (a, b) =>
       order.indexOf(fileInfo.get(a).wave) - order.indexOf(fileInfo.get(b).wave) ||
       a.localeCompare(b),
@@ -132,7 +138,7 @@ function renderDetail() {
   const { languages, missingToNa, outputFormat: format } = state.options;
   const ext = FORMATS[format]?.ext || "csv";
   const stataNames = format === "dta" || languages.includes("stata");
-  const dotted = stataNames && state.bundle.some((b) => /[^A-Za-z0-9_]/.test(b.column));
+  const dotted = stataNames && shownBundle().some((b) => /[^A-Za-z0-9_]/.test(b.column));
 
   // The list is redrawn in place, so it keeps its scroll position.
   const top = $("#basket-scroll")?.scrollTop || 0;
@@ -177,7 +183,7 @@ function renderDetail() {
           <span class="col-note">always included: the key the files are merged on</span></span>
       </li>
       ${files
-        .flatMap((f) => state.bundle.filter((b) => b.file === f))
+        .flatMap((f) => shownBundle().filter((b) => b.file === f))
         .map((b) => colRow(b, bad))
         .join("")}
     </ol>
@@ -216,14 +222,14 @@ function showFirstProblem() {
 /* Committed on blur or Enter, not per keystroke: a redraw replaces the input being typed in. */
 function rename(input) {
   const key = input.dataset.rename;
-  const item = state.bundle.find((b) => keyOf(b) === key);
+  const item = shownBundle().find((b) => keyOf(b) === key);
   // As typed: an invalid name is flagged with its reason rather than silently changed.
   const next = input.value.trim();
   if (!item || next === item.column) {
     if (item && input.value !== item.column) render();
     return;
   }
-  setSelection(state.bundle.map((b) => (keyOf(b) === key ? { ...b, column: next } : b)));
+  setSelection(shownBundle().map((b) => (keyOf(b) === key ? { ...b, column: next } : b)));
 }
 
 function setOption(change) {
@@ -263,19 +269,19 @@ async function loadTemplates() {
 
 async function download() {
   const { languages } = state.options;
-  if (!state.bundle.length || currentProblems().size || !languages.length) return;
+  if (!shownBundle().length || currentProblems().size || !languages.length) return;
   const button = $("#basket-download");
   button.disabled = true;
   say("Packaging…");
   try {
     templates ??= await loadTemplates();
     const dicts = {};
-    for (const file of new Set(state.bundle.map((b) => b.file))) {
-      dicts[file] = await loadDict(fetch, state.manifest.key, file, state.dictCache);
+    for (const file of new Set(shownBundle().map((b) => b.file))) {
+      dicts[file] = await loadDict(fetch, shownManifest().key, file, state.dictCache);
     }
     const { name, files } = buildProject(
-      state.bundle,
-      state.manifest,
+      shownBundle(),
+      shownManifest(),
       dicts,
       templates,
       state.options,
@@ -306,7 +312,7 @@ export function wireReview() {
   const detail = $("#basket-detail");
   detail.addEventListener("click", (e) => {
     const gone = e.target.closest("[data-remove]");
-    if (gone) return setSelection(remove(state.bundle, gone.dataset.remove).selection);
+    if (gone) return setSelection(remove(shownBundle(), gone.dataset.remove).selection);
     if (e.target.closest("#basket-clear")) return setSelection([]);
     if (e.target.closest("#basket-download")) return download();
     if (e.target.closest("#dl-show")) return showFirstProblem();
@@ -317,10 +323,16 @@ export function wireReview() {
       return;
     }
     if (e.target.closest("#fix-dots")) {
-      return setSelection(fixDots(state.bundle, state.manifest.identifier));
+      return setSelection(fixDots(shownBundle(), shownManifest().identifier));
     }
     const file = e.target.closest("[data-file]");
-    if (file) filterToFile(state.manifest.files.findIndex((f) => f.name === file.dataset.file));
+    if (file) {
+      const m = shownManifest();
+      filterToFile(
+        m.key,
+        m.files.findIndex((f) => f.name === file.dataset.file),
+      );
+    }
   });
   detail.addEventListener("change", (e) => {
     const t = e.target;
@@ -358,8 +370,7 @@ export function wireReview() {
   drop.addEventListener("drop", (e) => {
     e.preventDefault();
     try {
-      const item = JSON.parse(e.dataTransfer.getData(DRAG_MIME));
-      setSelection(addMany(state.bundle, [item], state.manifest).selection);
+      addDropped(JSON.parse(e.dataTransfer.getData(DRAG_MIME)));
     } catch {
       // not one of our rows
     }

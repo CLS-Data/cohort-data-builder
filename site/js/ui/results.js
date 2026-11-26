@@ -2,37 +2,57 @@
 
    Each row carries what decides whether a variable is worth a look (name, label, sweep,
    file). Everything secondary opens under the row from its own ▸ button, a few lines rather
-   than a pane, so many variables stay on screen at once. */
+   than a pane, so many variables stay on screen at once.
+
+   The list holds every chosen cohort's matches, cohort after cohort (feature 007). A row is
+   {cohort, row}: the cohort's key and its index row; its key is listKey's
+   `<cohort>:<fileIndex>:<name>`. */
 
 import { loadDict } from "../core/data.js";
 import { describeVariable } from "../core/details.js";
-import { buildLabelIndex, filterVariables, PAGE, page, sameLabel } from "../core/search.js";
+import { PAGE, page, sameLabel, searchCohorts } from "../core/search.js";
 import {
   addMany,
   canSelect,
   has,
-  rangeBetween,
   removeMany,
-  rowKey,
-  selectAllState,
   selectableItems,
   toggle,
   toItem,
 } from "../core/selection.js";
 import { esc, highlight, levelName } from "../core/text.js";
-import { ensure, flatten, rowTopics, toggle as toggleTopic } from "../core/topics.js";
+import {
+  ensure,
+  flatten,
+  mergeSchemes,
+  rowTopics,
+  schemeIndex,
+  toggle as toggleTopic,
+} from "../core/topics.js";
 import { renderSpine, renderTopicGrid, wireOverview } from "./overview.js";
 import { saveOptions, setSelection } from "./selected.js";
-import { DRAG_MIME, state } from "./state.js";
+import {
+  cohort,
+  DRAG_MIME,
+  listKey,
+  manifestOf,
+  readyCohorts,
+  selectionOf,
+  state,
+} from "./state.js";
 import { openSuggest } from "./suggest.js";
 import { switchView } from "./views.js";
 
 const $ = (sel) => document.querySelector(sel);
 const n = (x) => x.toLocaleString("en-GB");
-const keyOf = rowKey;
-const waveKey = (i) => state.manifest.wave.list[i].key;
-const fileOf = (row) => state.manifest.files[row[2]];
-const domainOf = (t) => state.domains[state.topics[t].domain];
+const SELECT_ALL_MAX = 500; // as core/selection.js: beyond this "select all" is a mistake
+const keyOf = listKey;
+const fileOf = (e) => manifestOf(e.cohort).files[e.row[2]];
+const waveOf = (e) => manifestOf(e.cohort).wave.list[e.row[3]];
+/* A row's topics are indices into its own cohort's scheme. */
+const topicsOf = (key) => flatten(manifestOf(key).topics);
+const domainOf = (key, t) => manifestOf(key).topics.domains[topicsOf(key)[t].domain];
+const entryFor = (key) => state.list.find((e) => keyOf(e) === key);
 
 /* ── Searching ───────────────────────────────────────────────────────── */
 
@@ -42,7 +62,7 @@ const domainOf = (t) => state.domains[state.topics[t].domain];
  *   scroll position (used when only the drawing changes).
  */
 export function runSearch({ keepPlace = false } = {}) {
-  const r = filterVariables(state.vars, state.manifest, {
+  state.results = searchCohorts(readyCohorts(), {
     query: state.query,
     wave: state.waveFilter,
     file: state.fileFilter,
@@ -51,15 +71,22 @@ export function runSearch({ keepPlace = false } = {}) {
     topicMode: state.topicMode,
     minConf: state.options.minConf,
   });
-  state.matches = r.matches;
-  state.levelCounts = r.perLevel;
-  state.tally = r.tally;
+  state.list = state.results.flatMap((r) => r.matches.map((row) => ({ cohort: r.cohort, row })));
+  // Level counts by name, summed over the cohorts: each cohort numbers its own levels.
+  state.levelCounts = new Map();
+  for (const r of state.results) {
+    const levels = manifestOf(r.cohort).levels || [];
+    for (const [i, count] of r.perLevel) {
+      const name = i === -1 ? -1 : levels[i];
+      state.levelCounts.set(name, (state.levelCounts.get(name) || 0) + count);
+    }
+  }
   if (!keepPlace) {
     state.shown = PAGE;
     $("#vscroll").scrollTop = 0;
   }
   renderResults();
-  renderSpine(r.perWave, isFiltered());
+  renderSpine(isFiltered());
   renderTopicGrid();
   renderLevelSelect();
   renderFilters();
@@ -68,7 +95,7 @@ export function runSearch({ keepPlace = false } = {}) {
 
 /** The selection changed but the matches did not: redraw what shows it, keeping place. */
 export function refreshSelection() {
-  if (!state.manifest) return;
+  if (!state.results.length) return;
   renderResults();
   renderSelectAll();
 }
@@ -80,8 +107,8 @@ const isFiltered = () =>
   state.levelFilter !== null ||
   state.topicSel.length > 0;
 
-/** Forget the filters and open rows: called when another cohort is opened. */
-export function resetForCohort() {
+/** Forget the filters and open rows. */
+export function resetFilters() {
   Object.assign(state, {
     query: "",
     waveFilter: null,
@@ -90,47 +117,63 @@ export function resetForCohort() {
     topicSel: [],
     topicMode: "any",
     gridExpanded: new Set(),
-    domains: state.manifest.topics?.domains || [],
-    topics: flatten(state.manifest.topics),
     expanded: new Set(),
     allValues: new Set(),
     anchor: null,
-    labelIndex: buildLabelIndex(state.vars),
   });
   $("#q").value = "";
 }
 
-/* Measurement level is a refinement, not a way in: a dropdown, with counts. */
+/** Take the chosen cohorts' topics and levels together: call when the choice changes. */
+export function mergeChosen() {
+  const ready = readyCohorts();
+  state.scheme = mergeSchemes(ready.map((c) => c.manifest.topics));
+  state.topics = flatten(state.scheme);
+  state.domains = state.scheme?.domains || [];
+  state.levels = [...new Set(ready.flatMap((c) => c.manifest.levels || []))];
+}
+
+/* Measurement level is a refinement, not a way in: a dropdown, with counts. The options'
+   values are positions in state.levels, the chosen cohorts' level names. */
 function renderLevelSelect() {
-  const levels = state.manifest.levels || [];
+  const levels = state.levels;
   const sel = $("#level");
   sel.hidden = !levels.length;
   const total = [...state.levelCounts.values()].reduce((a, b) => a + b, 0);
   const opt = (k) => {
-    const count = state.levelCounts.get(k) || 0;
-    const usable = count || state.levelFilter === k;
+    const name = k === -1 ? -1 : levels[k];
+    const count = state.levelCounts.get(name) || 0;
+    const usable = count || state.levelFilter === name;
     return `<option value="${k}"${usable ? "" : " disabled"}>${esc(levelName(levels, k))} (${n(count)})</option>`;
   };
   sel.innerHTML = `<option value="">Any level (${n(total)})</option>${[...levels.keys(), -1].map(opt).join("")}`;
-  sel.value = state.levelFilter === null ? "" : String(state.levelFilter);
+  const f = state.levelFilter;
+  sel.value = f === null ? "" : String(f === -1 ? -1 : levels.indexOf(f));
 }
 
 function renderFilters() {
   const chips = [];
-  if (state.waveFilter !== null) {
+  const w = state.waveFilter;
+  if (w !== null) {
+    const m = manifestOf(w.cohort);
     chips.push(
-      `<button class="chip" data-clear="wave" title="Show every ${esc(state.manifest.wave.term)}">${esc(waveKey(state.waveFilter))} ✕</button>`,
+      `<button class="chip" data-clear="wave" title="Show every ${esc(m.wave.term)}">${esc(m.wave.list[w.i].key)} ✕</button>`,
     );
   }
-  if (state.fileFilter !== null) {
+  const f = state.fileFilter;
+  if (f !== null) {
     chips.push(
-      `<button class="chip" data-clear="file" title="Show every file">${esc(state.manifest.files[state.fileFilter].name)} ✕</button>`,
+      `<button class="chip" data-clear="file" title="Show every file">${esc(manifestOf(f.cohort).files[f.i].name)} ✕</button>`,
     );
   }
+  const idx = schemeIndex(state.scheme);
   for (const s of state.topicSel) {
-    const label = s.kind === "d" ? state.domains[s.i].label : state.topics[s.i].label;
+    const label =
+      s.kind === "d"
+        ? state.domains[idx.domain.get(s.id)]?.label
+        : state.topics[idx.topic.get(s.id)]?.label;
     chips.push(
-      `<button class="chip chip-topic" data-unselect="${s.kind}:${s.i}" title="Remove this topic">${esc(label)} ✕</button>`,
+      `<button class="chip chip-topic" data-unselect="${s.kind}:${esc(s.id)}" title="Remove this topic">${esc(label || s.id)} ✕</button>`,
     );
   }
   // The any/all switch, once there is something for it to combine.
@@ -143,35 +186,39 @@ function renderFilters() {
   }
   $("#active-filters").innerHTML = chips.join("");
   $("#clear-filters").hidden = !isFiltered();
-  const count = state.matches.length;
+  const count = state.list.length;
   $("#result-count").textContent = `${n(count)} variable${count === 1 ? "" : "s"}`;
 }
 
 /* ── The list ────────────────────────────────────────────────────────── */
 
-function rowHtml(row, i, q) {
-  const file = fileOf(row);
-  const key = keyOf(row);
+function rowHtml(e, i, q) {
+  const { row } = e;
+  const m = manifestOf(e.cohort);
+  const file = fileOf(e);
+  const key = keyOf(e);
   const open = state.expanded.has(key);
-  const wave = state.manifest.wave.list[row[3]];
+  const wave = waveOf(e);
   const label = row[1] || "No label";
-  const why = canSelect(row, file, state.manifest.identifier);
+  const why = canSelect(row, file, m.identifier);
   const isId = why && file.hasId; // the identifier: in every download already
-  const isIn = !why && has(state.bundle, file.name, row[0]);
+  const isIn = !why && has(selectionOf(e.cohort), file.name, row[0]);
   const mark = isIn || isId ? "✓" : why ? "" : "＋";
   const attrs = why
     ? `aria-disabled="true" title="${esc(why)}"`
     : `aria-pressed="${isIn}" title="Click to ${isIn ? "remove" : "select"} · Shift-click for a range" draggable="true"`;
   // Up to two topics, strongest first, and a stripe in the colour of the strongest's domain.
-  const ts = state.topics.length ? rowTopics(row, state.options.minConf) : [];
+  const ts = m.topics ? rowTopics(row, state.options.minConf) : [];
+  const topics = ts.length ? topicsOf(e.cohort) : [];
   const tags = ts
     .slice(0, 2)
-    .map(
-      ([t]) => `<span class="topic-chip" data-domain="${esc(domainOf(t).id)}"
-       title="${esc(domainOf(t).label)} › ${esc(state.topics[t].label)}">${esc(state.topics[t].label)}</span>`,
-    )
+    .map(([t]) => {
+      const d = domainOf(e.cohort, t);
+      return `<span class="topic-chip" data-domain="${esc(d.id)}"
+       title="${esc(d.label)} › ${esc(topics[t].label)}">${esc(topics[t].label)}</span>`;
+    })
     .join("");
-  const stripe = ts.length ? ` data-domain="${esc(domainOf(ts[0][0]).id)}"` : "";
+  const stripe = ts.length ? ` data-domain="${esc(domainOf(e.cohort, ts[0][0]).id)}"` : "";
   return `<li class="vrow${open ? " is-open" : ""}${isIn ? " is-in" : ""}${why ? " is-fixed" : ""}" data-key="${esc(key)}"${stripe}>
     <div class="vrow-main">
       <button class="vrow-btn" data-i="${i}" ${attrs}>
@@ -187,60 +234,66 @@ function rowHtml(row, i, q) {
           aria-label="${open ? "Hide" : "Show"} details for ${esc(row[0])}"
           title="${open ? "Hide" : "Show"} details">${open ? "▾" : "▸"}</button>
     </div>
-    ${open ? `<div class="vrow-more" id="more-${esc(key)}">${moreHtml(row)}</div>` : ""}
+    ${open ? `<div class="vrow-more" id="more-${esc(key)}">${moreHtml(e)}</div>` : ""}
   </li>`;
+}
+
+/* The sweep term heading the list: the chosen cohorts' own, or "sweep" when they differ. */
+function sweepTerm() {
+  const terms = new Set(readyCohorts().map((c) => c.manifest.wave.term));
+  return terms.size === 1 ? [...terms][0] : "sweep";
 }
 
 /** Draw the result rows that fit, the "show more" button and the empty-state message. */
 export function renderResults() {
   const q = state.query.trim();
-  const { rows, left, next } = page(state.matches, state.shown);
-  if (!state.matches.length) {
+  const { rows, left, next } = page(state.list, state.shown);
+  if (!state.list.length) {
     $("#results").innerHTML = `<li class="vempty">No variables match.
       <button class="link-btn" data-clear-all>Clear the filters</button></li>`;
   } else {
     $("#results").innerHTML =
       `<li class="vhead" aria-hidden="true"><span></span><span>Variable</span><span>Label</span>
-         <span>${esc(state.manifest.wave.term)}</span><span class="v-file">File</span><span class="v-topics">${state.topics.length ? "Topics" : ""}</span><span></span></li>` +
-      rows.map((row, i) => rowHtml(row, i, q)).join("");
+         <span>${esc(sweepTerm())}</span><span class="v-file">File</span><span class="v-topics">${state.topics.length ? "Topics" : ""}</span><span></span></li>` +
+      rows.map((e, i) => rowHtml(e, i, q)).join("");
   }
   const more = $("#more");
   more.hidden = left <= 0;
   more.innerHTML =
     left > 0
       ? `<button class="btn" id="show-more">Show ${n(next)} more</button>
-         <span>${n(rows.length)} of ${n(state.matches.length)} shown</span>`
+         <span>${n(rows.length)} of ${n(state.list.length)} shown</span>`
       : "";
   // Rows open before their dictionary arrived fill in now.
-  for (const row of rows) if (state.expanded.has(keyOf(row))) fillMore(row);
+  for (const e of rows) if (state.expanded.has(keyOf(e))) fillMore(e);
 }
 
 /* ── A variable, opened ──────────────────────────────────────────────── */
 
-const dictId = (row) => `${state.manifest.key}/${fileOf(row).name}`;
+const dictId = (e) => `${e.cohort}/${fileOf(e).name}`;
 const failed = new Map(); // dictionaries that could not be loaded: id -> message
 
 /* The row's dictionary entry; undefined while not loaded, null when it has none. */
-function dictEntry(row) {
-  const dict = state.dictCache.get(dictId(row));
-  if (!dict) return failed.has(dictId(row)) ? null : undefined;
-  return dict.variables.find((v) => v.variable === row[0]) || null;
+function dictEntry(e) {
+  const dict = state.dictCache.get(dictId(e));
+  if (!dict) return failed.has(dictId(e)) ? null : undefined;
+  return dict.variables.find((v) => v.variable === e.row[0]) || null;
 }
 
-async function fillMore(row) {
-  if (dictEntry(row) !== undefined) return;
+async function fillMore(e) {
+  if (dictEntry(e) !== undefined) return;
   try {
-    await loadDict(fetch, state.manifest.key, fileOf(row).name, state.dictCache);
+    await loadDict(fetch, e.cohort, fileOf(e).name, state.dictCache);
   } catch (err) {
-    failed.set(dictId(row), err.message);
+    failed.set(dictId(e), err.message);
   }
-  const el = document.getElementById(`more-${keyOf(row)}`);
-  if (el && state.expanded.has(keyOf(row))) el.innerHTML = moreHtml(row);
+  const el = document.getElementById(`more-${keyOf(e)}`);
+  if (el && state.expanded.has(keyOf(e))) el.innerHTML = moreHtml(e);
 }
 
 const valueItem = (v) => `<li><span class="vm-code">${esc(v.code)}</span> ${esc(v.label)}</li>`;
 
-function valuesHtml(row, d) {
+function valuesHtml(e, d) {
   if (d.isIdentifier) {
     return `<p class="vm-note">The identifier every file is merged on: always the first column of a download.</p>`;
   }
@@ -248,12 +301,12 @@ function valuesHtml(row, d) {
     return `<p class="vm-note">${d.note === "continuous" ? "A continuous measure: no value labels." : "No value labels recorded."}</p>`;
   }
   // Answers first; the missing codes after, on a quieter line of their own.
-  const key = keyOf(row);
+  const key = keyOf(e);
   const all = state.allValues.has(key);
   const answers = all ? [...d.answers, ...d.more] : d.answers;
-  let toggle = "";
+  let more = "";
   if (d.more.length) {
-    toggle = `<li><button class="link-btn" data-values="${esc(key)}">${all ? "fewer" : `+ ${d.more.length} more`}</button></li>`;
+    more = `<li><button class="link-btn" data-values="${esc(key)}">${all ? "fewer" : `+ ${d.more.length} more`}</button></li>`;
   }
   const naItem = (v) =>
     v.lossy
@@ -262,20 +315,21 @@ function valuesHtml(row, d) {
   const kept = d.kept
     .map(([x, l]) => `<span class="vm-code">${esc(x)}</span> ${esc(l)}`)
     .join(", ");
-  return `${answers.length ? `<ul class="vm-values">${answers.map(valueItem).join("")}${toggle}</ul>` : ""}
+  return `${answers.length ? `<ul class="vm-values">${answers.map(valueItem).join("")}${more}</ul>` : ""}
     ${d.missing.length ? `<ul class="vm-values is-na" title="Missing-value codes"><li class="vm-key">Missing</li>${d.missing.map(naItem).join("")}</ul>` : ""}
     ${kept ? `<p class="vm-note vm-kept" title="Negative, but labelled as an answer: never converted to NA">Kept as answers: ${kept}</p>` : ""}`;
 }
 
-function sameLabelHtml(row) {
-  const { rows, more } = sameLabel(state.labelIndex, row);
+function sameLabelHtml(e) {
+  const { rows, more } = sameLabel(cohort(e.cohort).labelIndex, e.row);
   if (!rows.length) return "";
   const links = rows
+    .map((row) => ({ cohort: e.cohort, row }))
     .map(
       (
         r,
       ) => `<button class="vm-also-link" data-jump="${esc(keyOf(r))}" title="${esc(fileOf(r).name)}">
-        <span class="v-wave">${esc(waveKey(r[3]))}</span> ${esc(r[0])}</button>`,
+        <span class="v-wave">${esc(waveOf(r).key)}</span> ${esc(r.row[0])}</button>`,
     )
     .join("");
   return `<div class="vm-also"><span class="vm-key">Same label</span>${links}${more ? `<span class="vm-dim">+ ${more} more</span>` : ""}</div>`;
@@ -284,32 +338,36 @@ function sameLabelHtml(row) {
 /* Every topic in the dictionary entry, with its confidence; those under the threshold are
    dimmed rather than hidden. Clicking one filters by it. The tags come from a language
    model, so the line ends with a button to suggest better ones (see suggest.js). */
-function topicsHtml(entry, row) {
-  if (!state.topics.length) return "";
-  const byId = new Map(state.topics.map((t, i) => [t.id, i]));
+function topicsHtml(entry, e) {
+  const scheme = manifestOf(e.cohort).topics;
+  if (!scheme) return "";
+  const topics = topicsOf(e.cohort);
+  const byId = schemeIndex(scheme).topic;
   const tags = (entry.topics || [])
     .filter(([id]) => byId.has(id))
     .map(([id, conf]) => {
       const i = byId.get(id);
       const pct = Math.round(conf * 100);
-      const domain = domainOf(i);
-      return `<button class="vm-topic${pct < state.options.minConf ? " is-below" : ""}" data-topic-open="${i}"
-        data-domain="${esc(domain.id)}" title="${esc(domain.label)} › ${esc(state.topics[i].label)} · filter by this topic">${esc(state.topics[i].label)} <span class="vm-pct">${pct}%</span></button>`;
+      const domain = domainOf(e.cohort, i);
+      return `<button class="vm-topic${pct < state.options.minConf ? " is-below" : ""}" data-topic-open="${esc(id)}"
+        data-domain="${esc(domain.id)}" title="${esc(domain.label)} › ${esc(topics[i].label)} · filter by this topic">${esc(topics[i].label)} <span class="vm-pct">${pct}%</span></button>`;
     })
     .join("");
-  const suggest = `<button class="link-btn vm-suggest" data-suggest="${esc(keyOf(row))}">${tags ? "Suggest a tag change" : "Suggest a tag"}</button>`;
+  const suggest = `<button class="link-btn vm-suggest" data-suggest="${esc(keyOf(e))}">${tags ? "Suggest a tag change" : "Suggest a tag"}</button>`;
   return `<div class="vm-topics">${tags ? `<span class="vm-key">Topics</span>${tags}` : ""}${suggest}</div>`;
 }
 
-function moreHtml(row) {
-  const entry = dictEntry(row);
+function moreHtml(e) {
+  const { row } = e;
+  const m = manifestOf(e.cohort);
+  const entry = dictEntry(e);
   if (entry === undefined) return `<p class="vm-note">Loading…</p>`;
-  const file = fileOf(row);
+  const file = fileOf(e);
   if (entry === null) {
-    const why = failed.get(dictId(row)) || `${row[0]} is not in the ${file.name} dictionary.`;
+    const why = failed.get(dictId(e)) || `${row[0]} is not in the ${file.name} dictionary.`;
     return `<p class="vm-note vm-warn">${esc(why)}</p>`;
   }
-  const d = describeVariable(entry, file, state.manifest.identifier);
+  const d = describeVariable(entry, file, m.identifier);
   const facts = d.isIdentifier
     ? esc(file.name)
     : d.facts
@@ -319,23 +377,23 @@ function moreHtml(row) {
             : esc(f.name === "Position" ? `position ${f.value}` : f.value),
         )
         .join(" · ");
-  return `${valuesHtml(row, d)}
-    ${topicsHtml(entry, row)}
-    ${sameLabelHtml(row)}
-    ${file.hasId ? "" : `<p class="vm-note vm-warn">This file has no ${esc(state.manifest.identifier)} column, so it cannot be merged.</p>`}
+  return `${valuesHtml(e, d)}
+    ${topicsHtml(entry, e)}
+    ${sameLabelHtml(e)}
+    ${file.hasId ? "" : `<p class="vm-note vm-warn">This file has no ${esc(m.identifier)} column, so it cannot be merged.</p>`}
     <div class="vm-meta"><span>${facts}</span>
-      <button class="link-btn" data-file-open="${row[2]}">all in this file</button></div>`;
+      <button class="link-btn" data-file-open="${esc(e.cohort)}:${row[2]}">all in this file</button></div>`;
 }
 
 /* Redrawing a row replaces its buttons; a keyboard user stays where they were. */
-function toggleRow(row) {
-  const key = keyOf(row);
+function toggleRow(e) {
+  const key = keyOf(e);
   const had = document.activeElement?.matches?.(".v-expand");
   if (state.expanded.has(key)) state.expanded.delete(key);
   else state.expanded.add(key);
   const li = document.querySelector(`.vrow[data-key="${CSS.escape(key)}"]`);
-  if (li) li.outerHTML = rowHtml(row, state.matches.indexOf(row), state.query.trim());
-  if (state.expanded.has(key)) fillMore(row);
+  if (li) li.outerHTML = rowHtml(e, state.list.indexOf(e), state.query.trim());
+  if (state.expanded.has(key)) fillMore(e);
   if (had) {
     document
       .querySelector(`.vrow[data-key="${CSS.escape(key)}"] .v-expand`)
@@ -345,14 +403,40 @@ function toggleRow(row) {
 
 /* ── Selecting ───────────────────────────────────────────────────────── */
 
+/* The selectable rows among some list entries, as selection items, cohort by cohort. */
+function selectableByCohort(entries) {
+  const out = new Map();
+  for (const e of entries) {
+    if (!out.has(e.cohort)) out.set(e.cohort, []);
+    out.get(e.cohort).push(e.row);
+  }
+  return [...out].map(([key, rows]) => [key, selectableItems(rows, manifestOf(key))]);
+}
+
+/* Add or remove items, cohort by cohort; returns how many changed. */
+function changeMany(groups, adding) {
+  let changed = 0;
+  for (const [key, items] of groups) {
+    const r = adding
+      ? addMany(selectionOf(key), items, manifestOf(key))
+      : removeMany(selectionOf(key), items);
+    changed += r.changed;
+    setSelection(key, r.selection);
+  }
+  return changed;
+}
+
 function renderSelectAll() {
   const btn = $("#select-all");
-  const mode = selectAllState(state.matches, state.manifest, state.bundle);
-  btn.hidden = mode === "hidden";
+  const groups = selectableByCohort(state.list);
+  const count = groups.reduce((a, [, items]) => a + items.length, 0);
+  btn.hidden = !count || count > SELECT_ALL_MAX;
   if (btn.hidden) return;
-  const count = selectableItems(state.matches, state.manifest).length;
-  btn.dataset.mode = mode;
-  btn.textContent = `${mode === "remove" ? "Remove" : "Select"} all ${n(count)}`;
+  const allIn = groups.every(([key, items]) =>
+    items.every((it) => has(selectionOf(key), it.file, it.name)),
+  );
+  btn.dataset.mode = allIn ? "remove" : "add";
+  btn.textContent = `${allIn ? "Remove" : "Select"} all ${n(count)}`;
 }
 
 /* Said beside the count, and to a screen reader, when one click changed several rows. */
@@ -370,43 +454,34 @@ function sayCount(change) {
 }
 
 function selectAll() {
-  const items = selectableItems(state.matches, state.manifest);
-  if ($("#select-all").dataset.mode === "remove") {
-    const r = removeMany(state.bundle, items);
-    setSelection(r.selection);
-    sayCount(-r.changed);
-  } else {
-    const r = addMany(state.bundle, items, state.manifest);
-    setSelection(r.selection);
-    sayCount(r.changed);
-  }
+  const adding = $("#select-all").dataset.mode !== "remove";
+  const changed = changeMany(selectableByCohort(state.list), adding);
+  sayCount(adding ? changed : -changed);
 }
 
 /* A click puts a row in the selection or takes it out (Cmd- or Ctrl-click the same: a
    click never clears the others). Shift-click carries every row between it and the last
    row clicked the way the clicked row goes: in, or out. */
-function selectRow(btn, e) {
-  const row = state.matches[Number(btn.dataset.i)];
-  if (!row) return;
-  const key = keyOf(row);
+function selectRow(btn, ev) {
+  const e = state.list[Number(btn.dataset.i)];
+  if (!e) return;
+  const key = keyOf(e);
   const had = document.activeElement === btn;
   const anchor = state.anchor;
   state.anchor = key;
   if (btn.getAttribute("aria-disabled") === "true") return;
-  const item = toItem(row, state.manifest);
-  if (e.shiftKey && anchor && anchor !== key) {
+  const m = manifestOf(e.cohort);
+  const item = toItem(e.row, m);
+  const from = anchor ? state.list.findIndex((x) => keyOf(x) === anchor) : -1;
+  if (ev.shiftKey && from >= 0 && anchor !== key) {
     window.getSelection()?.removeAllRanges(); // Shift-click also extends the text selection
-    const range = rangeBetween(state.matches, anchor, key, state.manifest);
-    if (range.length) {
-      const adding = !has(state.bundle, item.file, item.name);
-      const r = adding
-        ? addMany(state.bundle, range, state.manifest)
-        : removeMany(state.bundle, range);
-      setSelection(r.selection);
-      sayCount(adding ? r.changed : -r.changed);
-    }
+    const to = state.list.indexOf(e);
+    const range = state.list.slice(Math.min(from, to), Math.max(from, to) + 1);
+    const adding = !has(selectionOf(e.cohort), item.file, item.name);
+    const changed = changeMany(selectableByCohort(range), adding);
+    if (changed) sayCount(adding ? changed : -changed);
   } else {
-    setSelection(toggle(state.bundle, item, state.manifest).selection);
+    setSelection(e.cohort, toggle(selectionOf(e.cohort), item, m).selection);
   }
   if (had) {
     document
@@ -415,13 +490,25 @@ function selectRow(btn, e) {
   }
 }
 
+/**
+ * Add a variable dragged from the list: the item {@link toItem} made, with its cohort.
+ * Without a cohort it goes to the one chosen cohort, if only one is chosen.
+ * @param {{cohort: string, name: string, file: string}} item The dropped item.
+ */
+export function addDropped(item) {
+  // An item without a cohort (from an older page) can only mean the one being searched.
+  const key = item?.cohort ?? (state.chosen.length === 1 ? state.chosen[0] : undefined);
+  if (cohort(key)?.status !== "ready") return;
+  setSelection(key, addMany(selectionOf(key), [item], manifestOf(key)).selection);
+}
+
 /* Drag a row onto the Selection tab to add it. */
 function wireDrag() {
   $("#results").addEventListener("dragstart", (e) => {
     const btn = e.target.closest?.(".vrow-btn");
-    const row = btn && state.matches[Number(btn.dataset.i)];
-    if (!row) return;
-    e.dataTransfer.setData(DRAG_MIME, JSON.stringify(toItem(row, state.manifest)));
+    const entry = btn && state.list[Number(btn.dataset.i)];
+    if (!entry) return;
+    e.dataTransfer.setData(DRAG_MIME, JSON.stringify(toItem(entry.row, manifestOf(entry.cohort))));
     e.dataTransfer.effectAllowed = "copy";
   });
   const tab = $('.view-tab[data-view="basket"]');
@@ -431,8 +518,7 @@ function wireDrag() {
   tab.addEventListener("drop", (e) => {
     e.preventDefault();
     try {
-      const item = JSON.parse(e.dataTransfer.getData(DRAG_MIME));
-      setSelection(addMany(state.bundle, [item], state.manifest).selection);
+      addDropped(JSON.parse(e.dataTransfer.getData(DRAG_MIME)));
     } catch {
       // not one of our rows
     }
@@ -442,10 +528,11 @@ function wireDrag() {
 /* Go to another variable: search for its label, which brings the whole same-label family
    into the list together, and open it. */
 async function jumpTo(key) {
-  const row = state.vars.find((r) => keyOf(r) === key);
+  const [c] = key.split(":");
+  const row = cohort(c)?.vars.find((r) => keyOf({ cohort: c, row: r }) === key);
   if (!row) return;
   // Its details first, so the row is scrolled to at its full height.
-  await fillMore(row);
+  await fillMore({ cohort: c, row });
   Object.assign(state, {
     query: row[1],
     waveFilter: null,
@@ -463,11 +550,17 @@ async function jumpTo(key) {
 
 /**
  * Show every variable in one file.
- * @param {number} fileIdx Index into the manifest's files.
+ * @param {string} key The cohort.
+ * @param {number} fileIdx Index into its manifest's files.
  */
-export function filterToFile(fileIdx) {
+export function filterToFile(key, fileIdx) {
   switchView("search");
-  Object.assign(state, { query: "", waveFilter: null, fileFilter: fileIdx, levelFilter: null });
+  Object.assign(state, {
+    query: "",
+    waveFilter: null,
+    fileFilter: { cohort: key, i: fileIdx },
+    levelFilter: null,
+  });
   $("#q").value = "";
   runSearch();
   $("#filterbar").scrollIntoView({ block: "start" });
@@ -475,10 +568,11 @@ export function filterToFile(fileIdx) {
 
 /* Change the topic filter with `change` (toggle or ensure from core/topics.js) and search
    again. A domain with one of its topics chosen opens, so the choice is never hidden. */
-function selectTopic(change, kind, i) {
-  state.topicSel = change(state.topicSel, kind, i, state.topics);
-  if (kind === "t" && state.topicSel.some((s) => s.kind === "t" && s.i === i)) {
-    state.gridExpanded.add(state.topics[i].domain);
+function selectTopic(change, kind, id) {
+  const { domainOf: domainOfTopic } = schemeIndex(state.scheme);
+  state.topicSel = change(state.topicSel, kind, id, domainOfTopic);
+  if (kind === "t" && state.topicSel.some((s) => s.kind === "t" && s.id === id)) {
+    state.gridExpanded.add(domainOfTopic.get(id));
   }
   runSearch();
 }
@@ -508,27 +602,32 @@ export function wireResults() {
 
   $("#results").addEventListener("click", (e) => {
     const expand = e.target.closest("[data-expand]");
-    if (expand) return toggleRow(state.matches[Number(expand.dataset.expand)]);
+    if (expand) return toggleRow(state.list[Number(expand.dataset.expand)]);
     const vals = e.target.closest("[data-values]");
     if (vals) {
       const key = vals.dataset.values;
       if (state.allValues.has(key)) state.allValues.delete(key);
       else state.allValues.add(key);
-      const row = state.matches.find((r) => keyOf(r) === key);
+      const entry = entryFor(key);
       const el = document.getElementById(`more-${key}`);
-      if (row && el) el.innerHTML = moreHtml(row);
+      if (entry && el) el.innerHTML = moreHtml(entry);
       return;
     }
     const tag = e.target.closest("[data-topic-open]");
-    if (tag) return selectTopic(ensure, "t", Number(tag.dataset.topicOpen));
+    if (tag) return selectTopic(ensure, "t", tag.dataset.topicOpen);
     const jump = e.target.closest("[data-jump]");
     if (jump) return jumpTo(jump.dataset.jump);
     const file = e.target.closest("[data-file-open]");
-    if (file) return filterToFile(Number(file.dataset.fileOpen));
+    if (file) {
+      const [key, i] = file.dataset.fileOpen.split(":");
+      return filterToFile(key, Number(i));
+    }
     const suggest = e.target.closest("[data-suggest]");
     if (suggest) {
-      const row = state.matches.find((r) => keyOf(r) === suggest.dataset.suggest);
-      if (row && dictEntry(row)) openSuggest(dictEntry(row), fileOf(row).name, suggest);
+      const entry = entryFor(suggest.dataset.suggest);
+      if (entry && dictEntry(entry)) {
+        openSuggest(dictEntry(entry), fileOf(entry).name, manifestOf(entry.cohort), suggest);
+      }
       return;
     }
     if (e.target.closest("[data-clear-all]")) return clearAll();
@@ -544,18 +643,19 @@ export function wireResults() {
     renderResults();
   });
 
+  const sameWave = (key, i) => state.waveFilter?.cohort === key && state.waveFilter.i === i;
   wireOverview({
-    onWave: (wave) => {
-      state.waveFilter = state.waveFilter === wave ? null : wave;
+    onWave: (key, i) => {
+      state.waveFilter = sameWave(key, i) ? null : { cohort: key, i };
       runSearch();
     },
-    onTopic: (kind, i) => selectTopic(toggleTopic, kind, i),
+    onTopic: (kind, id) => selectTopic(toggleTopic, kind, id),
     // A cell: that topic at that sweep. The same cell again lets go of the sweep only.
-    onCell: (kind, i, wave) => {
+    onCell: (kind, id, key, i) => {
       const already =
-        state.waveFilter === wave && state.topicSel.some((s) => s.kind === kind && s.i === i);
-      state.waveFilter = already ? null : wave;
-      selectTopic(ensure, kind, i);
+        sameWave(key, i) && state.topicSel.some((s) => s.kind === kind && s.id === id);
+      state.waveFilter = already ? null : { cohort: key, i };
+      selectTopic(ensure, kind, id);
     },
     onOptions: () => {
       saveOptions();
@@ -571,8 +671,8 @@ export function wireResults() {
     }
     const un = e.target.closest("[data-unselect]");
     if (un) {
-      const [kind, i] = un.dataset.unselect.split(":");
-      return selectTopic(toggleTopic, kind, Number(i));
+      const [kind, ...id] = un.dataset.unselect.split(":");
+      return selectTopic(toggleTopic, kind, id.join(":"));
     }
     const mode = e.target.closest("[data-mode]");
     if (mode) {
@@ -582,7 +682,8 @@ export function wireResults() {
   });
 
   $("#level").addEventListener("change", (e) => {
-    state.levelFilter = e.target.value === "" ? null : Number(e.target.value);
+    const v = e.target.value;
+    state.levelFilter = v === "" ? null : v === "-1" ? -1 : state.levels[Number(v)];
     runSearch();
   });
   $("#clear-filters").addEventListener("click", clearAll);

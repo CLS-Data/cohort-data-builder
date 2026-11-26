@@ -5,17 +5,16 @@
 
 import { tagSuggestionUrl, topicChanges } from "../core/feedback.js";
 import { esc } from "../core/text.js";
-import { state } from "./state.js";
 
 const $ = (s) => document.querySelector(s);
-let open = null; // {entry, file, opener} while the dialog is showing
+let open = null; // {entry, file, manifest, opener} while the dialog is showing
 
 const chosen = () => [...document.querySelectorAll("#tag-list input:checked")].map((i) => i.value);
 
 /* The current tags first, ticked, so they are seen before the long list; then every other
    topic by domain. */
-function renderList(entry) {
-  const domains = state.manifest.topics?.domains || [];
+function renderList(entry, manifest) {
+  const domains = manifest.topics?.domains || [];
   const conf = new Map((entry.topics || []).map(([id, c]) => [id, Math.round(c * 100)]));
   const domainOf = new Map(domains.flatMap((d) => d.topics.map((t) => [t.id, d])));
   const option = (
@@ -50,7 +49,9 @@ function renderList(entry) {
 
 /* "Adds Tenure · removes Alcohol": what the issue will ask for. */
 function renderChanges() {
-  const names = new Map(state.topics.map((t) => [t.id, t.label]));
+  const names = new Map(
+    (open.manifest.topics?.domains || []).flatMap((d) => d.topics.map((t) => [t.id, t.label])),
+  );
   const { add, remove } = topicChanges(open.entry, chosen());
   const say = (verb, ids) =>
     ids.length ? `${verb} ${ids.map((id) => names.get(id) || id).join(", ")}` : "";
@@ -76,14 +77,15 @@ function filter(q) {
  * @param {{variable: string, label?: string, topics?: Array<[string, number]>}} entry The
  *   variable's dictionary entry.
  * @param {string} file The data file the variable is in.
+ * @param {object} manifest The manifest of the variable's cohort, whose topics are offered.
  * @param {HTMLElement} opener The control that opened it, given focus back on close.
  */
-export function openSuggest(entry, file, opener) {
-  open = { entry, file, opener };
+export function openSuggest(entry, file, manifest, opener) {
+  open = { entry, file, manifest, opener };
   $("#tag-dialog-title").textContent = `Suggest tags for ${entry.variable}`;
   $("#tag-filter").value = "";
   $("#tag-why").value = "";
-  renderList(entry);
+  renderList(entry, manifest);
   renderChanges();
   $("#tag-dialog").showModal();
   $("#tag-filter").focus();
@@ -96,7 +98,7 @@ export function wireSuggest() {
   $("#tag-list").addEventListener("change", renderChanges);
   $("#tag-cancel").addEventListener("click", () => dialog.close());
   $("#tag-send").addEventListener("click", () => {
-    const url = tagSuggestionUrl(open.entry, open.file, state.manifest, {
+    const url = tagSuggestionUrl(open.entry, open.file, open.manifest, {
       topics: chosen(),
       why: $("#tag-why").value,
     });
