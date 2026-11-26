@@ -32,3 +32,19 @@ def test_selection_view(themed, serious):
     page.get_by_role("button", name="Selection").first.click()
     expect(page.locator("#basket-download")).to_be_visible()
     assert serious(page) == []
+
+
+@pytest.mark.parametrize("text", ["", "larger"])
+def test_two_cohorts_with_topics_open(themed, serious, text):
+    page = themed
+    if text:
+        page.get_by_role("button", name="Largest text").click()
+    page.locator('.cohorts button[data-cohort="mini2"]').click()
+    expect(page.locator("#results .v-group")).to_have_count(2)
+    page.locator("#tgrid-toggle").click()
+    page.get_by_role("button", name="Show the topics in Health").click()
+    page.locator('#results .vrow[data-key="mini2:2:smok11"] .vrow-btn').click()
+    assert serious(page) == []
+    page.get_by_role("button", name="Selection").first.click()
+    expect(page.locator("#basket-download")).to_be_visible()
+    assert serious(page) == []
