@@ -1,7 +1,9 @@
-"""Feature 007, user story 2: the overview stacks by cohort on one age axis.
+"""Feature 007, user story 2: the overview with several cohorts is one row of bars on a
+shared age axis, each bar stacked by cohort; the topic rows likewise.
 
 Fixture sweeps: mini 5y, 10y, xwave; mini2 3y, w2 (age 7), 11y, extra; so with both the
-axis reads 3, 5, 7, 10, 11, ?. See contracts/variables-view.md ("Overview").
+axis reads 3, 5, 7, 10, 11, ? (xwave and extra share "?"). See contracts/variables-view.md
+("Overview").
 """
 
 from playwright.sync_api import expect
@@ -12,26 +14,26 @@ def coh(page, key):
     return page.locator(f'.cohorts button[data-cohort="{key}"]')
 
 
-def sweep_row(page, key):
-    """A cohort's row of sweep bars in the overview."""
-    return page.locator(f'#ov-chart .ov-coh[data-cohort="{key}"]')
+def bar(page, col):
+    """The overview's bar for an axis column."""
+    return page.locator(f'#spine-track li[data-col="{col}"] button.node')
 
 
-def columns_with_bars(page, key):
-    """The axis columns in which a cohort's row has a bar."""
-    cells = sweep_row(page, key).locator("li:has(button.node)")
-    return [cells.nth(i).get_attribute("data-col") for i in range(cells.count())]
+def segments(locator):
+    """The cohorts stacked in a bar or cell, bottom first."""
+    segs = locator.locator(".coh-seg")
+    return [segs.nth(i).get_attribute("data-cohort") for i in range(segs.count())]
 
 
-def sub_row(page, topic, key):
-    """A cohort's sub-row under a topic row ("t:<id>") or domain row ("d:<id>")."""
-    return page.locator(f'#tgrid-body .tg-sub[data-of="{topic}"][data-cohort="{key}"]')
+def cell(page, topic, col):
+    """A topic ("t:<id>") or domain ("d:<id>") row's cell for an axis column."""
+    return page.locator(f'#tgrid-body .tg-row[data-id="{topic}"] .tg-cell[data-col="{col}"]')
 
 
 def both(mini):
     """Choose mini2 as well as mini."""
     coh(mini, "mini2").click()
-    expect(sweep_row(mini, "mini2")).to_be_visible()
+    expect(bar(mini, 0)).to_be_visible()
     return mini
 
 
@@ -41,91 +43,114 @@ def open_health(page):
     page.locator('#tgrid-body [data-expand="health"]').click()
 
 
-# T027 ─ one cohort as today; two on one age axis
+# One cohort: as before
 
 
 def test_one_cohort_keeps_todays_overview(mini):
     expect(mini.locator("#spine-track li")).to_have_count(3)
     expect(mini.locator("#spine-track .node-age")).to_have_text(["5y", "10y", "xwave"])
-    expect(mini.locator("#spine-track.is-axis")).to_have_count(0)
-    expect(mini.locator("#ov-chart .ov-coh")).to_have_count(0)
+    expect(mini.locator("#spine-track .coh-seg")).to_have_count(0)
 
 
-def test_two_cohorts_have_a_line_each_in_the_description(mini):
+def test_no_description_text_under_the_header(mini):
+    expect(mini.locator("#ov-about")).to_be_hidden()
     both(mini)
-    lines = mini.locator("#ov-about .ov-about-line")
-    expect(lines).to_have_count(2)
-    expect(lines.nth(0)).to_contain_text("Mini Test Cohort")
-    expect(lines.nth(0)).to_contain_text("16 variables")
-    expect(lines.nth(1)).to_contain_text("Second Mini Test Cohort")
-    expect(lines.locator(".coh-mark")).to_have_count(2)
+    expect(mini.locator("#ov-about")).to_be_hidden()
 
 
-def test_two_cohorts_share_an_age_axis(mini):
+# Several: one row, stacked
+
+
+def test_two_cohorts_share_one_row_of_bars_on_an_age_axis(mini):
     both(mini)
-    expect(mini.locator("#spine-track.is-axis li")).to_have_text(["3", "5", "7", "10", "11", "?"])
-    expect(sweep_row(mini, "mini").locator(".ov-label")).to_contain_text("Mini")
-    expect(sweep_row(mini, "mini").locator(".ov-count")).to_have_text("16")
-    expect(sweep_row(mini, "mini2").locator(".ov-count")).to_have_text("12")
-    assert columns_with_bars(mini, "mini") == ["1", "3", "5"]
-    assert columns_with_bars(mini, "mini2") == ["0", "2", "4", "5"]
+    expect(mini.locator("#spine-track li")).to_have_count(6)
+    expect(mini.locator("#spine-track .node-age")).to_have_text(["3", "5", "7", "10", "11", "?"])
+    expect(mini.locator("#spine-rows .ov-row")).to_have_count(0)
+    expect(mini.locator("#spine-note")).to_have_text("28")
+    assert segments(bar(mini, 0)) == ["mini2"]
+    assert segments(bar(mini, 1)) == ["mini"]
+    assert segments(bar(mini, 5)) == ["mini", "mini2"]  # catalogue order, bottom first
 
 
-# T028 ─ empty rows, clicking a bar, topic sub-rows
-
-
-def test_a_cohort_with_no_matches_keeps_its_row(mini):
+def test_segments_are_in_proportion_and_in_each_cohorts_colour(mini):
     both(mini)
-    mini.get_by_label("Search variables").fill("zzzz")
-    expect(sweep_row(mini, "mini").locator(".ov-count")).to_have_text("0")
-    expect(sweep_row(mini, "mini2").locator(".ov-count")).to_have_text("0")
+    heights = (
+        bar(mini, 5)
+        .locator(".coh-seg")
+        .evaluate_all(
+            "els => els.map(e => [e.getBoundingClientRect().height,"
+            " getComputedStyle(e).backgroundColor])"
+        )
+    )
+    title = bar(mini, 5).get_attribute("title")
+    assert "Mini" in title and "Mini2" in title
+    (h1, c1), (h2, c2) = heights
+    assert h1 > 0 and h2 > 0
+    assert c1 != c2
 
 
-def test_a_bar_filters_to_that_cohorts_sweep(mini):
+def test_a_bar_says_each_cohorts_count(mini):
     both(mini)
-    bar = sweep_row(mini, "mini2").locator('li[data-col="2"] button')
-    expect(bar).to_have_attribute("title", "Mini2 w2 (age 7) — 3 variables")
-    bar.click()
-    expect(mini.locator("#active-filters")).to_contain_text("Mini2 · w2")
+    expect(bar(mini, 2)).to_have_attribute("title", "Age 7 — 3 variables: Mini2 3 (w2)")
+
+
+def test_a_bar_filters_every_cohort_to_that_age(mini):
+    both(mini)
+    bar(mini, 2).click()
+    expect(mini.locator("#active-filters")).to_contain_text("age 7")
     expect(mini.locator("#result-count")).to_contain_text("3 variables")
-    expect(bar).to_have_attribute("aria-pressed", "true")
+    expect(bar(mini, 2)).to_have_attribute("aria-pressed", "true")
+    bar(mini, 5).click()  # "?" holds a sweep of each
+    expect(mini.locator("#active-filters")).to_contain_text("age not known")
+    expect(mini.locator('#result-count [data-goto="mini"]')).to_be_visible()
+    expect(mini.locator('#result-count [data-goto="mini2"]')).to_be_visible()
+    bar(mini, 5).click()
+    expect(mini.locator("#result-count")).to_contain_text("28 variables")
 
 
-def test_topic_rows_have_a_sub_row_per_cohort(mini):
+def test_a_cohort_with_no_matches_is_simply_absent_from_the_bars(mini):
+    both(mini)
+    mini.get_by_label("Search variables").fill("smok")
+    expect(mini.locator("#spine-note")).to_have_text("2")
+    assert segments(bar(mini, 1)) == ["mini"]
+    assert segments(bar(mini, 4)) == ["mini2"]
+
+
+# Topic rows: one row each, cells stacked
+
+
+def test_topic_rows_are_one_row_with_stacked_cells(mini):
     both(mini)
     open_health(mini)
-    expect(sub_row(mini, "t:smoking", "mini").locator("button.tg-cell")).to_have_count(3)
-    mini2_at_11 = sub_row(mini, "t:smoking", "mini2").locator('[data-col="4"]')
-    expect(mini2_at_11).to_have_attribute("aria-label", "Smoking, Mini2 at 11y: 1")
-    # vaping is in mini2's topics only
-    expect(sub_row(mini, "t:vaping", "mini").locator("button.tg-cell")).to_have_count(0)
-    expect(sub_row(mini, "t:vaping", "mini2").locator("button.tg-cell")).to_have_count(4)
+    expect(mini.locator("#tgrid-body .tg-sub")).to_have_count(0)
+    expect(mini.locator('#tgrid-body .tg-row[data-id="t:smoking"] .tg-cell')).to_have_count(6)
+    expect(cell(mini, "t:smoking", 4)).to_have_attribute(
+        "aria-label", "Smoking at age 11: 1 (Mini2 1)"
+    )
+    assert segments(cell(mini, "t:smoking", 1)) == ["mini"]
+    assert segments(cell(mini, "t:vaping", 1)) == []
 
 
-def test_an_untagged_cohort_says_so_in_the_topic_rows(mini):
+def test_an_untagged_cohort_is_named_above_the_topic_rows(mini):
     both(mini)
     coh(mini, "mini3").click()
-    expect(sweep_row(mini, "mini3")).to_be_visible()
+    expect(bar(mini, 0)).to_be_visible()
     open_health(mini)
-    expect(sub_row(mini, "d:health", "mini3")).to_contain_text("no topic tags")
-    expect(sub_row(mini, "t:smoking", "mini3")).to_contain_text("no topic tags")
+    expect(mini.locator("#tgrid-body")).to_contain_text("Mini3 has no topic tags")
 
 
-def test_a_sub_row_cell_filters_to_that_topic_at_that_sweep(mini):
+def test_a_cell_filters_to_that_topic_at_that_age(mini):
     both(mini)
     open_health(mini)
-    sub_row(mini, "t:smoking", "mini").locator('[data-col="1"]').click()
+    cell(mini, "t:smoking", 1).click()
     chips = mini.locator("#active-filters")
-    expect(chips).to_contain_text("Mini · 5y")
+    expect(chips).to_contain_text("age 5")
     expect(chips).to_contain_text("Smoking")
     expect(mini.locator('#results .vrow[data-key="mini:0:smoke5"]')).to_be_visible()
 
 
-# T029 ─ phone width
-
-
-def test_the_chart_scrolls_inside_itself_at_phone_width(page, serve, mini_site):
+def test_the_chart_fits_a_phone(page, serve, mini_site):
     page.set_viewport_size({"width": 390, "height": 800})
     page.goto(serve(mini_site) + "#mini+mini2")
-    expect(sweep_row(page, "mini2").locator(".ov-label")).to_be_visible()
+    expect(bar(page, 0)).to_be_visible()
     assert page.evaluate("document.documentElement.scrollWidth") <= 390

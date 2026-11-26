@@ -190,8 +190,17 @@ def test_a_cohort_that_fails_to_load_can_be_retried(mini):
     expect(mini.locator("#result-count")).to_contain_text("28 variables")
 
 
-def test_title_subtitle_and_footer_name_every_chosen_cohort(mini):
+def test_the_title_stays_the_same_and_the_footer_sums_the_cohorts(mini):
+    expect(mini).to_have_title("Cohort Data Builder")
     both(mini)
-    expect(mini).to_have_title("Mini + Mini2 · Cohort Data Builder")
-    expect(mini.locator("#mark-sub")).to_have_text("Mini + Mini2")
+    expect(mini).to_have_title("Cohort Data Builder")
+    expect(mini.locator("#mark-sub")).to_be_hidden()
     expect(mini.locator("#foot-counts")).to_contain_text("28 variables · 8 files · 2 cohorts")
+
+
+def test_hovering_a_cohort_says_what_it_is(mini):
+    title = coh(mini, "mini2").get_attribute("title")
+    assert title.startswith("Second Mini Test Cohort")
+    assert "12 variables in 4 files" in title
+    only = coh(mini, "mini").get_attribute("title")
+    assert only.startswith("Mini Test Cohort") and "At least one cohort stays chosen" in only

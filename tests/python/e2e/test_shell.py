@@ -29,9 +29,8 @@ def test_page_shell(page, mini_url):
 
 def test_cohort_name_and_footer_counts(page, mini_url):
     page.goto(mini_url)
-    expect(page.locator("#mark-sub")).to_have_text("Mini Test Cohort")
     expect(page.locator("#foot-counts")).to_contain_text("16 variables · 4 files · 3 sweeps")
-    expect(page).to_have_title("Mini · Cohort Data Builder")
+    expect(page).to_have_title("Cohort Data Builder")
 
 
 def cohort_button(page, key):
@@ -49,13 +48,12 @@ def test_picker_lists_every_cohort(page, real_url):
 
 def test_hash_opens_cohort_and_picker_updates_hash(page, real_url):
     page.goto(real_url + "#next_steps")
-    expect(page.locator("#mark-sub")).to_contain_text("Next Steps")
     expect(cohort_button(page, "next_steps")).to_have_attribute("aria-pressed", "true")
     cohort_button(page, "bcs70").click()
     expect(page).to_have_url(re.compile(r"#bcs70\+next_steps$"))
     cohort_button(page, "next_steps").click()
     expect(page).to_have_url(re.compile("#bcs70$"))
-    expect(page.locator("#mark-sub")).to_have_text("1970 British Cohort Study")
+    expect(cohort_button(page, "next_steps")).to_have_attribute("aria-pressed", "false")
 
 
 def test_last_cohort_reopens_without_hash(page, real_url):

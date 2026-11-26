@@ -22,10 +22,11 @@ def names(page):
 
 
 def test_overview_shows_cohort_counts_and_sweeps_in_order(mini):
-    about = mini.locator("#ov-about")
-    expect(about).to_contain_text("Mini Test Cohort")
-    expect(about).to_contain_text("A tiny fictional cohort for tests.")
-    expect(about).to_contain_text("16 variables in 4 files")
+    # What the cohort is: on hovering its toggle (feature 007), no longer a line of text.
+    about = mini.locator('.cohorts button[data-cohort="mini"]').get_attribute("title")
+    assert "Mini Test Cohort" in about
+    assert "A tiny fictional cohort for tests." in about
+    assert "16 variables in 4 files" in about
     bars = mini.locator("#spine-track [data-wave]")
     expect(bars.locator(".node-age")).to_have_text(["5y", "10y", "xwave"])
     expect(bars.locator(".node-n")).to_have_text(["6", "9", "1"])

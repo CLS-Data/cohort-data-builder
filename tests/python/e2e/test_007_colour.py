@@ -8,7 +8,7 @@ from playwright.sync_api import expect
 
 COLOURS = """() => {
   const out = {};
-  for (const el of document.querySelectorAll(".coh-mark, .coh-tag")) {
+  for (const el of document.querySelectorAll(".coh-mark, .coh-tag, .coh-seg")) {
     const host = el.closest("[data-cohort]");
     const key = host ? host.dataset.cohort : "(no cohort)";
     const cs = getComputedStyle(el);
@@ -73,7 +73,7 @@ def test_a_cohort_mark_looks_unlike_a_topic_area_square(mini):
     everywhere(mini)
     size = """(sel) => { const r = document.querySelector(sel).getBoundingClientRect();
                          return [Math.round(r.width), Math.round(r.height)]; }"""
-    mark = mini.evaluate(size, "#ov-about .coh-mark")
+    mark = mini.evaluate(size, "#cohorts .coh-mark")
     square = mini.evaluate(size, "#tgrid-body .dom-swatch")
     assert square[0] == square[1], square
     assert mark[1] > mark[0] * 2, mark  # tall and thin, not square
