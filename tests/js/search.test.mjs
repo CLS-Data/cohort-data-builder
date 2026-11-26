@@ -6,6 +6,7 @@ import {
   PAGE,
   page,
   sameLabel,
+  searchCohorts,
 } from "../../site/js/core/search.js";
 import { readFixture } from "./helpers.mjs";
 
@@ -71,9 +72,9 @@ test("the file filter keeps one file", () => {
   ]);
 });
 
-const smoking = { kind: "t", i: 0 };
-const alcohol = { kind: "t", i: 1 };
-const housing = { kind: "d", i: 1 };
+const smoking = { kind: "t", id: "smoking" };
+const alcohol = { kind: "t", id: "alcohol" };
+const housing = { kind: "d", id: "housing" };
 
 test("the topic filter keeps variables tagged at or above the threshold", () => {
   const f = (topicSel, topicMode, minConf) =>
@@ -127,11 +128,15 @@ test("the topic tally ignores the sweep and topic filters but not query, file or
   ]);
 });
 
-test("a cohort without topics ignores the topic filter and tallies nothing", () => {
+test("a cohort without topics matches nothing under a topic filter and says it is untagged", () => {
   const plain = { ...manifest, topics: undefined };
   const r = filterVariables(vars, plain, { ...any, topicSel: [smoking], minConf: 50 });
-  assert.equal(r.matches.length, 16);
+  assert.equal(r.matches.length, 0);
+  assert.equal(r.untagged, true);
   assert.deepEqual(r.tally, { topics: [], domains: [] });
+  const open = filterVariables(vars, plain, any);
+  assert.equal(open.matches.length, 16, "without a topic filter it matches as usual");
+  assert.equal(filterVariables(vars, manifest, any).untagged, false);
 });
 
 test("no match gives empty matches and zero counts", () => {
@@ -225,4 +230,77 @@ test("a query of regular-expression characters is matched literally", () => {
 test("a query of only spaces matches everything", () => {
   const r = filterVariables(vars, manifest, { ...any, query: "   " });
   assert.equal(r.matches.length, vars.length);
+});
+
+/* ── Feature 007: several cohorts ──────────────────────────────────────── */
+
+const cohorts = async (...keys) =>
+  Promise.all(
+    keys.map(async (key) => ({
+      key,
+      manifest: await readFixture(`${key}/manifest.json`),
+      vars: await readFixture(`${key}/index.json`),
+    })),
+  );
+
+test("the level filter also takes a level name", async () => {
+  assert.deepEqual(
+    names(filterVariables(vars, manifest, { ...any, level: "ORDINAL" }).matches),
+    names(filterVariables(vars, manifest, { ...any, level: 1 }).matches),
+  );
+  assert.equal(filterVariables(vars, manifest, { ...any, level: "NOPE" }).matches.length, 0);
+});
+
+test("searchCohorts gives one result per cohort, each as filterVariables gives it", async () => {
+  const cs = await cohorts("mini", "mini2", "mini3");
+  const results = searchCohorts(cs, { ...any, query: "sex" });
+  assert.deepEqual(
+    results.map((r) => r.cohort),
+    ["mini", "mini2", "mini3"],
+  );
+  for (const [i, c] of cs.entries()) {
+    const alone = filterVariables(c.vars, c.manifest, { ...any, query: "sex" });
+    assert.deepEqual(names(results[i].matches), names(alone.matches));
+    assert.deepEqual(results[i].perWave, alone.perWave);
+  }
+  assert.deepEqual(
+    results.map((r) => r.matches.length),
+    [3, 3, 1],
+  );
+});
+
+test("a sweep or file filter belongs to one cohort: the others have no matches", async () => {
+  const cs = await cohorts("mini", "mini2");
+  const byWave = searchCohorts(cs, { ...any, wave: { cohort: "mini2", i: 1 } });
+  assert.deepEqual(names(byWave[1].matches), ["CID", "sex", "read7"]);
+  assert.equal(byWave[0].matches.length, 0);
+  assert.equal(byWave[0].filteredElsewhere, true);
+  assert.equal(byWave[1].filteredElsewhere, false);
+  const byFile = searchCohorts(cs, { ...any, file: { cohort: "mini", i: 2 } });
+  assert.deepEqual(names(byFile[0].matches), ["PID", "hhrel"]);
+  assert.equal(byFile[1].matches.length, 0);
+});
+
+test("the level filter by name works across cohorts whose level lists differ", async () => {
+  const cs = await cohorts("mini", "mini2");
+  const r = searchCohorts(cs, { ...any, level: "ORDINAL" });
+  assert.deepEqual(names(r[1].matches), ["play3", "read7"]);
+  assert.ok(r[0].matches.length > 0);
+});
+
+test("topics are matched by id even where their index differs between schemes", async () => {
+  const cs = await cohorts("mini", "mini2", "mini3");
+  const f = { ...any, minConf: 50, topicSel: [smoking] };
+  const r = searchCohorts(cs, f);
+  assert.deepEqual(names(r[0].matches), ["smoke5"]);
+  assert.deepEqual(names(r[1].matches), ["smok11"]);
+  assert.equal(r[2].matches.length, 0);
+  assert.deepEqual(
+    r.map((x) => x.untagged),
+    [false, false, true],
+  );
+  const vaping = searchCohorts(cs, { ...f, topicSel: [{ kind: "t", id: "vaping" }] });
+  assert.equal(vaping[0].matches.length, 0);
+  assert.equal(vaping[0].untagged, false);
+  assert.deepEqual(names(vaping[1].matches), ["vape11"]);
 });

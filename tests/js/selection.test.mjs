@@ -4,6 +4,7 @@ import {
   add,
   addMany,
   canSelect,
+  cohortKeyOf,
   has,
   rangeBetween,
   remove,
@@ -47,6 +48,7 @@ test("toItem makes a selection entry from an index row", () => {
     label: "Does the mother smoke",
     file: "mini_age5",
     wave: "5y",
+    cohort: "mini",
   });
 });
 
@@ -186,4 +188,37 @@ test("restore tolerates garbage", () => {
 test("rangeBetween from a row to itself gives just that row", () => {
   const key = rowKey(byName("smoke5"));
   assert.deepEqual(rangeBetween(vars, key, key, manifest), [item("smoke5")]);
+});
+
+/* ── Feature 007: entries know their cohort ─────────────────────────────── */
+
+test("cohortKeyOf qualifies the key with the cohort", () => {
+  assert.equal(cohortKeyOf({ cohort: "mini", file: "f", name: "n" }), "mini:f:n");
+  assert.equal(cohortKeyOf(item("smoke5")), "mini:mini_age5:smoke5");
+});
+
+test("add and addMany give each entry the manifest's cohort, even when the item has none", () => {
+  const { selection } = addMany([], [{ name: "smoke5", file: "mini_age5" }], manifest);
+  assert.equal(selection[0].cohort, "mini");
+  const again = add(selection, { name: "smoke5", file: "mini_age5" }, manifest);
+  assert.equal(again.changed, 0, "an item without a cohort is still recognised as selected");
+});
+
+test("restore adds the cohort to entries saved without it", () => {
+  const saved = [{ name: "smoke5", label: "", file: "mini_age5", wave: "5y", column: "smoke5" }];
+  assert.equal(restore(saved, vars, manifest)[0].cohort, "mini");
+});
+
+test("equal names in two cohorts are different entries", async () => {
+  const vars2 = await readFixture("mini2/index.json");
+  const manifest2 = await readFixture("mini2/manifest.json");
+  const sex2 = toItem(
+    vars2.find((r) => r[0] === "sex"),
+    manifest2,
+  );
+  assert.equal(sex2.cohort, "mini2");
+  assert.notEqual(cohortKeyOf(sex2), cohortKeyOf(item("sex")));
+  const { selection } = add([], item("sex"), manifest);
+  assert.equal(has(selection, item("sex").file, "sex"), true);
+  assert.equal(has(selection, sex2.file, "sex"), false);
 });

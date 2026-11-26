@@ -5,9 +5,12 @@ import {
   DEFAULT_CONF,
   ensure,
   flatten,
+  localSel,
+  mergeSchemes,
   passes,
   rowDomains,
   rowTopics,
+  schemeIndex,
   shade,
   tally,
   toggle,
@@ -18,12 +21,14 @@ import { readFixture } from "./helpers.mjs";
 let vars;
 let manifest;
 let topics;
+let domainOf;
 const byName = (name) => vars.find((r) => r[0] === name);
 
 before(async () => {
   vars = await readFixture("mini/index.json");
   manifest = await readFixture("mini/manifest.json");
   topics = flatten(manifest.topics);
+  domainOf = schemeIndex(manifest.topics).domainOf;
 });
 
 test("flatten lists every topic with its domain index", () => {
@@ -59,37 +64,37 @@ test("rowDomains gives the domains of a row's topics", () => {
   assert.deepEqual([...rowDomains([2, 0], topics)].sort(), [0, 1]);
 });
 
-test("toggle adds and removes an item without changing the original", () => {
+test("toggle adds and removes an item by id without changing the original", () => {
   const sel = [];
-  const one = toggle(sel, "t", 0, topics);
-  assert.deepEqual(one, [{ kind: "t", i: 0 }]);
+  const one = toggle(sel, "t", "smoking", domainOf);
+  assert.deepEqual(one, [{ kind: "t", id: "smoking" }]);
   assert.deepEqual(sel, []);
-  assert.deepEqual(toggle(one, "t", 0, topics), []);
+  assert.deepEqual(toggle(one, "t", "smoking", domainOf), []);
 });
 
 test("selecting a topic replaces its selected domain, and a domain replaces its topics", () => {
-  const withDomain = toggle([{ kind: "t", i: 2 }], "d", 0, topics);
-  assert.deepEqual(toggle(withDomain, "t", 1, topics), [
-    { kind: "t", i: 2 },
-    { kind: "t", i: 1 },
+  const withDomain = toggle([{ kind: "t", id: "tenure" }], "d", "health", domainOf);
+  assert.deepEqual(toggle(withDomain, "t", "alcohol", domainOf), [
+    { kind: "t", id: "tenure" },
+    { kind: "t", id: "alcohol" },
   ]);
   const withTopics = [
-    { kind: "t", i: 0 },
-    { kind: "t", i: 1 },
-    { kind: "t", i: 2 },
+    { kind: "t", id: "smoking" },
+    { kind: "t", id: "alcohol" },
+    { kind: "t", id: "tenure" },
   ];
-  assert.deepEqual(toggle(withTopics, "d", 0, topics), [
-    { kind: "t", i: 2 },
-    { kind: "d", i: 0 },
+  assert.deepEqual(toggle(withTopics, "d", "health", domainOf), [
+    { kind: "t", id: "tenure" },
+    { kind: "d", id: "health" },
   ]);
 });
 
 test("ensure selects but never deselects", () => {
-  const sel = [{ kind: "t", i: 0 }];
-  assert.equal(ensure(sel, "t", 0, topics), sel);
-  assert.deepEqual(ensure(sel, "t", 2, topics), [
-    { kind: "t", i: 0 },
-    { kind: "t", i: 2 },
+  const sel = [{ kind: "t", id: "smoking" }];
+  assert.equal(ensure(sel, "t", "smoking", domainOf), sel);
+  assert.deepEqual(ensure(sel, "t", "tenure", domainOf), [
+    { kind: "t", id: "smoking" },
+    { kind: "t", id: "tenure" },
   ]);
 });
 
@@ -153,4 +158,47 @@ test("confidence thresholds are 30, 50, 70 or 90, defaulting to 50", () => {
 test("shade does not divide by zero when every count is zero", () => {
   assert.equal(shade(0, 0, 0, "row"), 0);
   assert.equal(shade(0, 0, 0, "abs"), 0);
+});
+
+/* ── Feature 007: topics by id across cohorts ─────────────────────────── */
+
+test("schemeIndex maps ids to this scheme's indices and topics to their domain", () => {
+  const idx = schemeIndex(manifest.topics);
+  assert.equal(idx.topic.get("tenure"), 2);
+  assert.equal(idx.domain.get("housing"), 1);
+  assert.equal(idx.domainOf.get("alcohol"), "health");
+  const none = schemeIndex(undefined);
+  assert.equal(none.topic.size, 0);
+});
+
+test("localSel turns ids into this scheme's indices, -1 when it lacks them", async () => {
+  const m2 = await readFixture("mini2/manifest.json");
+  const sel = [
+    { kind: "t", id: "smoking" },
+    { kind: "t", id: "vaping" },
+    { kind: "d", id: "housing" },
+  ];
+  assert.deepEqual(localSel(sel, manifest.topics), [
+    { kind: "t", i: 0 },
+    { kind: "t", i: -1 },
+    { kind: "d", i: 1 },
+  ]);
+  assert.deepEqual(localSel(sel, m2.topics), [
+    { kind: "t", i: 1 },
+    { kind: "t", i: 0 },
+    { kind: "d", i: -1 },
+  ]);
+});
+
+test("mergeSchemes unions domains and topics by id, first scheme's order and labels first", async () => {
+  const m2 = await readFixture("mini2/manifest.json");
+  const merged = mergeSchemes([manifest.topics, undefined, m2.topics]);
+  assert.deepEqual(
+    merged.domains.map((d) => [d.id, d.topics.map((t) => t.id)]),
+    [
+      ["health", ["smoking", "alcohol", "vaping"]],
+      ["housing", ["tenure"]],
+    ],
+  );
+  assert.equal(mergeSchemes([undefined]), undefined);
 });
