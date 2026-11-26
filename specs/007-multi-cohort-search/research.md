@@ -66,7 +66,7 @@ never scrolls sideways (SC-006).
 indices into one cohort's flattened scheme. Each cohort maps ids to its own indices when it
 is filtered and tallied. A cohort without tags (no `manifest.topics`) is "untagged": while
 a topic filter is active it has no matches, its overview row and result heading say "no
-topic tags" rather than "no matches", and its topic sub-rows read "no topic tags" (FR-015).
+topic tags" rather than "no matches", and the topic rows name it as having no topic tags (FR-015).
 
 **Rationale**: Indices differ between scheme versions; ids are the scheme's identity (D7
 already checks ids). All cohorts are tagged from the same scheme (spec assumption), so ids

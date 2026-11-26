@@ -14,7 +14,6 @@ import { loadCatalogue, loadCohort } from "../core/data.js";
 import { buildLabelIndex } from "../core/search.js";
 import { read, storeKey, write } from "../core/storage.js";
 import { esc } from "../core/text.js";
-import { renderAbout } from "./overview.js";
 import { renderPanel, wirePanel } from "./panel.js";
 import { mergeChosen, refreshSelection, resetFilters, runSearch, wireResults } from "./results.js";
 import { wireReview } from "./review.js";
@@ -48,7 +47,7 @@ function drawPicker() {
   $("#cohorts").innerHTML = state.catalogue
     .map(
       (d) => `<button type="button" data-cohort="${esc(d.key)}" data-coh="${colourSlot(d.key, all)}"
-        aria-pressed="false" title="${esc(d.fullName || d.name)}"><span class="coh-mark" aria-hidden="true"></span>${esc(d.name)}</button>`,
+        aria-pressed="false" title="${esc(about(d.key))}"><span class="coh-mark" aria-hidden="true"></span>${esc(d.name)}</button>`,
     )
     .join("");
 }
@@ -62,29 +61,38 @@ function updatePicker() {
     const last = on && only;
     if (last) b.setAttribute("aria-disabled", "true");
     else b.removeAttribute("aria-disabled");
-    b.title = last ? "At least one cohort stays chosen" : entry(key).fullName || entry(key).name;
+    b.title = about(key) + (last ? "\nAt least one cohort stays chosen." : "");
     if (state.cohorts.get(key)?.status === "loading") b.setAttribute("aria-busy", "true");
     else b.removeAttribute("aria-busy");
   }
 }
 
-/* Title, subtitle and footer name the chosen cohorts (contracts/cohort-choice.md). */
+/* What a cohort is, for hovering its toggle: its full name, description and size, from its
+   manifest once loaded, else the catalogue. */
+function about(key) {
+  const c = state.cohorts.get(key);
+  const m = c?.status === "ready" ? c.manifest : entry(key);
+  const counts = m.counts || { variables: m.variables, files: m.files };
+  const size =
+    counts.variables === undefined
+      ? ""
+      : `\n${n(counts.variables)} variables in ${n(counts.files)} file${counts.files === 1 ? "" : "s"}.`;
+  return `${m.fullName || m.name}${m.description ? ` — ${m.description}` : ""}${size}`;
+}
+
+/* The footer sums the chosen cohorts; the title stays the site's own (contracts/cohort-choice.md). */
 function showNames() {
   const chosen = state.chosen.map(entry);
+  document.title = "Cohort Data Builder";
   if (chosen.length === 1) {
     const c = state.cohorts.get(chosen[0].key);
     const m = c?.status === "ready" ? c.manifest : null;
-    document.title = `${chosen[0].name} · Cohort Data Builder`;
-    $("#mark-sub").textContent = chosen[0].fullName || chosen[0].name;
     $("#foot-counts").textContent = m
       ? `${n(m.counts.variables)} variables · ${m.counts.files} files · ` +
         `${m.wave.list.length} ${m.wave.plural} · built ${m.built}`
       : "—";
     return;
   }
-  const names = chosen.map((d) => d.name).join(" + ");
-  document.title = `${names} · Cohort Data Builder`;
-  $("#mark-sub").textContent = names;
   const sum = (f) => chosen.reduce((a, d) => a + (d[f] || 0), 0);
   $("#foot-counts").textContent =
     `${n(sum("variables"))} variables · ${n(sum("files"))} files · ${chosen.length} cohorts`;
@@ -95,7 +103,6 @@ function refresh() {
   mergeChosen();
   updatePicker();
   showNames();
-  renderAbout();
   runSearch();
   renderPanel();
 }
@@ -127,6 +134,8 @@ async function choose(next) {
   for (const f of ["waveFilter", "fileFilter"]) {
     if (state[f] && !next.includes(state[f].cohort)) state[f] = null;
   }
+  // An age filter is a column of the axis, which changes with the cohorts.
+  if (state.waveFilter?.sweeps) state.waveFilter = null;
   const hash = formatChoice(next, keys());
   if (decodeURIComponent(location.hash.slice(1)) !== hash)
     history.replaceState(null, "", `#${hash}`);

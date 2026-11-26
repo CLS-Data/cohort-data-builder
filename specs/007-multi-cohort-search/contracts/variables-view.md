@@ -1,38 +1,35 @@
 # Contract: the Variables view with several cohorts
 
 With one cohort chosen, everything below collapses to today's view (FR-005): no cohort
-headings, no sub-rows, sweeps as columns.
+headings, sweeps as columns, topic cells shaded.
 
 ## Overview
 
-Sketch; the names, ages and counts are illustrative, not real.
+Sketch; the ages and counts are illustrative, not real. Each bar is stacked by cohort
+(█ NCDS, ▒ BCS70), first cohort at the bottom.
 
 ```text
-● NCDS  National Child Development Study — 1958 … 30,112 variables in 61 files.
-● BCS70 1970 British Cohort Study — … 32,452 variables in 84 files.
-
-              age  0   7   10  11  16  23  26  …  ?
-NCDS   4,210       ▇   ▅       ▆   ▇   ▆           
-BCS70  3,118       ▆       ▇       ▆       ▅      ▂
+ALL VARIABLES 7,328   ▒        ▒   ▒       ▒
+                      █   █    █   █   █   █
+                      0   7   10  11  16  23 …  ?
 ▸ Topics …
-  Smoking      412
-    NCDS       230 ░   ░       ▒   ▓   ▓
-    BCS70      182 ░       ▒       ▓       ▓
+  Smoking      412    ▁   ▂    ▃   ▄   ▆   ▅
 ```
 
-- One description line per chosen cohort (FR-011), catalogue order, with its mark.
-- One sweep row per chosen cohort: label = mark + short name + total (FR-012); columns from
-  the age axis (research R2, FR-012a); `?` = "age not known" column, only when needed.
-- Bar button: `data-cohort`, `data-wave`; title `<cohort> <sweep key> (age <age>) — n
-  variables`. Click sets `waveFilter = {cohort, i}`; chip reads `NCDS · 11y ✕` (FR-007).
-- Empty cohort: row shown, total `0`, empty cells (FR-013). Loading: `Loading NCDS…`.
-  Failed: message and Retry button.
-- Topic and domain rows: total across chosen cohorts; beneath, one sub-row per chosen cohort
-  with mark, short name, total and cells on the same columns (FR-014). Untagged cohort:
-  sub-row reads "no topic tags" in place of cells (FR-015). Shading "within topic" scales
-  each sub-row to its own busiest cell; "across topics" uses one scale for all.
-- The chart region scrolls sideways inside itself when narrower than its columns, with row
-  labels pinned; the page never scrolls sideways.
+- No description text (FR-011): what a cohort is shows in its header toggle's title.
+- One row (FR-012): `#spine-track li[data-col=j]`, one per age-axis column (research R2,
+  FR-012a); `?` = "age not known", only when needed. Each `button.node[data-col]` holds
+  `.node-fill.is-stack` with one `.coh-seg[data-cohort][data-coh]` per cohort with matches
+  there, `flex-grow` = its count, catalogue order bottom up.
+- Bar title: `Age 11 — 4 variables: NCDS 3 (s2), BCS70 1 (s3)`. Click sets
+  `waveFilter = {col, label, sweeps: {cohort: i}}`; chip reads `age 11 ✕`; again clears it.
+  The age filter is dropped when the chosen cohorts change (the axis changes).
+- Empty column: `is-empty` bar (FR-013).
+- Topic and domain rows (FR-014): label and total across cohorts, then `.tg-cell.is-stack
+  [data-col]` per column with `.tg-stack` of `.coh-seg`s; aria-label `Smoking at age 11: 3
+  (NCDS 2, BCS70 1)`. Height scales "within topic" to the row's busiest cell, "across
+  topics" to the busiest domain cell. Untagged cohorts: `X has no topic tags.` above the
+  rows (FR-015).
 
 ## Filter bar and results
 

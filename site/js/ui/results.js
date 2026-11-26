@@ -173,7 +173,11 @@ function renderFilters() {
     several()
       ? ` data-cohort="${esc(key)}" data-coh="${slotOf(key)}"><span class="coh-mark" aria-hidden="true"></span`
       : "";
-  if (w !== null) {
+  if (w?.sweeps) {
+    chips.push(
+      `<button class="chip" data-clear="wave" title="Show every age">${esc(ageName(w))} ✕</button>`,
+    );
+  } else if (w !== null) {
     const m = manifestOf(w.cohort);
     chips.push(
       `<button class="chip" data-clear="wave" title="Show every ${esc(m.wave.term)}"${chipAttrs(w.cohort)}>${esc(named(w.cohort, m.wave.list[w.i].key))} ✕</button>`,
@@ -217,9 +221,13 @@ function renderFilters() {
     : total;
 }
 
+/* An age filter's name: "age 7", or "age not known". */
+const ageName = (w) => (w.label === "?" ? "age not known" : `age ${w.label}`);
+
 /* What a filter on one cohort's sweep or file is called, for the other cohorts' headings. */
 function filterName() {
   const w = state.waveFilter;
+  if (w?.sweeps) return ageName(w);
   if (w) return `${nameOf(w.cohort)} · ${manifestOf(w.cohort).wave.list[w.i].key}`;
   const f = state.fileFilter;
   return f ? `${nameOf(f.cohort)} · ${manifestOf(f.cohort).files[f.i].name}` : "";
@@ -758,18 +766,22 @@ export function wireResults() {
     renderResults();
   });
 
-  const sameWave = (key, i) => state.waveFilter?.cohort === key && state.waveFilter.i === i;
+  // A sweep is {cohort, i}; an age on the several-cohort axis is {col, label, sweeps}.
+  const same = (f) => {
+    const w = state.waveFilter;
+    if (!w) return false;
+    return f.sweeps ? w.col === f.col : w.cohort === f.cohort && w.i === f.i;
+  };
   wireOverview({
-    onWave: (key, i) => {
-      state.waveFilter = sameWave(key, i) ? null : { cohort: key, i };
+    onWave: (f) => {
+      state.waveFilter = same(f) ? null : f;
       runSearch();
     },
     onTopic: (kind, id) => selectTopic(toggleTopic, kind, id),
-    // A cell: that topic at that sweep. The same cell again lets go of the sweep only.
-    onCell: (kind, id, key, i) => {
-      const already =
-        sameWave(key, i) && state.topicSel.some((s) => s.kind === kind && s.id === id);
-      state.waveFilter = already ? null : { cohort: key, i };
+    // A cell: that topic at that sweep or age. The same cell again lets go of the sweep only.
+    onCell: (kind, id, f) => {
+      const already = same(f) && state.topicSel.some((s) => s.kind === kind && s.id === id);
+      state.waveFilter = already ? null : f;
       selectTopic(ensure, kind, id);
     },
     onOptions: () => {

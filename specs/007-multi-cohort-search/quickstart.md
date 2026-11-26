@@ -45,10 +45,10 @@ unchanged apart from the cohort selector.
 | # | Do | Expect |
 |---|---|---|
 | 1 | Open `/` in a fresh profile | One cohort chosen, page as before (Q3, FR-005) |
-| 2 | Press a second cohort in the header | It loads in under 3 s; two description lines, two sweep rows on one age axis, results grouped under two headings, count split by cohort |
+| 2 | Press a second cohort in the header | It loads in under 3 s; one row of bars on an age axis, each bar stacked in both colours; results grouped under two headings, count split by cohort; hovering a toggle says what the cohort is; the title does not change |
 | 3 | Search `smok` | Both groups narrow; a cohort with none shows "no matches" |
 | 4 | Click a sweep bar of the second cohort | Only that cohort's sweep; chip names cohort and sweep |
-| 5 | Open Topics → a domain | Each topic has a sub-row per cohort in its colour; an untagged cohort reads "no topic tags" |
+| 5 | Open Topics → a domain | Each topic is one row of cells stacked by cohort; an untagged cohort is named above the rows |
 | 6 | Select variables from both; open Selection | Grouped by cohort; button "Download N variables from 2 cohorts" |
 | 7 | Give two cohorts' variables the same column name | No clash reported |
 | 8 | Download, unzip | `cohorts-merge-<date>/README.md` and one complete project folder per cohort |

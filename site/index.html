@@ -22,7 +22,6 @@
   <div class="mark">
     <span class="mark-name">Cohort Data Builder</span>
     <span class="beta-pill" title="Still being developed">Beta</span>
-    <span class="mark-sub" id="mark-sub"></span>
   </div>
 
   <div class="cohorts" id="cohorts" role="group" aria-label="Cohorts"></div>
@@ -52,12 +51,9 @@
   <section class="view is-current" data-view="search">
 
     <section class="overview" id="overview" aria-label="What the study holds">
-      <div class="ov-head">
-        <p class="ov-about" id="ov-about"></p>
-      </div>
-
       <div class="ov-chart" id="ov-chart">
-        <!-- Row one: every matching variable, by sweep. -->
+        <!-- Row one: every matching variable, by sweep; with several cohorts, by age, each
+             bar stacked by cohort. -->
         <div class="ov-row ov-total">
           <div class="ov-label">
             <span class="ov-total-name" id="spine-title">All variables</span>
@@ -65,8 +61,6 @@
           </div>
           <ol class="spine-track" id="spine-track" aria-label="Matches by sweep"></ol>
         </div>
-        <!-- With several cohorts: one row of sweep bars per cohort, on the age axis above. -->
-        <div class="ov-cohorts" id="spine-rows"></div>
         <!-- Then one row per topic: the topic filter, as a tree. -->
         <div class="ov-topics" id="tgrid" hidden>
           <button class="ov-toggle" id="tgrid-toggle" aria-expanded="false" aria-controls="tgrid-body">

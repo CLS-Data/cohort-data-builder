@@ -28,17 +28,18 @@ Order of precedence: address, `cohorts`, `cohort`, first catalogue cohort.
 ```
 
 - One button per catalogue cohort, catalogue order; pressing toggles the cohort.
-- When one cohort is chosen its button has `aria-disabled="true"` and the title "At least
-  one cohort stays chosen"; pressing it does nothing.
+- Each button's title says what the cohort is: full name — description, then
+  `N variables in M files.` (FR-011).
+- When one cohort is chosen its button has `aria-disabled="true"` and its title adds "At
+  least one cohort stays chosen."; pressing it does nothing.
 - A loading cohort's button shows a busy state (`aria-busy="true"`); a failed one stays
-  pressed and its overview row offers Retry.
+  pressed and its heading in the results offers Retry.
 - Replaces `<select id="dataset">`. The tests' `#dataset` selector moves to
   `.cohorts button[data-cohort=…]`.
 
-## Title, subtitle, footer (FR-016)
+## Title and footer (FR-016)
 
 | Place | One cohort | Several |
 |---|---|---|
-| `document.title` | `BCS70 · Cohort Data Builder` | `NCDS + BCS70 · Cohort Data Builder` |
-| `#mark-sub` | full name | short names joined by ` + ` |
+| `document.title` | `Cohort Data Builder` | `Cohort Data Builder` |
 | `#foot-counts` | as today | summed variables and files, then `· N cohorts` |

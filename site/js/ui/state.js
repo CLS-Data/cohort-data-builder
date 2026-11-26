@@ -19,7 +19,9 @@ export const state = {
   chosen: [], // the keys being searched, in catalogue order; never empty once started
   dictCache: new Map(), // dictionaries loaded so far, keyed "<key>/<file>"
   query: "",
-  waveFilter: null, // {cohort, i}: one cohort's sweep, or null
+  // {cohort, i}: one cohort's sweep; {col, label, sweeps: {cohort: i}}: one age on the
+  // several-cohort axis, each cohort's sweep there; or null.
+  waveFilter: null,
   fileFilter: null, // {cohort, i}: one cohort's file, or null
   levelFilter: null, // a level name, -1 for unrecorded, or null
   // The topic filter: items {kind: "d"|"t", id} combined by topicMode ("any" or "all").

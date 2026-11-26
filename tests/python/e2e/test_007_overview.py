@@ -74,6 +74,7 @@ def test_two_cohorts_share_one_row_of_bars_on_an_age_axis(mini):
 
 def test_segments_are_in_proportion_and_in_each_cohorts_colour(mini):
     both(mini)
+    expect(bar(mini, 5).locator(".coh-seg")).to_have_count(2)
     heights = (
         bar(mini, 5)
         .locator(".coh-seg")

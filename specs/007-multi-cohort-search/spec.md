@@ -14,7 +14,8 @@
 
 - Q: Should the cohorts' sweep rows line up on one shared age axis, or each show its own sweeps? → A: One shared age axis; each sweep is placed at the cohort members' age at that sweep (FR-012a, FR-012b).
 - Q: How should the code for a multi-cohort selection be downloaded? → A: One zip holding a top-level README and one complete project folder per cohort, each identical to that cohort's single-cohort download (FR-020).
-- Q: With several cohorts chosen, how should each topic row lay out its per-cohort counts on the shared age axis? → A: One sub-row per chosen cohort under each topic and domain, in the cohort's colour, on the shared age axis.
+- Q: With several cohorts chosen, how should each topic row lay out its per-cohort counts on the shared age axis? → A: ~~One sub-row per chosen cohort~~ Revised after review: one row per topic and domain, each cell a small bar stacked by cohort in their colours.
+- Q (review of the built overview): How should the overview look with several cohorts? → A: One row of bars on the shared age axis, each bar stacked by cohort in proportion and in each cohort's colour; no description text (what a cohort is shows on hovering its toggle); the title never names the chosen cohorts.
 - Q: With several cohorts chosen, how should the variable result list be ordered? → A: Grouped by cohort, in catalogue order, each block under a cohort heading with its count; today's order within each cohort.
 - Q: On a first visit (no saved choice, no cohort in the page address), which cohorts are chosen? → A: Only the first cohort in the catalogue, as today; more are added from the header.
 
@@ -65,43 +66,37 @@ per cohort that adds up to the total.
 
 ### User Story 2 - The overview stacks by cohort (Priority: P1)
 
-The top panel of the Variables view tells the researcher what each chosen cohort is and
-where the matching variables sit in time. With several cohorts it shows, for each chosen
-cohort in its colour: its full name and size (the description line), and its own row of
-sweep bars. The topic rows show, for each topic, how many matching variables each cohort
-has at each sweep, so the researcher can see at a glance which cohorts measured smoking
-and when.
+The top panel of the Variables view shows where the matching variables sit in time. With
+several cohorts it is still one row of bars, on an axis of age: each bar is stacked by
+cohort, in proportion and in each cohort's colour. The topic rows do the same in small, so
+the researcher can see at a glance which cohorts measured smoking and when. What a cohort
+is (full name, description, size) shows on hovering its toggle in the header.
 
 **Why this priority**: Seeing coverage across cohorts is the main reason to search them
 together; without it the researcher only gets a longer list.
 
-**Independent Test**: Choose three cohorts with no search: the overview shows three
-description lines and three rows of sweep bars, each in its cohort's colour, with each
-cohort's own sweeps; opening Topics and the Health behaviour domain shows a count per
-cohort for each topic.
+**Independent Test**: Choose three cohorts with no search: the overview shows one row of
+bars on an age axis, each bar stacked in the three cohorts' colours; opening Topics and the
+Health behaviour domain shows each topic as one row of stacked cells.
 
 **Acceptance Scenarios**:
 
-1. **Given** three cohorts are chosen, **When** the overview is drawn, **Then** there is one
-   line per cohort giving its colour, full name, description and variable and file counts,
-   in a fixed cohort order.
+1. **Given** several cohorts are chosen, **When** the researcher hovers a cohort's toggle,
+   **Then** they see its full name, description and variable and file counts; there is no
+   description text in the overview.
 2. **Given** three cohorts are chosen, **When** the overview is drawn, **Then** there is one
-   row of sweep bars per cohort, labelled with the cohort's short name and its total,
-   with the rows lined up on one shared age axis: each sweep sits at the cohort members'
-   age at that sweep, so the same life stage is in the same column in every row (NCDS at
-   11 above BCS70 at 10).
-3. **Given** a search is active, **When** the overview is drawn, **Then** each cohort's row
-   shows only its matching variables, and a cohort with no matches shows an empty row with
-   a zero total rather than disappearing.
-4. **Given** several cohorts, **When** the researcher clicks a sweep bar, **Then** the list
-   narrows to that sweep of that cohort only, and the filter chip names both cohort and
-   sweep.
+   row of bars on one shared age axis: each sweep sits at the cohort members' age at that
+   sweep, and each bar is stacked by cohort in proportion to its count, in its colour.
+3. **Given** a search is active, **When** the overview is drawn, **Then** each bar shows only
+   matching variables; a cohort with no matches has no segment.
+4. **Given** several cohorts, **When** the researcher clicks a bar, **Then** the list narrows
+   to that age in every cohort (each cohort's sweep there), and the filter chip reads
+   "age 11".
 5. **Given** several cohorts and Topics open, **When** the researcher looks at a topic,
-   **Then** they see that topic's total and, per cohort, its counts by sweep in the
-   cohort's colour; clicking the topic name filters every chosen cohort by that topic.
-6. **Given** a cohort has no topic tags, **When** topics are shown, **Then** that cohort's
-   part of each topic row says it has no tags, rather than showing zeros as if it had been
-   tagged.
+   **Then** they see its total and one row of cells, each stacked by cohort; a cell narrows
+   to that topic at that age; clicking the topic name filters every chosen cohort by it.
+6. **Given** a cohort has no topic tags, **When** topics are shown, **Then** a note above
+   the topic rows says so, rather than showing zeros as if it had been tagged.
 
 ---
 
@@ -265,10 +260,11 @@ the download step shows a project with a folder or dataset per cohort.
 
 **The overview (top panel)**
 
-- **FR-011**: The overview MUST show one description line per chosen cohort: colour, full
-  name, description, variable and file counts.
-- **FR-012**: The overview MUST show one row of sweep bars per chosen cohort, in that
-  cohort's colour and with its total, using that cohort's own sweeps and sweep term.
+- **FR-011**: Hovering a cohort's toggle MUST show its full name, description and variable
+  and file counts. The overview MUST NOT show description text.
+- **FR-012**: With several cohorts the overview MUST show one row of bars, one per age
+  column, each stacked by cohort in proportion to its count and in its colour, with the
+  total across cohorts.
 - **FR-012a**: With two or more cohorts chosen, the sweep rows and the topic rows' sweep
   cells MUST share one age axis: each sweep is placed at the cohort members' age at that
   sweep, and the axis is labelled in years of age. With one cohort chosen, its sweeps are
@@ -276,17 +272,15 @@ the download step shows a project with a folder or dataset per cohort.
 - **FR-012b**: Each sweep MUST be placed by its age (or age range) when it is known. A
   sweep without a known age MUST still be shown, in a clearly labelled "age not known"
   position, never dropped.
-- **FR-013**: A chosen cohort with no matching variables MUST still show its row, with a
-  zero total and empty sweeps.
-- **FR-014**: Each topic and domain row MUST show the total across chosen cohorts, with one
-  sub-row per chosen cohort beneath it, labelled with the cohort's short name and total and
-  marked in its colour, whose cells are that cohort's counts by sweep on the shared age
-  axis; a click on a cell narrows to that topic at that cohort's sweep. With one cohort
-  chosen there are no sub-rows, as today.
-- **FR-015**: A cohort without topic tags MUST be shown as untagged in the topic rows, not
-  as having zero matches.
-- **FR-016**: The page title, header subtitle and footer counts MUST describe all chosen
-  cohorts (for example "NCDS + BCS70" and the summed counts).
+- **FR-013**: An age with no matching variables in any cohort MUST still show, as an empty
+  bar; a cohort with none at an age simply has no segment there.
+- **FR-014**: Each topic and domain row MUST show the total across chosen cohorts and one
+  cell per age column, each a small bar stacked by cohort; a click on a cell narrows to
+  that topic at that age. With one cohort chosen the cells are shaded as today.
+- **FR-015**: A cohort without topic tags MUST be named as untagged above the topic rows,
+  not shown as having zero matches.
+- **FR-016**: The page title and header MUST NOT change with the chosen cohorts; the footer
+  counts MUST sum them.
 
 **Selection and download**
 

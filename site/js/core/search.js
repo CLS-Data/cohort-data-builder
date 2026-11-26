@@ -91,10 +91,13 @@ export function filterVariables(vars, manifest, filters) {
  *
  * The query, level and topic filters apply to every cohort. A sweep or file filter names
  * its cohort: the others then have no matches (and are marked `filteredElsewhere`), though
- * their topic tally still ignores a sweep filter, as it does within a cohort.
+ * their topic tally still ignores a sweep filter, as it does within a cohort. An age filter
+ * (one column of the age axis) gives each cohort its own sweep there; a cohort without one
+ * has no matches.
  * @param {{key: string, manifest: object, vars: Array[]}[]} cohorts The chosen cohorts,
  *   in the order to list them.
- * @param {{query: string, wave: {cohort: string, i: number}|null,
+ * @param {{query: string,
+ *   wave: {cohort: string, i: number}|{col: number, label: string, sweeps: Object<string, number>}|null,
  *   file: {cohort: string, i: number}|null, level: number|string|null,
  *   topicSel?: object[], topicMode?: "any"|"all", minConf?: number}} filters As
  *   {@link filterVariables}, with sweep and file filters naming their cohort.
@@ -103,7 +106,11 @@ export function filterVariables(vars, manifest, filters) {
  *   filteredElsewhere: boolean}[]} One result per cohort, in the order given.
  */
 export function searchCohorts(cohorts, filters) {
-  const own = (f, key) => (f ? (f.cohort === key ? f.i : NONE) : null);
+  const own = (f, key) => {
+    if (!f) return null;
+    if (f.sweeps) return key in f.sweeps ? f.sweeps[key] : NONE;
+    return f.cohort === key ? f.i : NONE;
+  };
   return cohorts.map(({ key, manifest, vars }) => {
     const wave = own(filters.wave, key);
     const file = own(filters.file, key);

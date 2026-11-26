@@ -188,17 +188,31 @@ header, overview, result tags, Selected panel and Selection view, in both themes
 two cohorts, multi-cohort download.
 
 **Independent Test**: Open `tutorial/`: intro lists cohorts with `.coh-mark`s and says they
-can be searched together; Search/Explore demos show two cohort groups and two sweep rows;
+can be searched together; Search/Explore demos show two cohort groups and bars stacked by cohort;
 Download step shows a `cohorts-merge-…/` tree.
 
 ### Tests for User Story 5 ⚠️ write first, see them fail
 
-- [ ] T047 [US5] Extend `tests/python/e2e/test_tutorial.py`: `#t-cohort-list` items each have a `.coh-mark` whose colour equals the builder's for the same key (same stylesheet); intro text mentions searching cohorts together; the Search demo, typing `smok`, lists rows from two cohorts each with a `.coh-tag`; the Explore demo shows two sweep rows on one age axis; the Download step contains `cohorts-merge-` and two `-merge-` folders; no sideways scroll at 390px. Commit `test(007-us5): tutorial for several cohorts`.
+- [ ] T047 [US5] Extend `tests/python/e2e/test_tutorial.py`: `#t-cohort-list` items each have a `.coh-mark` whose colour equals the builder's for the same key (same stylesheet); intro text mentions searching cohorts together; the Search demo, typing `smok`, lists rows from two cohorts each with a `.coh-tag`; the Explore demo shows one row of bars on an age axis, stacked by cohort; the Download step contains `cohorts-merge-` and two `-merge-` folders; no sideways scroll at 390px. Commit `test(007-us5): tutorial for several cohorts`.
 
 ### Implementation for User Story 5
 
-- [ ] T048 [US5] In `site/tutorial/tutorial.js` add a second cohort's demo variables (ask the user to supply 3–4 real NCDS or Next Steps smoking/alcohol variable names, labels, sweeps and value labels from the published dictionaries, since `site/data/` is closed to the assistant; never invent them as if real), give each demo variable a `cohort`, and render cohort groups, tags and two sweep rows on an age axis (reuse `site/js/core/ages.js` if the tutorial can import it; else mirror its rule and note why).
+- [ ] T048 [US5] In `site/tutorial/tutorial.js` add a second cohort's demo variables (ask the user to supply 3–4 real NCDS or Next Steps smoking/alcohol variable names, labels, sweeps and value labels from the published dictionaries, since `site/data/` is closed to the assistant; never invent them as if real), give each demo variable a `cohort`, and render cohort groups, tags and bars stacked by cohort on an age axis (reuse `site/js/core/ages.js` if the tutorial can import it; else mirror its rule and note why).
 - [ ] T049 [US5] In `site/tutorial/index.html` and `tutorial.css`: intro sentence and cohort list with marks; Select and Download steps describe the grouped selection and the folder-per-cohort zip (tree sketch); Run step says to run each folder on its own and that cohorts are not merged; mention that earlier saved selections of several cohorts now appear together (research R6). Make T047 pass; open `007-us5-tutorial` PR with a filled "How to review" (quickstart §2 step 13; tutorial copy needs close reading).
+
+---
+
+## Phase 7b: Overview revised after review
+
+The user reviewed the built overview and asked for: the header toggles as they are, with
+what a cohort is shown on hover; a title that never names the chosen cohorts; no
+description text; one row of bars stacked by cohort; topic rows likewise. Supersedes
+T027–T033's sub-rows and description lines, and FR-011–FR-016 as first written.
+
+- [X] T055 Rewrite `tests/python/e2e/test_007_overview.py` for one stacked row (segments per column, proportion and colour, bar title, age filter across cohorts, stacked topic cells, untagged note, phone width); update title, hover and colour tests in `test_007_choose.py`, `test_shell.py`, `test_us1_search.py`, `test_007_colour.py`; add the age-filter test to `tests/js/search.test.mjs`. Commit `test(007-overview): …`.
+- [X] T056 `site/js/core/search.js` `searchCohorts`: an age filter `{col, label, sweeps}`; `ui/results.js` chip and wiring; `ui/boot.js` toggle titles, fixed title, drop the age filter when the cohorts change.
+- [X] T057 `site/js/ui/overview.js`: `renderStacked` and stacked topic rows; remove the description line, `#spine-rows` and `#mark-sub`; `site/styles.css` stacked segments in place of the sub-row styles.
+- [X] T058 Update spec (clarification, US2, FR-011–FR-016), `contracts/variables-view.md`, `contracts/cohort-choice.md`, quickstart.
 
 ---
 
