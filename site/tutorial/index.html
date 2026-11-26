@@ -47,7 +47,8 @@
       <p class="t-lede">Search every variable in the studies, see where a topic was measured,
         pick what you need and download a small R, Python or Stata project that builds your dataset
         from your own copy of the data. Every panel below is a working copy of the builder:
-        try it as you read.</p>
+        try it as you read. You can search several cohorts at once: press each one you want
+        in the builder's header, and each keeps its own colour wherever it appears.</p>
       <ul class="t-stats" aria-label="What the builder holds">
         <li><b id="t-total">–</b><span>variables</span></li>
         <li><b id="t-cohorts">–</b><span>cohorts</span></li>
@@ -152,7 +153,10 @@
         <h2 id="h-select">Build your selection</h2>
         <p>Click a row to add it; click again to take it out. Selected rows turn green and
           gather in the panel beside the list, grouped by sweep or by file. The selection is
-          kept in your browser, per cohort, so it is still there next time.</p>
+          kept in your browser, per cohort, so it is still there next time. With several
+          cohorts chosen, the selection is grouped by cohort, and a cohort you stop searching
+          keeps what you picked from it. Selections you saved from different cohorts before
+          now appear together.</p>
         <ul class="t-do">
           <li><span>Click one row, then hold <kbd>Shift</kbd> and click another to select
             everything between them.</span></li>
@@ -187,7 +191,8 @@
           will get: rename or remove any of them there. The download options and button stay in
           view below the list, however long it is. You get a zip of code: it reads only the
           files your variables are in, keeps only those columns, and joins the sweeps on the
-          person identifier.</p>
+          person identifier. A selection from several cohorts downloads as one zip with
+          a folder per cohort, each a complete project of its own.</p>
         <ul class="t-do">
           <li><span>Choose R, Python, a Stata do-file or any mix, and the format to write.</span></li>
           <li><span>Missing codes such as <code>-9 Refused</code> can become <code>NA</code>, or
@@ -217,6 +222,15 @@
           <p class="t-summary" id="dl-summary" aria-live="polite"></p>
         </form>
         <pre class="t-tree" id="dl-tree" aria-label="What the zip holds"></pre>
+        <p class="t-demo-foot">From two cohorts:</p>
+        <pre class="t-tree" id="dl-tree-many" aria-label="What the zip holds, from two cohorts"><b>cohorts-merge-&lt;date&gt;.zip</b>
+├─ README.md     ← what each folder holds
+├─ ncds-merge-&lt;date&gt;/
+│  ├─ README.md, codebook.csv, data/, R/ …
+│  └─ output/merged.csv
+└─ bcs70-merge-&lt;date&gt;/
+   ├─ README.md, codebook.csv, data/, R/ …
+   └─ output/merged.csv</pre>
       </div>
     </section>
 
@@ -233,6 +247,9 @@
             <code>.sav</code> files; Python needs <code>pandas</code> (and <code>pyreadstat</code>
             for <code>.sav</code>); Stata needs version 16 or later.</span></li>
           <li><span>It stops with a clear message if a file or variable is missing from your copy.</span></li>
+          <li><span>From several cohorts? Run each folder on its own, with that cohort's files in
+            its <code>data/</code>. The cohorts are different people, so they are not merged with
+            each other.</span></li>
         </ul>
       </div>
       <div class="t-demo">

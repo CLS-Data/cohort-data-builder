@@ -235,6 +235,11 @@ function topicChip(id, conf, cls = "topic-chip") {
 
 const isMissing = (v, na) => na.some(([lo, hi]) => v >= lo && v <= hi);
 
+/* The builder's rule for a cohort's colour (site/js/core/cohorts.js, colourSlot), mirrored:
+   the tutorial loads nothing from the builder but its stylesheet. */
+const PINNED = { ncds: 1, bcs70: 2, next_steps: 3, mcs: 4 };
+const colourSlot = (key, keys) => PINNED[key] || (Math.max(0, keys.indexOf(key)) % 6) + 1;
+
 /* Live counts */
 
 async function loadCounts() {
@@ -243,7 +248,18 @@ async function loadCounts() {
     $("#t-cohorts").textContent = fmt(datasets.length);
     $("#t-total").textContent = fmt(datasets.reduce((s, d) => s + d.variables, 0));
     const list = $("#t-cohort-list");
-    for (const d of datasets) list.append(el("li", {}, `${d.name} `, el("span", {}, fmt(d.variables))));
+    const keys = datasets.map((d) => d.key);
+    for (const d of datasets) {
+      list.append(
+        el(
+          "li",
+          { "data-cohort": d.key, "data-coh": String(colourSlot(d.key, keys)) },
+          el("span", { class: "coh-mark", "aria-hidden": "true" }),
+          `${d.name} `,
+          el("span", {}, fmt(d.variables)),
+        ),
+      );
+    }
     const manifest = await (await fetch(`../data/${datasets[0].key}/manifest.json`)).json();
     const domains = manifest.topics?.domains || [];
     $("#t-domains").textContent = fmt(domains.length);

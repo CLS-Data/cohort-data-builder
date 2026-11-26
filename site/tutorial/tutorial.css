@@ -43,7 +43,8 @@ a.view-tab { display: inline-block; text-decoration: none; }
 }
 .t-cohorts { display: flex; flex-wrap: wrap; gap: 5px; margin: 12px 0 0; padding: 0; list-style: none; }
 .t-cohorts li { font-family: var(--mono); font-size: 0.7188rem; color: var(--ink); }
-.t-cohorts li span { color: var(--ink-3); }
+.t-cohorts li > span:not(.coh-mark) { color: var(--ink-3); }
+.t-cohorts .coh-mark { margin-right: 4px; vertical-align: -1px; }
 .t-cohorts li + li::before { content: "·"; margin-right: 5px; color: var(--ink-3); }
 
 /* The steps, drawn as the builder's sweep bars: one node per step. */
