@@ -4,9 +4,11 @@
    With several cohorts the overview lines their sweeps up by age. The axis is ordinal, not
    to scale: one equal-width column per distinct age across the cohorts, so that the same
    age is in the same column, near ages sit side by side without overlapping, and early
-   childhood (sweeps months apart) is not crushed against adulthood (years apart). Sweeps
-   whose age is not known go in "?" columns at the end. With one cohort the columns are just
-   its sweeps, which is the overview as it was before. */
+   childhood (sweeps months apart) is not crushed against adulthood (years apart). A cohort
+   with several sweeps at one age (sub-sweeps) has them in adjacent columns of that age, in
+   list order; an age has as many columns as any cohort needs. Sweeps whose age is not known
+   go in "?" columns at the end. With one cohort the columns are just its sweeps, in list
+   order, which is the overview as it was before. */
 
 const AGE_KEY = /^(\d+(?:\.\d+)?)([ym])$/;
 
@@ -57,30 +59,35 @@ export function ageAxis(manifests) {
       slots: new Map([[m.key, list.map((_, i) => i)]]),
     };
   }
-  const known = new Set();
-  let unknown = 0;
+  // How many columns each age needs: the most sweeps any one cohort has at it.
+  const width = new Map(); // rounded age (null: not known) -> columns
   for (const m of manifests) {
-    let here = 0;
+    const here = new Map();
     for (const w of m.wave.list) {
       const age = sweepAge(w);
-      if (age === null) here++;
-      else known.add(same(age));
+      const k = age === null ? null : same(age);
+      here.set(k, (here.get(k) || 0) + 1);
     }
-    unknown = Math.max(unknown, here);
+    for (const [k, n] of here) width.set(k, Math.max(width.get(k) || 0, n));
   }
-  const ages = [...known].sort((a, b) => a - b);
-  const columns = [
-    ...ages.map((age) => ({ age, label: ageLabel(age) })),
-    ...Array.from({ length: unknown }, () => ({ age: null, label: "?" })),
-  ];
+  const ages = [...width.keys()].filter((k) => k !== null).sort((a, b) => a - b);
+  const columns = [];
+  const first = new Map(); // rounded age -> its first column
+  for (const k of [...ages, null]) {
+    if (!width.has(k)) continue;
+    first.set(k, columns.length);
+    for (let n = 0; n < width.get(k); n++) columns.push({ age: k, label: ageLabel(k) });
+  }
   const slots = new Map();
   for (const m of manifests) {
     const row = columns.map(() => null);
-    let nth = 0;
+    const used = new Map(); // rounded age -> columns of it taken so far
     m.wave.list.forEach((w, i) => {
       const age = sweepAge(w);
-      const col = age === null ? ages.length + nth++ : ages.indexOf(same(age));
-      row[col] = i;
+      const k = age === null ? null : same(age);
+      const nth = used.get(k) || 0;
+      used.set(k, nth + 1);
+      row[first.get(k) + nth] = i;
     });
     slots.set(m.key, row);
   }

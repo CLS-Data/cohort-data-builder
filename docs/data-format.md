@@ -222,7 +222,7 @@ All problems are listed in one run. The rules:
 |---|---|
 | D1 | Every file is UTF-8 JSON of the shape above, with required fields present and of the right type. |
 | D2 | `datasets.json` keys are unique and well formed, each has `<key>/manifest.json` and `<key>/index.json`, and its counts match the manifest. |
-| D3 | The manifest's `key` matches its folder. Sweep keys are unique and not empty. File names are unique and well formed. Each file's sweep is declared. `counts` match `index.json` and `files`. A sweep's `age` is 0–120, its `ageRange` is `[min, max]` with `min ≤ max` and contains `age`, and ages increase in list order. A sweep with no age and no age-shaped key gives a warning, not a failure. |
+| D3 | The manifest's `key` matches its folder. Sweep keys are unique and not empty. File names are unique and well formed. Each file's sweep is declared. `counts` match `index.json` and `files`. A sweep's `age` is 0–120, its `ageRange` is `[min, max]` with `min ≤ max` and contains `age`. Ages need not follow the list's order. A sweep with no age and no age-shaped key gives a warning, not a failure. |
 | D4 | Index rows have a name, file, sweep and level indices in range, and topics in pairs with topic numbers in range and percents 0–100. |
 | D5 | Every manifest file has its dictionary, whose `file` and `wave` match. Every index row's variable is in that dictionary. Variable names are unique per file, ignoring case. |
 | D6 | `values` entries have `value` and `label` strings. `na` has numeric `values`, `ranges` of `[low, high]` with `low ≤ high`, and `kept`/`lossy` as `[code, label]` pairs. |

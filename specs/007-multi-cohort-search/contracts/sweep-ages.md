@@ -21,10 +21,13 @@ otherwise the sweep is drawn in the "age not known" column. Existing manifests s
 
 - `age`, if present, is a number from 0 to 120.
 - `ageRange`, if present, is two numbers, `min ≤ max`, and contains `age` when both exist.
-- Within a cohort, sweep ages strictly increase in list order (the list is in time order).
+- Ages need not follow the list's order: sub-sweeps share an age (bcs70 `s10_1`–`s10_4` are
+  all 50) and can be older than the sweep after them (ncds `s9_1`, 63, before `s10`, 61).
 - A warning, not a failure, for a sweep with neither `age` nor an age-shaped key.
 
 ## Axis labels
+
+Several sweeps of one cohort at one age sit in adjacent columns of that age, in list order.
 
 An age under 1 is labelled in months (`9m`); otherwise in whole years where whole (`11`)
 or one decimal (`2.5`). With a range the tooltip gives it (`ages 33–35`).

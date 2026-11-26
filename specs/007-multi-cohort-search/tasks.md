@@ -64,7 +64,7 @@ cohort. **No user story starts until this phase is merged.**
 
 ### Implementation for Foundational
 
-- [x] T010 [P] Add sweep-age checks to D3 in `scripts/checks.py` per `contracts/sweep-ages.md` ("`age`, if present, is a number from 0 to 120"; "`ageRange`, if present, is two numbers, `min ≤ max`, and contains `age` when both exist"; "sweep ages strictly increase in list order"; warning for no age), with `age`/`ageRange` as optional fields in `check_manifest_shape`; make T005 pass.
+- [x] T010 [P] Add sweep-age checks to D3 in `scripts/checks.py` per `contracts/sweep-ages.md` ("`age`, if present, is a number from 0 to 120"; "`ageRange`, if present, is two numbers, `min ≤ max`, and contains `age` when both exist"; ages need not follow list order (changed after T002a: sub-sweeps share ages); warning for no age), with `age`/`ageRange` as optional fields in `check_manifest_shape`; make T005 pass.
 - [x] T011 [P] Create `site/js/core/ages.js` with `sweepAge`, `ageLabel`, `ageAxis`, `cells` (JSDoc each; research R2: ordinal union of distinct ages, unknown last; one cohort = its sweeps); make T006 pass.
 - [x] T012 [P] Create `site/js/core/cohorts.js` with `parseChoice`, `formatChoice`, `chooseInitial`, `toggleChoice`, `colourSlot` and the pinned map (`ncds` 1, `bcs70` 2, `next_steps` 3, `mcs` 4); make T007 pass.
 - [x] T013 Change `site/js/core/selection.js` (entries carry `cohort`; `keyOf`, `toItem`, `restore`, `has`), `site/js/core/topics.js` (filter items `{kind, id}`; `idIndex(scheme)` map), and `site/js/core/search.js` (`filterVariables` takes ids and a level name, reports `untagged`; new `searchCohorts`); make T008 pass, keeping every existing Node test green.

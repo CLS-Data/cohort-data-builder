@@ -376,17 +376,17 @@ def sweep_age(wave: dict) -> float | None:
 
 
 def check_sweep_ages(report: _Report, rel: str, waves: list[dict]) -> None:
-    """D3: sweep ages are 0-120, age ranges are ordered and contain the age, ages increase.
+    """D3: sweep ages are 0-120, and age ranges are ordered and contain the age.
 
-    See contracts/sweep-ages.md (feature 007). A sweep with no known age is not a problem
-    here; it is reported by `sweep_age_warnings`.
+    See contracts/sweep-ages.md (feature 007). Ages need not follow the list's order: sub-
+    sweeps share an age and can be older than the sweep after them, and the site sorts by
+    age. A sweep with no known age is not a problem here; `sweep_age_warnings` reports it.
 
     Args:
         report: Where problems go.
         rel: The manifest's path.
         waves: `manifest.wave.list`.
     """
-    last = None
     for i, w in enumerate(waves):
         where = f"wave.list[{i}] ({w.get('key')})"
         age = w.get("age")
@@ -401,13 +401,6 @@ def check_sweep_ages(report: _Report, rel: str, waves: list[dict]) -> None:
                 report.add(rel, where, "'ageRange' should have min ≤ max")
             elif age is not None and not span[0] <= age <= span[1]:
                 report.add(rel, where, f"'ageRange' {span} should contain 'age' {age}")
-        # A malformed age is reported above, not also counted in the order.
-        known = None if w.get("age") is not None and age is None else sweep_age(w)
-        if known is None:
-            continue
-        if last is not None and known <= last:
-            report.add(rel, where, "sweep ages should increase in list order")
-        last = known
 
 
 def sweep_age_warnings(data_dir: Path) -> list[Problem]:

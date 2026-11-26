@@ -90,7 +90,7 @@ as `<path>[: <location>]: <message>`, all problems at once.
 |---|---|
 | D1 | Every file is valid UTF-8 JSON of the shape above; required fields present with the right types. |
 | D2 | `datasets.json` keys are unique, match `^[a-z][a-z0-9_]*$`, and each has `<key>/manifest.json` and `<key>/index.json`; its `variables`/`files` counts match the manifest. |
-| D3 | Manifest: `key` matches its folder; sweep keys unique and non-empty; file names unique and match `^[A-Za-z0-9][A-Za-z0-9_.\-]*$`; each file's `wave` is a declared sweep; `counts` match `index.json` and `files`. Sweep `age`, if given, is 0–120; `ageRange` is `[min ≤ max]` containing `age`; ages increase in list order. A sweep with no age and no age-shaped key is a warning only. |
+| D3 | Manifest: `key` matches its folder; sweep keys unique and non-empty; file names unique and match `^[A-Za-z0-9][A-Za-z0-9_.\-]*$`; each file's `wave` is a declared sweep; `counts` match `index.json` and `files`. Sweep `age`, if given, is 0–120; `ageRange` is `[min ≤ max]` containing `age`; ages need not follow list order. A sweep with no age and no age-shaped key is a warning only. |
 | D4 | Index rows: name non-empty; file, sweep and level indices in range (level may be -1); topic list of even length, topic indices in range, percents 0–100. |
 | D5 | Every manifest file has `dict/<file>.json` whose `file` matches and `wave` matches the manifest; every index row's variable exists in that file's dictionary; variable names unique per file ignoring case. |
 | D6 | `values`, when present, has entries with `value` and `label` strings. `na`, when present, has `values` (numbers) and `ranges` (pairs, `lo ≤ hi` where both non-null); `kept`/`lossy` are optional, and when present are lists of `[code, label]` pairs. |
