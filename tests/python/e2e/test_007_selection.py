@@ -107,7 +107,7 @@ def test_saved_selections_of_unchosen_cohorts_come_back(page, serve, mini_site):
             "([k, v]) => localStorage.setItem(k, v)",
             [f"cohort-data-builder:{key}:selection", json.dumps(value)],
         )
-    page.goto(url + "#mini")
+    page.reload()  # the same address again would not reload the page
     heads = cohort_heads(page, "#sp-list")
     expect(heads).to_have_count(2)
     expect(heads.nth(1)).to_contain_text("Mini2 (1)")  # "gone" is not in mini2's index

@@ -18,7 +18,13 @@ import { renderAbout } from "./overview.js";
 import { renderPanel, wirePanel } from "./panel.js";
 import { mergeChosen, refreshSelection, resetFilters, runSearch, wireResults } from "./results.js";
 import { wireReview } from "./review.js";
-import { onSelectionChange, restoreOptions, restoreSelection, storage } from "./selected.js";
+import {
+  onSelectionChange,
+  restoreOptions,
+  restoreSelection,
+  savedSelection,
+  storage,
+} from "./selected.js";
 import { RETRY_EVENT, state } from "./state.js";
 import { wireSuggest } from "./suggest.js";
 import { switchView } from "./views.js";
@@ -200,6 +206,12 @@ async function boot() {
   });
   window.addEventListener("hashchange", () => choose(parseChoice(location.hash, keys())));
   resetFilters();
+  // Cohorts not chosen but with a saved selection load in the background, so the selection
+  // shows them all (research R6).
+  for (const key of keys()) {
+    const saved = savedSelection(key);
+    if (Array.isArray(saved) && saved.length) load(key);
+  }
   await choose(
     chooseInitial({
       hash: location.hash,

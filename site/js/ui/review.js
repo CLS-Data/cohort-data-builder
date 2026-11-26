@@ -3,17 +3,28 @@
 
    One list, not two: user testing found a second list of the same variables confusing.
    The columns list is also where a name clash between two files becomes visible (two files
-   both calling something `sex` is normal). */
+   both calling something `sex` is normal).
 
-import { buildProject, FORMATS } from "../core/codegen.js";
-import { fixDots, problems } from "../core/columns.js";
+   With a selection from several cohorts (feature 007) the view has a section per cohort,
+   each its own project with its own files, identifier and column checks, and one download
+   holds a folder per cohort (contracts/multi-cohort-download.md). */
+
+import { buildBundle, FORMATS } from "../core/codegen.js";
+import { colourSlot } from "../core/cohorts.js";
+import { fixDots, problemsByCohort } from "../core/columns.js";
 import { loadDict } from "../core/data.js";
-import { keyOf, remove } from "../core/selection.js";
+import { cohortKeyOf } from "../core/selection.js";
 import { esc } from "../core/text.js";
 import { zip } from "../core/zip.js";
 import { addDropped, filterToFile } from "./results.js";
-import { onSelectionChange, saveOptions, setSelection as setFor } from "./selected.js";
-import { cohort, DRAG_MIME, manifestOf, selectionOf, state } from "./state.js";
+import {
+  clearSelection,
+  onSelectionChange,
+  removeSelected,
+  saveOptions,
+  setSelection,
+} from "./selected.js";
+import { allSelected, cohort, DRAG_MIME, manifestOf, selectionOf, state } from "./state.js";
 import { onShow } from "./views.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -32,41 +43,53 @@ const TEMPLATE_FILES = [
   "python/requirements.txt",
   "stata/load_data.do",
   "stata/merge.do",
+  "cohorts-README.md",
 ];
 let templates = null; // fetched on the first download: most visitors never download
 
-/* The cohort whose selection this view shows. One cohort at a time until the view groups
-   several (feature 007, user story 3). */
-const shownKey = () => state.chosen[0];
-const shownManifest = () => manifestOf(shownKey());
-const shownBundle = () => selectionOf(shownKey());
-const setSelection = (next) => setFor(shownKey(), next);
-const waveOrder = () => shownManifest().wave.list.map((w) => w.key);
-const currentProblems = () =>
-  problems(
-    shownBundle(),
-    shownManifest().identifier,
+/* The cohorts with something selected, in catalogue order; loaded, so they can be drawn. */
+const selectedCohorts = () =>
+  [...new Set(allSelected().map((b) => b.cohort))].filter((key) => cohort(key)?.status === "ready");
+/* With nothing selected, the view speaks of the first chosen cohort. */
+const shownKeys = () => {
+  const keys = selectedCohorts();
+  return keys.length ? keys : state.chosen.slice(0, 1);
+};
+const total = () => selectedCohorts().reduce((a, k) => a + selectionOf(k).length, 0);
+const nameOf = (key) => state.catalogue.find((d) => d.key === key)?.name || key;
+const slotOf = (key) =>
+  colourSlot(
+    key,
+    state.catalogue.map((d) => d.key),
+  );
+const currentProblems = () => {
+  const keys = selectedCohorts();
+  return problemsByCohort(
+    new Map(keys.map((k) => [k, selectionOf(k)])),
+    new Map(keys.map((k) => [k, manifestOf(k)])),
     state.options.outputFormat,
     state.options.languages,
   );
+};
+const itemOf = (key) => allSelected().find((b) => cohortKeyOf(b) === key);
 
 /* ── Drawing ─────────────────────────────────────────────────────────── */
 
 /* Drawn only while the view is showing: with thousands selected these panes are the
    slowest thing on the page, and every click in the list would otherwise redraw them. */
 function render() {
-  if (state.view !== "basket" || cohort(shownKey())?.status !== "ready") return;
+  if (state.view !== "basket" || cohort(shownKeys()[0])?.status !== "ready") return;
   renderDetail();
 }
 
 function colRow(b, bad) {
-  const problem = bad.get(keyOf(b));
+  const problem = bad.get(cohortKeyOf(b));
   return `<li class="col-row${problem ? " is-bad" : ""}">
-    <button class="add is-in basket-x" data-remove="${esc(keyOf(b))}"
+    <button class="add is-in basket-x" data-remove="${esc(cohortKeyOf(b))}"
         aria-label="Remove ${esc(b.name)}" title="Remove"><span class="add-yes">✓</span><span class="add-no">✕</span></button>
     <span class="col-kind col-kind-raw" title="${esc(b.wave)}">${esc(b.wave)}</span>
     <span class="col-body">
-      <input class="col-input" type="text" value="${esc(b.column)}" data-rename="${esc(keyOf(b))}"
+      <input class="col-input" type="text" value="${esc(b.column)}" data-rename="${esc(cohortKeyOf(b))}"
           spellcheck="false" autocomplete="off" aria-label="Output column name for ${esc(b.name)}"
           aria-invalid="${problem ? "true" : "false"}">
       <span class="col-note">${esc(b.label || "no label")} ·
@@ -119,26 +142,74 @@ function optionsHtml(languages, format, missingToNa) {
   </div>`;
 }
 
+/* A cohort's selected files, in sweep order. */
+function filesOf(key) {
+  const m = manifestOf(key);
+  const fileInfo = new Map(m.files.map((f) => [f.name, f]));
+  const order = m.wave.list.map((w) => w.key);
+  return [...new Set(selectionOf(key).map((b) => b.file))].sort(
+    (a, b) =>
+      order.indexOf(fileInfo.get(a).wave) - order.indexOf(fileInfo.get(b).wave) ||
+      a.localeCompare(b),
+  );
+}
+
+/* A cohort's files needed and its columns. `ids` only for the one-cohort view, whose
+   lists the tests and the tutorial know by id. */
+function cohortBody(key, bad, ids) {
+  const m = manifestOf(key);
+  const fileInfo = new Map(m.files.map((f) => [f.name, f]));
+  const files = filesOf(key);
+  const id = (name) => (ids ? ` id="${name}"` : "");
+  return `<h2 class="section-title">Data files it needs</h2>
+    <ul class="linklist"${id("basket-files")}>${files
+      .map(
+        (
+          f,
+        ) => `<li><button data-file="${esc(f)}" data-cohort="${esc(key)}" title="Show every variable in ${esc(f)}">
+        <span class="ll-name">${esc(f)}</span>
+        <span class="ll-desc">${esc(fileInfo.get(f).description || "")}</span>
+        <span class="ll-meta">${esc(fileInfo.get(f).wave)}</span></button></li>`,
+      )
+      .join("")}</ul>
+    <p class="note">Put them all in the project's <code>data/</code> folder, in any format (<code>.tab</code>, <code>.csv</code>, <code>.dta</code>, <code>.sav</code>): the scripts pick the read call from the extension.${m.ukdsUrl ? ` Download them from the <a href="${esc(m.ukdsUrl)}" target="_blank" rel="noopener">UK Data Service</a>.` : ""}</p>
+    <h2 class="section-title">Columns</h2>
+    <p class="note">In the order they are written. Rename or remove any of them here.</p>
+    <ol class="cols"${id("basket-cols")}>
+      <li class="col-row is-fixed">
+        <span class="basket-x" aria-hidden="true"></span>
+        <span class="col-kind col-kind-id" title="The identifier">·</span>
+        <span class="col-body"><span class="col-name">${esc(m.identifier)}</span>
+          <span class="col-note">always included: the key the files are merged on</span></span>
+      </li>
+      ${files
+        .flatMap((f) => selectionOf(key).filter((b) => b.file === f))
+        .map((b) => colRow(b, bad))
+        .join("")}
+    </ol>`;
+}
+
+/* A cohort's heading: its mark, name and count, and whether it is being searched. */
+const cohortHead = (key, tag = "h2") =>
+  `<${tag} class="sel-coh-head" data-coh="${slotOf(key)}"><span class="coh-mark" aria-hidden="true"></span>${esc(nameOf(key))} (${n(selectionOf(key).length)})${
+    state.chosen.includes(key) ? "" : ` <span class="sel-off">not being searched</span>`
+  }</${tag}>`;
+
 function renderDetail() {
   const el = $("#basket-detail");
-  const m = shownManifest();
-  const count = shownBundle().length;
+  const keys = shownKeys();
+  const several = keys.length > 1;
+  const m = manifestOf(keys[0]);
+  const count = total();
   if (!count) {
     el.innerHTML = emptyHtml(m);
     return;
   }
   const bad = currentProblems();
-  const fileInfo = new Map(m.files.map((f) => [f.name, f]));
-  const order = waveOrder();
-  const files = [...new Set(shownBundle().map((b) => b.file))].sort(
-    (a, b) =>
-      order.indexOf(fileInfo.get(a).wave) - order.indexOf(fileInfo.get(b).wave) ||
-      a.localeCompare(b),
-  );
   const { languages, missingToNa, outputFormat: format } = state.options;
   const ext = FORMATS[format]?.ext || "csv";
   const stataNames = format === "dta" || languages.includes("stata");
-  const dotted = stataNames && shownBundle().some((b) => /[^A-Za-z0-9_]/.test(b.column));
+  const dotted = stataNames && allSelected().some((b) => /[^A-Za-z0-9_]/.test(b.column));
 
   // The list is redrawn in place, so it keeps its scroll position.
   const top = $("#basket-scroll")?.scrollTop || 0;
@@ -148,45 +219,44 @@ function renderDetail() {
       ? `${plural(bad.size, "column name")} ${bad.size === 1 ? "needs" : "need"} changing.`
       : "";
 
-  el.innerHTML = `
-    <div class="basket-scroll" id="basket-scroll" tabindex="0" role="region" aria-label="Selected variables">
-    <div class="detail-head">
-      <div class="detail-eyebrow">${esc(m.name)} · ${plural(count, "variable")} from ${plural(files.length, "file")}
+  const head = several
+    ? `<div class="detail-head">
+      <div class="detail-eyebrow">${plural(count, "variable")} from ${keys.length} cohorts
+        · <button class="link-btn" id="basket-clear">Clear</button></div>
+      <h1 class="detail-name">A project per cohort</h1>
+      <p class="detail-label">Each cohort's variables are merged into its own
+        <code>output/merged.${ext}</code>, one row per person, on its own identifier.
+        The cohorts are different people and are not merged with each other.</p>
+    </div>`
+    : `<div class="detail-head">
+      <div class="detail-eyebrow">${esc(m.name)} · ${plural(count, "variable")} from ${plural(filesOf(keys[0]).length, "file")}${
+        state.chosen.includes(keys[0]) ? "" : ` · <span class="sel-off">not being searched</span>`
+      }
         · <button class="link-btn" id="basket-clear">Clear</button></div>
       <h1 class="detail-name">output/merged.${ext}</h1>
       <p class="detail-label">One row per person, joined on <code>${esc(m.identifier)}</code>.
         A file with several rows per person is written to its own file instead.</p>
-    </div>
+    </div>`;
+  const body = several
+    ? keys
+        .map(
+          (key) => `<section class="sel-coh" data-cohort="${esc(key)}">${cohortHead(key)}
+            <p class="note">In <code>${esc(key)}-merge-…/</code>, joined on <code>${esc(manifestOf(key).identifier)}</code>.</p>
+            ${cohortBody(key, bad, false)}</section>`,
+        )
+        .join("")
+    : cohortBody(keys[0], bad, true);
+
+  el.innerHTML = `
+    <div class="basket-scroll" id="basket-scroll" tabindex="0" role="region" aria-label="Selected variables">
+    ${head}
     ${
       bad.size
         ? `<div class="warn"><span>⚠</span><div><strong>${plural(bad.size, "column name")} ${bad.size === 1 ? "needs" : "need"} changing</strong>
         before downloading; each says why below.${dotted ? ` <button class="link-btn" id="fix-dots">Replace every . with _</button>` : ""}</div></div>`
         : ""
     }
-    <h2 class="section-title">Data files it needs</h2>
-    <ul class="linklist" id="basket-files">${files
-      .map(
-        (f) => `<li><button data-file="${esc(f)}" title="Show every variable in ${esc(f)}">
-        <span class="ll-name">${esc(f)}</span>
-        <span class="ll-desc">${esc(fileInfo.get(f).description || "")}</span>
-        <span class="ll-meta">${esc(fileInfo.get(f).wave)}</span></button></li>`,
-      )
-      .join("")}</ul>
-    <p class="note">Put them all in the project's <code>data/</code> folder, in any format (<code>.tab</code>, <code>.csv</code>, <code>.dta</code>, <code>.sav</code>): the scripts pick the read call from the extension.${m.ukdsUrl ? ` Download them from the <a href="${esc(m.ukdsUrl)}" target="_blank" rel="noopener">UK Data Service</a>.` : ""}</p>
-    <h2 class="section-title">Columns</h2>
-    <p class="note">In the order they are written. Rename or remove any of them here.</p>
-    <ol class="cols" id="basket-cols">
-      <li class="col-row is-fixed">
-        <span class="basket-x" aria-hidden="true"></span>
-        <span class="col-kind col-kind-id" title="The identifier">·</span>
-        <span class="col-body"><span class="col-name">${esc(m.identifier)}</span>
-          <span class="col-note">always included: the key the files are merged on</span></span>
-      </li>
-      ${files
-        .flatMap((f) => shownBundle().filter((b) => b.file === f))
-        .map((b) => colRow(b, bad))
-        .join("")}
-    </ol>
+    ${body}
     </div>
     <div class="basket-download-area${optionsOpen ? "" : " is-folded"}" id="basket-download-area" role="region" aria-label="Download">
       <h2 class="section-title dl-title">Download</h2>
@@ -203,7 +273,9 @@ function renderDetail() {
   const button = $("#basket-download");
   button.disabled = bad.size > 0 || !languages.length;
   const names = { r: "R", python: "Python", stata: "Stata do-file" };
-  button.textContent = `Download ${languages.map((l) => names[l]).join(" + ") || "…"} code`;
+  button.textContent = several
+    ? `Download ${plural(count, "variable")} from ${keys.length} cohorts`
+    : `Download ${languages.map((l) => names[l]).join(" + ") || "…"} code`;
 }
 
 /* On a small screen the options fold away under a toggle, so the download bar stays short. */
@@ -222,14 +294,17 @@ function showFirstProblem() {
 /* Committed on blur or Enter, not per keystroke: a redraw replaces the input being typed in. */
 function rename(input) {
   const key = input.dataset.rename;
-  const item = shownBundle().find((b) => keyOf(b) === key);
+  const item = itemOf(key);
   // As typed: an invalid name is flagged with its reason rather than silently changed.
   const next = input.value.trim();
   if (!item || next === item.column) {
     if (item && input.value !== item.column) render();
     return;
   }
-  setSelection(shownBundle().map((b) => (keyOf(b) === key ? { ...b, column: next } : b)));
+  setSelection(
+    item.cohort,
+    selectionOf(item.cohort).map((b) => (cohortKeyOf(b) === key ? { ...b, column: next } : b)),
+  );
 }
 
 function setOption(change) {
@@ -269,24 +344,21 @@ async function loadTemplates() {
 
 async function download() {
   const { languages } = state.options;
-  if (!shownBundle().length || currentProblems().size || !languages.length) return;
+  if (!total() || currentProblems().size || !languages.length) return;
   const button = $("#basket-download");
   button.disabled = true;
   say("Packaging…");
   try {
     templates ??= await loadTemplates();
-    const dicts = {};
-    for (const file of new Set(shownBundle().map((b) => b.file))) {
-      dicts[file] = await loadDict(fetch, shownManifest().key, file, state.dictCache);
+    const projects = [];
+    for (const key of selectedCohorts()) {
+      const dicts = {};
+      for (const file of new Set(selectionOf(key).map((b) => b.file))) {
+        dicts[file] = await loadDict(fetch, key, file, state.dictCache);
+      }
+      projects.push({ selection: selectionOf(key), manifest: manifestOf(key), dicts });
     }
-    const { name, files } = buildProject(
-      shownBundle(),
-      shownManifest(),
-      dicts,
-      templates,
-      state.options,
-      today(),
-    );
+    const { name, files } = buildBundle(projects, templates, state.options, today());
     const blob = new Blob([zip(files)], { type: "application/zip" });
     const url = URL.createObjectURL(blob);
     const link = Object.assign(document.createElement("a"), { href: url, download: `${name}.zip` });
@@ -312,8 +384,8 @@ export function wireReview() {
   const detail = $("#basket-detail");
   detail.addEventListener("click", (e) => {
     const gone = e.target.closest("[data-remove]");
-    if (gone) return setSelection(remove(shownBundle(), gone.dataset.remove).selection);
-    if (e.target.closest("#basket-clear")) return setSelection([]);
+    if (gone) return removeSelected([gone.dataset.remove]);
+    if (e.target.closest("#basket-clear")) return clearSelection();
     if (e.target.closest("#basket-download")) return download();
     if (e.target.closest("#dl-show")) return showFirstProblem();
     if (e.target.closest("#dl-toggle")) {
@@ -323,11 +395,14 @@ export function wireReview() {
       return;
     }
     if (e.target.closest("#fix-dots")) {
-      return setSelection(fixDots(shownBundle(), shownManifest().identifier));
+      for (const key of selectedCohorts()) {
+        setSelection(key, fixDots(selectionOf(key), manifestOf(key).identifier));
+      }
+      return;
     }
     const file = e.target.closest("[data-file]");
     if (file) {
-      const m = shownManifest();
+      const m = manifestOf(file.dataset.cohort);
       filterToFile(
         m.key,
         m.files.findIndex((f) => f.name === file.dataset.file),

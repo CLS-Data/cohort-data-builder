@@ -461,3 +461,47 @@ export function buildProject(selection, manifest, dicts, templates, options, tod
   }
   return { name: project, files };
 }
+
+/**
+ * Build the download for one cohort or several (feature 007,
+ * specs/007-multi-cohort-search/contracts/multi-cohort-download.md).
+ * @param {{selection: object[], manifest: object, dicts: Object<string, object>}[]} projects
+ *   One per cohort with a selection, in catalogue order; each selection not empty.
+ * @param {Object<string, string>} templates The text of each file in site/templates/,
+ *   including `cohorts-README.md` when there are several cohorts.
+ * @param {{languages: ("r"|"python"|"stata")[], missingToNa: boolean, outputFormat: string}} options
+ *   The download options, the same for every cohort.
+ * @param {string} today The date, YYYY-MM-DD.
+ * @returns {{name: string, files: Array<[string, string]>}} With one cohort, exactly
+ *   {@link buildProject}'s result. With several, `cohorts-merge-<date>`: a README, then each
+ *   cohort's own project, unchanged, in a folder of its own.
+ */
+export function buildBundle(projects, templates, options, today) {
+  if (!projects.length) throw new Error("Nothing is selected.");
+  const own = projects.map((p) =>
+    buildProject(p.selection, p.manifest, p.dicts, templates, options, today),
+  );
+  if (projects.length === 1) return own[0];
+  const name = `cohorts-merge-${today}`;
+  const total = projects.reduce((a, p) => a + p.selection.length, 0);
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const cohorts = projects
+    .map(
+      (p, i) =>
+        `- **${p.manifest.name}** (${p.manifest.fullName}): ${plural(p.selection.length, "variable")}, in \`${own[i].name}/\``,
+    )
+    .join("\n");
+  const readme = fill(templates["cohorts-README.md"], {
+    created: today,
+    count: `${plural(total, "variable")} from ${projects.length} cohorts`,
+    cohorts,
+    languages: languagesSentence(options.languages),
+  });
+  return {
+    name,
+    files: [
+      [`${name}/README.md`, readme],
+      ...own.flatMap((p) => p.files.map(([path, text]) => [`${name}/${path}`, text])),
+    ],
+  };
+}

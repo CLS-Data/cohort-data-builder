@@ -3,6 +3,10 @@
 What the researcher receives (FR-019–FR-028). Behaviour matches `PoC/templates/` and
 `PoC/site/js/codegen.js`.
 
+A selection from several cohorts downloads as one zip holding this project once per
+cohort, unchanged, plus a top-level README: see
+[multi-cohort-download.md](../../007-multi-cohort-search/contracts/multi-cohort-download.md).
+
 ## Layout
 
 ```text

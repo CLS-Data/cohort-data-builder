@@ -65,6 +65,25 @@ export function problems(selection, identifier, format, languages = []) {
 }
 
 /**
+ * {@link problems} for every cohort's selection, each checked on its own: each cohort's
+ * download is a separate project, so the same column in two cohorts is no clash (feature
+ * 007, FR-019).
+ * @param {Map<string, object[]>} bundles Each cohort's selection, by cohort key.
+ * @param {Map<string, {identifier: string}>} manifests Each cohort's manifest, by key.
+ * @param {"csv"|"dta"|"sav"} format The chosen output file type.
+ * @param {string[]} [languages] The chosen code languages.
+ * @returns {Map<string, string>} `<cohort>:<file>:<name>` to the problem.
+ */
+export function problemsByCohort(bundles, manifests, format, languages = []) {
+  const out = new Map();
+  for (const [key, selection] of bundles) {
+    const found = problems(selection, manifests.get(key).identifier, format, languages);
+    for (const [k, msg] of found) out.set(`${key}:${k}`, msg);
+  }
+  return out;
+}
+
+/**
  * Make every column a Stata-safe name: anything but letters, digits and _ becomes _, and
  * a name that would then clash gets `_2`, `_3`… .
  * @param {object[]} selection The selection.

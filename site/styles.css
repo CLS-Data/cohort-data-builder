@@ -1132,6 +1132,14 @@ body.is-dragging-var .view-tab[data-view="basket"] {
 .vm-cohort { display: flex; align-items: center; gap: 4px; }
 .count-goto { font: inherit; }
 
+/* A cohort's heading in the selected panel and the Selection view. */
+.sel-coh + .sel-coh { margin-top: 14px; }
+.sel-coh-head {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+  margin: 8px 0 4px; font-size: 0.875rem; font-weight: 700; color: var(--ink);
+}
+.sel-off { font-size: 0.75rem; font-weight: 400; color: var(--ink-3); font-style: italic; }
+
 .picker {
   display: flex; align-items: center; gap: 8px;
   font-family: var(--mono); font-size: 0.6875rem;

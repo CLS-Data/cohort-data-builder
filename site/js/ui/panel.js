@@ -4,8 +4,12 @@
    A summary rather than the whole Selection view: a count, the variables grouped by sweep
    or by file, a filter for when there are hundreds, and the way on to review and download.
    Quick with thousands selected: a group draws its first GROUP_SHOWN rows until asked for
-   the rest, and a closed group draws none. */
+   the rest, and a closed group draws none.
 
+   With a selection from several cohorts, or from a cohort not being searched, the groups
+   sit under a heading per cohort (feature 007). */
+
+import { colourSlot } from "../core/cohorts.js";
 import { cohortKeyOf } from "../core/selection.js";
 import { capitalise, esc } from "../core/text.js";
 import { clearSelection, removeSelected, saveOptions } from "./selected.js";
@@ -39,6 +43,27 @@ function groupsOf(items) {
   }
   return [...groups].sort(([a], [b]) => (byFile ? a.localeCompare(b) : rank.get(a) - rank.get(b)));
 }
+
+/* Sweep or file groups, each known as `<cohort>|<group>` so two cohorts' "s1" stay apart. */
+function groupsHtml(key, items) {
+  return groupsOf(items)
+    .map(([name, rows]) => {
+      const g = `${key}|${name}`;
+      const open = !closed.has(g);
+      const shown = open ? (full.has(g) ? rows : rows.slice(0, GROUP_SHOWN)) : [];
+      return `<section class="sp-grp">
+      <button class="sp-grp-head" data-grp="${esc(g)}" aria-expanded="${open}">
+        <span class="sp-caret" aria-hidden="true">${open ? "▾" : "▸"}</span>
+        <span class="sp-grp-name">${esc(name)}</span>
+        <span class="sp-grp-n">${n(rows.length)}</span></button>
+      ${open ? `<ul class="sp-rows">${shown.map(rowHtml).join("")}</ul>` : ""}
+      ${open && shown.length < rows.length ? `<button class="link-btn sp-all" data-all="${esc(g)}">Show all ${n(rows.length)}</button>` : ""}
+    </section>`;
+    })
+    .join("");
+}
+
+const nameOf = (key) => state.catalogue.find((d) => d.key === key)?.name || key;
 
 function rowHtml(b) {
   const label = b.label || "no label";
@@ -85,18 +110,22 @@ export function renderPanel() {
     list.innerHTML = `<p class="sp-empty">None of the ${n(count)} match “${esc(filter.trim())}”.</p>`;
     return;
   }
-  list.innerHTML = groupsOf(items)
-    .map(([g, rows]) => {
-      const open = !closed.has(g);
-      const shown = open ? (full.has(g) ? rows : rows.slice(0, GROUP_SHOWN)) : [];
-      return `<section class="sp-grp">
-      <button class="sp-grp-head" data-grp="${esc(g)}" aria-expanded="${open}">
-        <span class="sp-caret" aria-hidden="true">${open ? "▾" : "▸"}</span>
-        <span class="sp-grp-name">${esc(g)}</span>
-        <span class="sp-grp-n">${n(rows.length)}</span></button>
-      ${open ? `<ul class="sp-rows">${shown.map(rowHtml).join("")}</ul>` : ""}
-      ${open && shown.length < rows.length ? `<button class="link-btn sp-all" data-all="${esc(g)}">Show all ${n(rows.length)}</button>` : ""}
-    </section>`;
+  const keys = [...new Set(selected.map((b) => b.cohort))];
+  const headed = keys.length > 1 || !state.chosen.includes(keys[0]);
+  if (!headed) {
+    list.innerHTML = groupsHtml(keys[0], items);
+    return;
+  }
+  const all = state.catalogue.map((d) => d.key);
+  list.innerHTML = keys
+    .map((key) => {
+      const mine = items.filter((b) => b.cohort === key);
+      if (!mine.length) return "";
+      const own = selected.filter((b) => b.cohort === key).length;
+      return `<section class="sel-coh" data-cohort="${esc(key)}">
+        <h3 class="sel-coh-head" data-coh="${colourSlot(key, all)}"><span class="coh-mark" aria-hidden="true"></span>${esc(nameOf(key))} (${n(own)})${
+          state.chosen.includes(key) ? "" : ` <span class="sel-off">not being searched</span>`
+        }</h3>${groupsHtml(key, mine)}</section>`;
     })
     .join("");
 }

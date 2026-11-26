@@ -18,7 +18,8 @@ project.
 
 ## Using it
 
-1. Choose a cohort. Search by any part of a variable's name or label, and narrow by sweep,
+1. Choose one cohort or several (the buttons in the header; the page address, e.g.
+   `#ncds+bcs70`, keeps the choice). Search by any part of a variable's name or label, and narrow by sweep,
    file, measurement level or topic. Open a variable with ▸ to see its value labels, missing
    codes, topics and the same question at other sweeps.
 2. Click variables to select them (Shift-click for a range). The selection is kept in your
@@ -30,7 +31,9 @@ project.
 4. Unzip, put the data files listed in its README into `data/` (any of `.tab`, `.csv`,
    `.dta`, `.sav`, in any subfolder), and run `R/merge.R`, `python/merge.py` or, in Stata 16
    or later, `do stata/merge.do` from the project folder (Stata writes `.dta` or `.csv`, not
-   `.sav`).
+   `.sav`). A selection from several cohorts downloads as one zip holding a folder per
+   cohort, each a complete project run on its own; the cohorts are not merged with each
+   other.
 
 **Larger text.** Every font size follows the browser's own text-size setting and zoom
 (Ctrl/Cmd +). The three **A** buttons in the header set normal, 125% or 150% text; the
