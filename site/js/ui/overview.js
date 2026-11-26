@@ -8,18 +8,31 @@
    domain or topic in the filter; the cells beside it are the same thing by sweep, and a
    cell narrows to that topic at that sweep. */
 
+import { colourSlot } from "../core/cohorts.js";
 import { esc } from "../core/text.js";
 import { schemeIndex, shade } from "../core/topics.js";
-import { manifestOf, state } from "./state.js";
+import { cohort, manifestOf, state } from "./state.js";
 
 const $ = (sel) => document.querySelector(sel);
 
 /** Write the line saying what the cohort is and how big it is. */
 export function renderAbout() {
-  const m = manifestOf(state.chosen[0]);
-  $("#ov-about").innerHTML =
-    `<strong>${esc(m.fullName)}</strong>${m.description ? ` — ${esc(m.description)}` : ""} ` +
-    `<span class="vm-dim">${m.counts.variables.toLocaleString("en-GB")} variables in ${m.counts.files} files.</span>`;
+  // One line per chosen cohort, from its manifest once loaded, else the catalogue.
+  const several = state.chosen.length > 1;
+  const keys = state.catalogue.map((d) => d.key);
+  $("#ov-about").innerHTML = state.chosen
+    .map((key) => {
+      const m = cohort(key)?.manifest || state.catalogue.find((d) => d.key === key);
+      const counts = m.counts || { variables: m.variables, files: m.files };
+      const mark = several
+        ? `<span class="coh-mark" data-coh="${colourSlot(key, keys)}" aria-hidden="true"></span>`
+        : "";
+      return (
+        `<span class="ov-about-line">${mark}<strong>${esc(m.fullName || m.name)}</strong>${m.description ? ` — ${esc(m.description)}` : ""} ` +
+        `<span class="vm-dim">${counts.variables.toLocaleString("en-GB")} variables in ${counts.files} files.</span></span>`
+      );
+    })
+    .join(several ? "<br>" : "");
 }
 
 /**

@@ -75,7 +75,7 @@ def test_unknown_keys_in_the_address_are_dropped(page, serve, mini_site):
 def test_the_last_chosen_cohort_stays_chosen(mini):
     only = coh(mini, "mini")
     expect(only).to_have_attribute("aria-disabled", "true")
-    only.click()
+    only.click(force=True)  # aria-disabled: Playwright would wait for it to be enabled
     expect(only).to_have_attribute("aria-pressed", "true")
     expect(mini.locator("#result-count")).to_have_text("16 variables")
     both(mini)

@@ -8,6 +8,7 @@
    {cohort, row}: the cohort's key and its index row; its key is listKey's
    `<cohort>:<fileIndex>:<name>`. */
 
+import { colourSlot } from "../core/cohorts.js";
 import { loadDict } from "../core/data.js";
 import { describeVariable } from "../core/details.js";
 import { PAGE, page, sameLabel, searchCohorts } from "../core/search.js";
@@ -53,6 +54,20 @@ const waveOf = (e) => manifestOf(e.cohort).wave.list[e.row[3]];
 const topicsOf = (key) => flatten(manifestOf(key).topics);
 const domainOf = (key, t) => manifestOf(key).topics.domains[topicsOf(key)[t].domain];
 const entryFor = (key) => state.list.find((e) => keyOf(e) === key);
+const several = () => state.chosen.length > 1;
+const catalogueEntry = (key) => state.catalogue.find((d) => d.key === key) || { name: key };
+const nameOf = (key) => catalogueEntry(key).name;
+const slotOf = (key) =>
+  colourSlot(
+    key,
+    state.catalogue.map((d) => d.key),
+  );
+const cohTag = (key) =>
+  `<span class="coh-tag" data-coh="${slotOf(key)}">${esc(nameOf(key))}</span>`;
+const variables = (count) => `${n(count)} variable${count === 1 ? "" : "s"}`;
+
+/** The event the list fires, with a cohort key as detail, when Retry is pressed. */
+export const RETRY_EVENT = "cohort-data-builder:retry";
 
 /* ── Searching ───────────────────────────────────────────────────────── */
 
@@ -154,16 +169,17 @@ function renderLevelSelect() {
 function renderFilters() {
   const chips = [];
   const w = state.waveFilter;
+  const named = (key, text) => (several() ? `${nameOf(key)} · ${text}` : text);
   if (w !== null) {
     const m = manifestOf(w.cohort);
     chips.push(
-      `<button class="chip" data-clear="wave" title="Show every ${esc(m.wave.term)}">${esc(m.wave.list[w.i].key)} ✕</button>`,
+      `<button class="chip" data-clear="wave" title="Show every ${esc(m.wave.term)}">${esc(named(w.cohort, m.wave.list[w.i].key))} ✕</button>`,
     );
   }
   const f = state.fileFilter;
   if (f !== null) {
     chips.push(
-      `<button class="chip" data-clear="file" title="Show every file">${esc(manifestOf(f.cohort).files[f.i].name)} ✕</button>`,
+      `<button class="chip" data-clear="file" title="Show every file">${esc(named(f.cohort, manifestOf(f.cohort).files[f.i].name))} ✕</button>`,
     );
   }
   const idx = schemeIndex(state.scheme);
@@ -186,8 +202,50 @@ function renderFilters() {
   }
   $("#active-filters").innerHTML = chips.join("");
   $("#clear-filters").hidden = !isFiltered();
-  const count = state.list.length;
-  $("#result-count").textContent = `${n(count)} variable${count === 1 ? "" : "s"}`;
+  // With several cohorts, a count per cohort, each a way to its group.
+  const total = variables(state.list.length);
+  $("#result-count").innerHTML = several()
+    ? `${total}${state.results
+        .map(
+          (r) =>
+            ` · <button class="link-btn count-goto" data-goto="${esc(r.cohort)}" title="Go to ${esc(nameOf(r.cohort))}">${esc(nameOf(r.cohort))} ${n(r.matches.length)}</button>`,
+        )
+        .join("")}`
+    : total;
+}
+
+/* What a filter on one cohort's sweep or file is called, for the other cohorts' headings. */
+function filterName() {
+  const w = state.waveFilter;
+  if (w) return `${nameOf(w.cohort)} · ${manifestOf(w.cohort).wave.list[w.i].key}`;
+  const f = state.fileFilter;
+  return f ? `${nameOf(f.cohort)} · ${manifestOf(f.cohort).files[f.i].name}` : "";
+}
+
+/* A chosen cohort's heading in the list: its mark, full name, and count or state. */
+function groupHtml(key) {
+  const c = cohort(key);
+  const name = catalogueEntry(key).fullName || nameOf(key);
+  let what;
+  if (!c || c.status === "loading")
+    what = `<span class="v-group-n">Loading ${esc(nameOf(key))}…</span>`;
+  else if (c.status === "failed") {
+    what = `<span class="v-group-n vm-warn">Could not load ${esc(nameOf(key))}.</span>
+      <button class="link-btn" data-retry="${esc(key)}">Retry</button>`;
+  } else {
+    const r = state.results.find((x) => x.cohort === key);
+    const count = r ? r.matches.length : 0;
+    if (r?.filteredElsewhere) {
+      what = `<span class="v-group-n">filtered to ${esc(filterName())}</span>
+        <button class="link-btn" data-clear-filter>Clear filter</button>`;
+    } else if (!count && r?.untagged && state.topicSel.length) {
+      what = `<span class="v-group-n">no topic tags</span>`;
+    } else {
+      what = `<span class="v-group-n">${count ? variables(count) : "no matches"}</span>`;
+    }
+  }
+  return `<li class="v-group" data-cohort="${esc(key)}" data-coh="${slotOf(key)}">
+    <span class="coh-mark" aria-hidden="true"></span><strong>${esc(name)}</strong> ${what}</li>`;
 }
 
 /* ── The list ────────────────────────────────────────────────────────── */
@@ -224,7 +282,7 @@ function rowHtml(e, i, q) {
       <button class="vrow-btn" data-i="${i}" ${attrs}>
         <span class="v-check" aria-hidden="true">${mark}</span>
         <span class="v-name" title="${esc(row[0])}">${highlight(row[0], q)}</span>
-        <span class="v-label" title="${esc(label)}">${highlight(label, q)}</span>
+        <span class="v-label" title="${esc(label)}">${several() ? `${cohTag(e.cohort)} ` : ""}${highlight(label, q)}</span>
         <span class="v-wave" title="${esc(wave.label || "")}">${esc(wave.key)}</span>
         <span class="v-file" title="${esc(file.description || file.name)}">${esc(file.name)}</span>
         <span class="v-topics">${tags}</span>
@@ -248,14 +306,32 @@ function sweepTerm() {
 export function renderResults() {
   const q = state.query.trim();
   const { rows, left, next } = page(state.list, state.shown);
-  if (!state.list.length) {
-    $("#results").innerHTML = `<li class="vempty">No variables match.
-      <button class="link-btn" data-clear-all>Clear the filters</button></li>`;
-  } else {
+  const head = `<li class="vhead" aria-hidden="true"><span></span><span>Variable</span><span>Label</span>
+         <span>${esc(sweepTerm())}</span><span class="v-file">File</span><span class="v-topics">${state.topics.length ? "Topics" : ""}</span><span></span></li>`;
+  if (several()) {
+    // A heading per chosen cohort, then its rows; a cohort whose rows start beyond those
+    // shown waits for "show more".
+    const parts = [head];
+    let start = 0;
+    for (const key of state.chosen) {
+      if (start >= rows.length && start > 0 && left > 0) break;
+      parts.push(groupHtml(key));
+      const count = state.results.find((r) => r.cohort === key)?.matches.length || 0;
+      for (let i = start; i < Math.min(start + count, rows.length); i++) {
+        parts.push(rowHtml(rows[i], i, q));
+      }
+      start += count;
+    }
+    $("#results").innerHTML = parts.join("");
+  } else if (!state.list.length) {
+    const c = cohort(state.chosen[0]);
     $("#results").innerHTML =
-      `<li class="vhead" aria-hidden="true"><span></span><span>Variable</span><span>Label</span>
-         <span>${esc(sweepTerm())}</span><span class="v-file">File</span><span class="v-topics">${state.topics.length ? "Topics" : ""}</span><span></span></li>` +
-      rows.map((e, i) => rowHtml(e, i, q)).join("");
+      c?.status === "ready"
+        ? `<li class="vempty">No variables match.
+      <button class="link-btn" data-clear-all>Clear the filters</button></li>`
+        : groupHtml(state.chosen[0]).replace('class="v-group"', 'class="v-group vempty"');
+  } else {
+    $("#results").innerHTML = head + rows.map((e, i) => rowHtml(e, i, q)).join("");
   }
   const more = $("#more");
   more.hidden = left <= 0;
@@ -377,7 +453,10 @@ function moreHtml(e) {
             : esc(f.name === "Position" ? `position ${f.value}` : f.value),
         )
         .join(" · ");
-  return `${valuesHtml(e, d)}
+  const whose = several()
+    ? `<p class="vm-note vm-cohort">${cohTag(e.cohort)} ${esc(catalogueEntry(e.cohort).fullName || nameOf(e.cohort))}</p>`
+    : "";
+  return `${whose}${valuesHtml(e, d)}
     ${topicsHtml(entry, e)}
     ${sameLabelHtml(e)}
     ${file.hasId ? "" : `<p class="vm-note vm-warn">This file has no ${esc(m.identifier)} column, so it cannot be merged.</p>`}
@@ -413,18 +492,22 @@ function selectableByCohort(entries) {
   return [...out].map(([key, rows]) => [key, selectableItems(rows, manifestOf(key))]);
 }
 
-/* Add or remove items, cohort by cohort; returns how many changed. */
+/* Add or remove items, cohort by cohort; returns how many changed, and per cohort. */
 function changeMany(groups, adding) {
   let changed = 0;
+  const per = [];
   for (const [key, items] of groups) {
     const r = adding
       ? addMany(selectionOf(key), items, manifestOf(key))
       : removeMany(selectionOf(key), items);
     changed += r.changed;
+    if (r.changed) per.push(`${nameOf(key)} ${n(r.changed)}`);
     setSelection(key, r.selection);
   }
+  lastPer = per.length > 1 ? ` (${per.join(" · ")})` : "";
   return changed;
 }
+let lastPer = ""; // the per-cohort numbers of the last changeMany, for sayCount
 
 function renderSelectAll() {
   const btn = $("#select-all");
@@ -445,7 +528,7 @@ function sayCount(change) {
   const el = $("#select-status");
   const m = Math.abs(change);
   el.textContent = change
-    ? `${change > 0 ? "Added" : "Removed"} ${n(m)} variable${m === 1 ? "" : "s"}`
+    ? `${change > 0 ? "Added" : "Removed"} ${n(m)} variable${m === 1 ? "" : "s"}${lastPer}`
     : "";
   clearTimeout(sayTimer);
   sayTimer = setTimeout(() => {
@@ -548,6 +631,22 @@ async function jumpTo(key) {
     ?.scrollIntoView({ block: "nearest" });
 }
 
+/* Scroll to a cohort's heading, showing rows up to it first if need be. */
+function goToGroup(key) {
+  let start = 0;
+  for (const r of state.results) {
+    if (r.cohort === key) break;
+    start += r.matches.length;
+  }
+  if (start >= state.shown) {
+    state.shown = start + PAGE;
+    renderResults();
+  }
+  document
+    .querySelector(`#results .v-group[data-cohort="${CSS.escape(key)}"]`)
+    ?.scrollIntoView({ block: "start" });
+}
+
 /**
  * Show every variable in one file.
  * @param {string} key The cohort.
@@ -631,10 +730,23 @@ export function wireResults() {
       return;
     }
     if (e.target.closest("[data-clear-all]")) return clearAll();
+    if (e.target.closest("[data-clear-filter]")) {
+      Object.assign(state, { waveFilter: null, fileFilter: null });
+      return runSearch();
+    }
+    const retry = e.target.closest("[data-retry]");
+    if (retry) {
+      document.dispatchEvent(new CustomEvent(RETRY_EVENT, { detail: retry.dataset.retry }));
+      return;
+    }
     const btn = e.target.closest(".vrow-btn");
     if (btn) selectRow(btn, e);
   });
   $("#select-all").addEventListener("click", selectAll);
+  $("#result-count").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-goto]");
+    if (b) goToGroup(b.dataset.goto);
+  });
   wireDrag();
 
   $("#more").addEventListener("click", (e) => {

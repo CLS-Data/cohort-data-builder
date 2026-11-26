@@ -1,17 +1,32 @@
-/* Starting the page: loading the catalogue, choosing and opening a cohort, the theme.
+/* Starting the page: loading the catalogue, choosing and loading cohorts, the theme.
 
-   The cohort in view is named in the URL hash (#bcs70), so a link can point at one. */
+   The chosen cohorts are named in the URL hash (#ncds+bcs70), so a link can point at them
+   (contracts/cohort-choice.md); a single key (#bcs70) is the address of earlier versions. */
 
+import {
+  chooseInitial,
+  colourSlot,
+  formatChoice,
+  parseChoice,
+  toggleChoice,
+} from "../core/cohorts.js";
 import { loadCatalogue, loadCohort } from "../core/data.js";
 import { buildLabelIndex } from "../core/search.js";
 import { read, storeKey, write } from "../core/storage.js";
 import { esc } from "../core/text.js";
 import { renderAbout } from "./overview.js";
 import { renderPanel, wirePanel } from "./panel.js";
-import { mergeChosen, refreshSelection, resetFilters, runSearch, wireResults } from "./results.js";
+import {
+  mergeChosen,
+  RETRY_EVENT,
+  refreshSelection,
+  resetFilters,
+  runSearch,
+  wireResults,
+} from "./results.js";
 import { wireReview } from "./review.js";
 import { onSelectionChange, restoreOptions, restoreSelection, storage } from "./selected.js";
-import { manifestOf, state } from "./state.js";
+import { state } from "./state.js";
 import { wireSuggest } from "./suggest.js";
 import { switchView } from "./views.js";
 
@@ -24,59 +39,101 @@ function fail(message, detail) {
     `<p>${esc(detail)}</p><p>Try reloading the page.</p></div>`;
 }
 
-/** The cohort to open: the one in the hash, else the last one used, else the first. */
-function chooseCohort() {
-  const keys = state.catalogue.map((d) => d.key);
-  const fromHash = decodeURIComponent(location.hash.slice(1));
-  if (keys.includes(fromHash)) return fromHash;
-  const last = read(storage, storeKey("cohort"), null);
-  return keys.includes(last) ? last : keys[0];
+const keys = () => state.catalogue.map((d) => d.key);
+const entry = (key) => state.catalogue.find((d) => d.key === key);
+const n = (x) => x.toLocaleString("en-GB");
+
+/* The header's toggle buttons, one per catalogue cohort; drawn once, updated after. */
+function drawPicker() {
+  const all = keys();
+  $("#cohorts").innerHTML = state.catalogue
+    .map(
+      (d) => `<button type="button" data-cohort="${esc(d.key)}" data-coh="${colourSlot(d.key, all)}"
+        aria-pressed="false" title="${esc(d.fullName || d.name)}"><span class="coh-mark" aria-hidden="true"></span>${esc(d.name)}</button>`,
+    )
+    .join("");
 }
 
-/* Load a cohort into state.cohorts, once. */
+function updatePicker() {
+  const only = state.chosen.length === 1;
+  for (const b of document.querySelectorAll("#cohorts button")) {
+    const key = b.dataset.cohort;
+    const on = state.chosen.includes(key);
+    b.setAttribute("aria-pressed", String(on));
+    const last = on && only;
+    if (last) b.setAttribute("aria-disabled", "true");
+    else b.removeAttribute("aria-disabled");
+    b.title = last ? "At least one cohort stays chosen" : entry(key).fullName || entry(key).name;
+    if (state.cohorts.get(key)?.status === "loading") b.setAttribute("aria-busy", "true");
+    else b.removeAttribute("aria-busy");
+  }
+}
+
+/* Title, subtitle and footer name the chosen cohorts (contracts/cohort-choice.md). */
+function showNames() {
+  const chosen = state.chosen.map(entry);
+  if (chosen.length === 1) {
+    const c = state.cohorts.get(chosen[0].key);
+    const m = c?.status === "ready" ? c.manifest : null;
+    document.title = `${chosen[0].name} · Cohort Data Builder`;
+    $("#mark-sub").textContent = chosen[0].fullName || chosen[0].name;
+    $("#foot-counts").textContent = m
+      ? `${n(m.counts.variables)} variables · ${m.counts.files} files · ` +
+        `${m.wave.list.length} ${m.wave.plural} · built ${m.built}`
+      : "—";
+    return;
+  }
+  const names = chosen.map((d) => d.name).join(" + ");
+  document.title = `${names} · Cohort Data Builder`;
+  $("#mark-sub").textContent = names;
+  const sum = (f) => chosen.reduce((a, d) => a + (d[f] || 0), 0);
+  $("#foot-counts").textContent =
+    `${n(sum("variables"))} variables · ${n(sum("files"))} files · ${chosen.length} cohorts`;
+}
+
+/* Everything that shows the chosen cohorts, drawn again. */
+function refresh() {
+  mergeChosen();
+  updatePicker();
+  showNames();
+  renderAbout();
+  runSearch();
+  renderPanel();
+}
+
+/* Load a cohort into state.cohorts, once; a failed one is tried again. */
 async function load(key) {
   const have = state.cohorts.get(key);
-  if (have?.status === "ready") return;
+  if (have?.status === "ready" || have?.status === "loading") return;
   state.cohorts.set(key, { status: "loading" });
+  updatePicker();
   try {
     const { manifest, vars } = await loadCohort(fetch, key);
     state.cohorts.set(key, { status: "ready", manifest, vars, labelIndex: buildLabelIndex(vars) });
+    restoreSelection(key);
   } catch (err) {
     state.cohorts.set(key, { status: "failed", error: err.message });
-    throw err;
   }
+  if (state.chosen.includes(key)) refresh();
 }
 
-/** Load a cohort and show its name and counts. */
-async function openCohort(key) {
-  if (state.chosen.length === 1 && state.chosen[0] === key) return;
-  const picker = $("#dataset");
-  picker.value = key;
-  picker.disabled = true;
-  try {
-    await load(key);
-  } catch (err) {
-    fail(`Could not load the ${key} data.`, err.message);
-    return;
-  } finally {
-    picker.disabled = false;
+/**
+ * Choose these cohorts: remember the choice, drop filters on cohorts no longer chosen,
+ * and load the ones not loaded yet.
+ * @param {string[]} next The keys, in catalogue order; not empty.
+ */
+async function choose(next) {
+  if (!next.length || formatChoice(next, keys()) === formatChoice(state.chosen, keys())) return;
+  state.chosen = next;
+  for (const f of ["waveFilter", "fileFilter"]) {
+    if (state[f] && !next.includes(state[f].cohort)) state[f] = null;
   }
-  state.chosen = [key];
-  if (location.hash.slice(1) !== key) history.replaceState(null, "", `#${key}`);
-  write(storage, storeKey("cohort"), key);
-
-  const m = manifestOf(key);
-  document.title = `${m.name} · Cohort Data Builder`;
-  $("#mark-sub").textContent = m.fullName;
-  $("#foot-counts").textContent =
-    `${m.counts.variables.toLocaleString("en-GB")} variables · ${m.counts.files} files · ` +
-    `${m.wave.list.length} ${m.wave.plural} · built ${m.built}`;
-
-  resetFilters();
-  mergeChosen();
-  renderAbout();
-  runSearch();
-  restoreSelection(key);
+  const hash = formatChoice(next, keys());
+  if (decodeURIComponent(location.hash.slice(1)) !== hash)
+    history.replaceState(null, "", `#${hash}`);
+  write(storage, storeKey("cohorts"), next);
+  refresh();
+  await Promise.all(next.map(load));
 }
 
 /** Restore the stored theme and make the theme button switch it. */
@@ -129,10 +186,13 @@ async function boot() {
     fail("Could not load the site data.", "No cohorts are listed in data/datasets.json.");
     return;
   }
-  $("#dataset").innerHTML = state.catalogue
-    .map((d) => `<option value="${esc(d.key)}">${esc(d.name)}</option>`)
-    .join("");
-  $("#dataset").addEventListener("change", (e) => openCohort(e.target.value));
+  drawPicker();
+  $("#cohorts").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-cohort]");
+    if (b) choose(toggleChoice(state.chosen, b.dataset.cohort, keys()));
+  });
+  // A Retry button in the list (results.js) for a cohort that failed to load.
+  document.addEventListener(RETRY_EVENT, (e) => load(e.detail));
   for (const tab of document.querySelectorAll(".view-tab")) {
     tab.addEventListener("click", () => switchView(tab.dataset.view));
   }
@@ -145,11 +205,16 @@ async function boot() {
     renderPanel();
     refreshSelection();
   });
-  window.addEventListener("hashchange", () => {
-    const key = decodeURIComponent(location.hash.slice(1));
-    if (state.catalogue.some((d) => d.key === key)) openCohort(key);
-  });
-  await openCohort(chooseCohort());
+  window.addEventListener("hashchange", () => choose(parseChoice(location.hash, keys())));
+  resetFilters();
+  await choose(
+    chooseInitial({
+      hash: location.hash,
+      stored: read(storage, storeKey("cohorts"), null),
+      storedOld: read(storage, storeKey("cohort"), null),
+      keys: keys(),
+    }),
+  );
 }
 
 boot();

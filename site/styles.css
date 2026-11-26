@@ -1083,6 +1083,30 @@ body.is-dragging-var .view-tab[data-view="basket"] {
 
 /* ── Dataset picker ───────────────────────────────────────────────── */
 
+/* The cohorts being searched: one toggle per cohort (feature 007). Wraps at phone width. */
+.cohorts { display: flex; flex-wrap: wrap; gap: 4px; }
+.cohorts button {
+  display: inline-flex; align-items: center;
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  padding: 4px 8px; border: 1px solid var(--rule); border-radius: 2px;
+  background: var(--paper); color: var(--ink-3); cursor: pointer;
+}
+.cohorts button:hover { color: var(--ink); background: var(--paper-3); }
+.cohorts button[aria-pressed="true"] { color: var(--ink); border-color: var(--coh, var(--rule)); background: var(--paper-2); }
+.cohorts button[aria-pressed="false"] .coh-mark { opacity: .35; }
+.cohorts button[aria-disabled="true"] { cursor: default; }
+.cohorts button[aria-busy="true"] { cursor: progress; opacity: .7; }
+
+/* A cohort's heading in the result list, with several cohorts chosen. */
+.v-group {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px;
+  padding: 14px 0 6px; border-bottom: 1px solid var(--rule);
+}
+.v-group .coh-mark { align-self: center; }
+.v-group-n { color: var(--ink-2); font-size: 0.8125rem; }
+.vm-cohort { display: flex; align-items: center; gap: 4px; }
+.count-goto { font: inherit; }
+
 .picker {
   display: flex; align-items: center; gap: 8px;
   font-family: var(--mono); font-size: 0.6875rem;
