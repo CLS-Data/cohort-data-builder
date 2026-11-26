@@ -1,5 +1,8 @@
 """The site is usable at phone width (FR-035)."""
 
+import json
+import shutil
+
 import pytest
 from playwright.sync_api import expect
 
@@ -61,3 +64,31 @@ def test_selection_view_fits_and_downloads(phone):
     no_sideways_scroll(phone)
     with phone.expect_download():
         button.click()
+
+
+@pytest.fixture
+def four_cohort_site(mini_site):
+    """The fixture site with a fourth fictional cohort: a copy of the first under a new key."""
+    data = mini_site / "data"
+    catalogue = json.loads((data / "datasets.json").read_text())
+    first = catalogue["datasets"][0]
+    shutil.copytree(data / first["key"], data / "mini4")
+    catalogue["datasets"].append({**first, "key": "mini4", "name": "Mini4"})
+    (data / "datasets.json").write_text(json.dumps(catalogue))
+    return mini_site
+
+
+@pytest.mark.parametrize("text", ["Normal text", "Larger text", "Largest text"])
+def test_four_cohorts_wrap_in_the_header_at_phone_width(page, serve, four_cohort_site, text):
+    page.set_viewport_size({"width": 390, "height": 812})
+    page.goto(serve(four_cohort_site))
+    buttons = page.locator(".cohorts button")
+    expect(buttons).to_have_count(4)
+    page.get_by_role("group", name="Text size").get_by_role("button", name=text).click()
+    for i in range(1, 4):
+        buttons.nth(i).click()
+    expect(page.locator("#results .v-group")).to_have_count(4)
+    assert page.evaluate("document.documentElement.scrollWidth") <= 390
+    for i in range(4):
+        box = buttons.nth(i).bounding_box()
+        assert box["x"] >= 0 and box["x"] + box["width"] <= 390.5, box
