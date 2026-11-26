@@ -204,9 +204,9 @@ Download step shows a `cohorts-merge-…/` tree.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T050 [P] `tests/python/e2e/test_performance.py`: with every fixture cohort chosen and the `mini` index replicated to ~115,000 rows in a temp site, a new search redraws in under 1 s; adding a cohort shows its rows in under 3 s on the local server (SC-002, SC-003).
-- [ ] T051 [P] `tests/python/e2e/test_responsive.py` and `test_text_size.py`: header cohort group wraps without sideways scroll at 390px with four cohorts (add two more fictional catalogue entries in a temp copy) at every text size.
-- [ ] T052 [P] Update `README.md` (what the site does: several cohorts; colours; download layout), `CLAUDE.md` (one line naming feature 007 and its spec folder) and JSDoc of every touched export; check `docs/data-format.md` mentions sweep ages.
+- [X] T050 [P] `tests/python/e2e/test_performance.py`: with every fixture cohort chosen and the `mini` index replicated to ~115,000 rows in a temp site, a new search redraws in under 1 s; adding a cohort shows its rows in under 3 s on the local server (SC-002, SC-003).
+- [X] T051 [P] `tests/python/e2e/test_responsive.py` and `test_text_size.py`: header cohort group wraps without sideways scroll at 390px with four cohorts (add two more fictional catalogue entries in a temp copy) at every text size.
+- [X] T052 [P] Update `README.md` (what the site does: several cohorts; colours; download layout), `CLAUDE.md` (one line naming feature 007 and its spec folder) and JSDoc of every touched export; check `docs/data-format.md` mentions sweep ages.
 - [ ] T053 Run `specs/007-multi-cohort-search/quickstart.md` §1 and §2 by hand on the real site (the user, since `site/data/` is closed to the assistant) and record results in the final PR's "How to review".
 - [ ] T054 Merge-readiness: full `uv run pytest`, `npm test`, `npm run lint`, `uv run ruff check . && uv run ruff format --check .`; open the PR from `007-multi-cohort-search` to `main` (do not merge).
 

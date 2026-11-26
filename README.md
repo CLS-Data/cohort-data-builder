@@ -4,9 +4,11 @@ Search the variables of UK longitudinal cohort studies, pick the ones you need, 
 a small R, Python and/or Stata project that merges them from your own copy of the data into one
 file, one row per participant.
 
-It starts with the 1970 British Cohort Study (BCS70, 32,452 variables) and Next Steps
-(11,430). It is a static site on GitHub Pages: everything runs in your browser, with no
-accounts and no server.
+It covers the National Child Development Study (NCDS), the 1970 British Cohort Study
+(BCS70), Next Steps and the Millennium Cohort Study (MCS), searched one at a time or several
+together: each cohort keeps its own colour, the overview lines their sweeps up by age, and a
+selection from several cohorts downloads as one zip with a project per cohort. It is a
+static site on GitHub Pages: everything runs in your browser, with no accounts and no server.
 
 **The site and the download contain no study data.** They hold only the published data
 dictionaries: names, labels, value labels, missing codes and topics. You get the data itself

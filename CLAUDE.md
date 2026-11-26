@@ -11,7 +11,9 @@ Feature 002 (`specs/002-topic-tagger/`) adds the topic tagger: a standalone Pyth
 `tools/topic-tagger/`, its own project that imports nothing outside its folder and is imported
 by nothing outside it, and `scripts/topics.py`, which exports cohorts for it and merges the
 tags back into `site/data`. The tagger can also be used from Python
-(`from topic_tagger import tag`; feature 006, `specs/006-tagger-api/`).
+(`from topic_tagger import tag`; feature 006, `specs/006-tagger-api/`). Feature 007
+(`specs/007-multi-cohort-search/`) lets several cohorts be searched, selected and downloaded
+together.
 
 ## Commands
 
