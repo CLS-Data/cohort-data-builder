@@ -34,6 +34,13 @@ So key parsing gives nothing for the real data: every sweep except `xwave` needs
 axis (user story 2) is useful. Until then each cohort's sweeps all fall in "age not known"
 columns. `xwave` keeps no age by design.
 
+**Where the ages are**: the CLS studies metadata gives each sweep a `sweep-year-age` text
+(`Sweep6.1 - 2002/04 - 44/45 years old`), which the (uncommitted) build turned into the
+sweep labels (`Sweep 6.1: age 44/45, 2002/04`). `scripts/sweep_ages.py` (T002a) reads the
+age back out of the label and writes `age`/`ageRange` into the manifest, so the age is in
+the data, as decided above, not parsed by the site. Better still, the build should write
+`age` from that column directly once its source is in the repository.
+
 ## R2. The shared age axis: ordinal columns, not a linear scale
 
 **Decision**: The axis is the sorted union of the distinct ages of every chosen cohort's

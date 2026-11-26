@@ -17,7 +17,15 @@ uv run python -c "import json,pathlib; [print(p.parent.name, [(w['key'], w.get('
 ```
 
 Keys of the form `14y` or `9m` need nothing; any other key needs `age` added
-([contracts/sweep-ages.md](contracts/sweep-ages.md)).
+([contracts/sweep-ages.md](contracts/sweep-ages.md)). The real cohorts' keys are not
+age-shaped (research R1), but their labels carry the CLS metadata's age text, so:
+
+```sh
+uv run python scripts/sweep_ages.py site/data/bcs70 site/data/mcs site/data/ncds site/data/next_steps
+# check the ages it lists, then the same again with --write
+```
+
+It lists the sweeps whose label gives no age; add `age` to those by hand.
 
 ## 1. Automated checks
 
