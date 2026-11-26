@@ -58,7 +58,7 @@ export function renderAbout() {
         ? `<span class="coh-mark" data-coh="${colourSlot(key, keys)}" aria-hidden="true"></span>`
         : "";
       return (
-        `<span class="ov-about-line">${mark}<strong>${esc(m.fullName || m.name)}</strong>${m.description ? ` — ${esc(m.description)}` : ""} ` +
+        `<span class="ov-about-line" data-cohort="${esc(key)}">${mark}<strong>${esc(m.fullName || m.name)}</strong>${m.description ? ` — ${esc(m.description)}` : ""} ` +
         `<span class="vm-dim">${counts.variables.toLocaleString("en-GB")} variables in ${counts.files} file${counts.files === 1 ? "" : "s"}.</span></span>`
       );
     })

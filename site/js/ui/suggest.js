@@ -82,7 +82,8 @@ function filter(q) {
  */
 export function openSuggest(entry, file, manifest, opener) {
   open = { entry, file, manifest, opener };
-  $("#tag-dialog-title").textContent = `Suggest tags for ${entry.variable}`;
+  // The cohort's name too: the same variable name can be in several cohorts.
+  $("#tag-dialog-title").textContent = `Suggest tags for ${entry.variable} (${manifest.name})`;
   $("#tag-filter").value = "";
   $("#tag-why").value = "";
   renderList(entry, manifest);

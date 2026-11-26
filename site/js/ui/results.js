@@ -168,16 +168,21 @@ function renderFilters() {
   const chips = [];
   const w = state.waveFilter;
   const named = (key, text) => (several() ? `${nameOf(key)} · ${text}` : text);
+  // With several cohorts a sweep or file chip carries its cohort's mark, beside its name.
+  const chipAttrs = (key) =>
+    several()
+      ? ` data-cohort="${esc(key)}" data-coh="${slotOf(key)}"><span class="coh-mark" aria-hidden="true"></span`
+      : "";
   if (w !== null) {
     const m = manifestOf(w.cohort);
     chips.push(
-      `<button class="chip" data-clear="wave" title="Show every ${esc(m.wave.term)}">${esc(named(w.cohort, m.wave.list[w.i].key))} ✕</button>`,
+      `<button class="chip" data-clear="wave" title="Show every ${esc(m.wave.term)}"${chipAttrs(w.cohort)}>${esc(named(w.cohort, m.wave.list[w.i].key))} ✕</button>`,
     );
   }
   const f = state.fileFilter;
   if (f !== null) {
     chips.push(
-      `<button class="chip" data-clear="file" title="Show every file">${esc(named(f.cohort, manifestOf(f.cohort).files[f.i].name))} ✕</button>`,
+      `<button class="chip" data-clear="file" title="Show every file"${chipAttrs(f.cohort)}>${esc(named(f.cohort, manifestOf(f.cohort).files[f.i].name))} ✕</button>`,
     );
   }
   const idx = schemeIndex(state.scheme);
@@ -275,7 +280,7 @@ function rowHtml(e, i, q) {
     })
     .join("");
   const stripe = ts.length ? ` data-domain="${esc(domainOf(e.cohort, ts[0][0]).id)}"` : "";
-  return `<li class="vrow${open ? " is-open" : ""}${isIn ? " is-in" : ""}${why ? " is-fixed" : ""}" data-key="${esc(key)}"${stripe}>
+  return `<li class="vrow${open ? " is-open" : ""}${isIn ? " is-in" : ""}${why ? " is-fixed" : ""}" data-key="${esc(key)}" data-cohort="${esc(e.cohort)}"${stripe}>
     <div class="vrow-main">
       <button class="vrow-btn" data-i="${i}" ${attrs}>
         <span class="v-check" aria-hidden="true">${mark}</span>
