@@ -27,7 +27,7 @@ site/data/
 { "key": "next_steps", "name": "Next Steps", "fullName": "…", "description": "…",
   "identifier": "NSID", "ukdsUrl": "https://…", "built": "YYYY-MM-DD",
   "wave": { "term": "sweep", "plural": "sweeps",
-            "list": [ { "key": "14y", "label": "Sweep 1, 2004" } ] },
+            "list": [ { "key": "14y", "label": "Sweep 1, 2004", "age": 14, "ageRange": [13, 14] } ] },
   "levels": ["NOMINAL", "ORDINAL", "SCALE"],
   "files": [ { "name": "wave_one_…", "wave": "14y", "study": "5545",
                "description": "…", "hasId": true } ],
@@ -38,6 +38,12 @@ site/data/
 ```
 
 `topics` is omitted when the cohort has no tags; the site then hides topic features.
+
+A sweep's `age` (optional, feature 007) is the cohort members' typical age in years at it,
+months as a fraction (9 months = 0.75); `ageRange` (optional) is `[min, max]` when the sweep
+spanned ages. Without `age` the site reads the key when it is `<n>y` or `<n>m`; otherwise
+the sweep is drawn as "age not known". They line several cohorts' sweeps up by age
+(see `specs/007-multi-cohort-search/contracts/sweep-ages.md`).
 
 ## `data/<key>/index.json`
 
@@ -84,7 +90,7 @@ as `<path>[: <location>]: <message>`, all problems at once.
 |---|---|
 | D1 | Every file is valid UTF-8 JSON of the shape above; required fields present with the right types. |
 | D2 | `datasets.json` keys are unique, match `^[a-z][a-z0-9_]*$`, and each has `<key>/manifest.json` and `<key>/index.json`; its `variables`/`files` counts match the manifest. |
-| D3 | Manifest: `key` matches its folder; sweep keys unique and non-empty; file names unique and match `^[A-Za-z0-9][A-Za-z0-9_.\-]*$`; each file's `wave` is a declared sweep; `counts` match `index.json` and `files`. |
+| D3 | Manifest: `key` matches its folder; sweep keys unique and non-empty; file names unique and match `^[A-Za-z0-9][A-Za-z0-9_.\-]*$`; each file's `wave` is a declared sweep; `counts` match `index.json` and `files`. Sweep `age`, if given, is 0–120; `ageRange` is `[min ≤ max]` containing `age`; ages increase in list order. A sweep with no age and no age-shaped key is a warning only. |
 | D4 | Index rows: name non-empty; file, sweep and level indices in range (level may be -1); topic list of even length, topic indices in range, percents 0–100. |
 | D5 | Every manifest file has `dict/<file>.json` whose `file` matches and `wave` matches the manifest; every index row's variable exists in that file's dictionary; variable names unique per file ignoring case. |
 | D6 | `values`, when present, has entries with `value` and `label` strings. `na`, when present, has `values` (numbers) and `ranges` (pairs, `lo ≤ hi` where both non-null); `kept`/`lossy` are optional, and when present are lists of `[code, label]` pairs. |
