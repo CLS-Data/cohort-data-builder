@@ -304,3 +304,20 @@ test("topics are matched by id even where their index differs between schemes", 
   assert.equal(vaping[0].untagged, false);
   assert.deepEqual(names(vaping[1].matches), ["vape11"]);
 });
+
+test("an age filter takes each cohort's sweep at that age; a cohort without one has none", async () => {
+  const cs = await cohorts("mini", "mini2");
+  const atAge = searchCohorts(cs, {
+    ...any,
+    wave: { col: 5, label: "?", sweeps: { mini: 2, mini2: 3 } },
+  });
+  assert.deepEqual(
+    atAge[0].perWave,
+    filterVariables(cs[0].vars, cs[0].manifest, { ...any, wave: 2 }).perWave,
+  );
+  assert.ok(atAge[1].matches.length > 0);
+  const only = searchCohorts(cs, { ...any, wave: { col: 2, label: "7", sweeps: { mini2: 1 } } });
+  assert.deepEqual(names(only[1].matches), ["CID", "sex", "read7"]);
+  assert.equal(only[0].matches.length, 0);
+  assert.equal(only[0].filteredElsewhere, true);
+});
