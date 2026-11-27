@@ -30,3 +30,4 @@ test-results/
 
 # Ad hoc development work and local data: never committed
 /adhoc/
+!/adhoc/tiered/big/report.html
